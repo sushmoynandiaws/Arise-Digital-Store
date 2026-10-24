@@ -5,7 +5,7 @@
       "root": ".",
       "runtime": "rust",
       "entrypoint": "api/app.rs",
-      "devCommand": "cargo run --locked --bin arise-digital-store"
+      "devCommand": "cargo run --locked --bin marketplace-api"
     },
     "web": {
       "root": "web",

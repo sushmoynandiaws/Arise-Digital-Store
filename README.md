@@ -74,7 +74,7 @@ AriseSell needs its existing Redis service for single-use authorization codes. S
 
 Signed-in purchases require that same authenticated AriseSell account, including when returning from another browser. A guest cookie alone cannot open an account-associated purchase after logout. The purchase-history sign-in button returns directly to purchase history.
 
-For a single-instance standalone deployment, run `docker compose up --build -d` and place it behind an HTTPS reverse proxy matching `PUBLIC_ORIGIN`. Back up the marketplace data volume and protect its encryption key. For Vercel multi-service deployment, follow [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md); serverless instances require shared PostgreSQL metadata storage. The Dockerfile has not been built on this machine; the local WSL build is the verified standalone runtime.
+For a single-instance standalone deployment, set `PUBLIC_ORIGIN` to the HTTPS domain serving this container, then run `docker compose up --build -d` and place it behind an HTTPS reverse proxy. An Nginx example is in [`deploy/nginx/store-api.conf.example`](deploy/nginx/store-api.conf.example). Replace `store-api.yourdomain.com` with your real domain before enabling it, point DNS to the VPS, and run `sudo certbot --nginx -d your-real-domain` to enable HTTPS. Set AriseSell's `MARKETPLACE_REDIRECT_URI` to `https://your-real-domain/api/auth/callback` so it exactly matches `PUBLIC_ORIGIN`. Back up the marketplace data volume and protect its encryption key. For Vercel multi-service deployment, follow [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md); serverless instances require shared PostgreSQL metadata storage. The Dockerfile has not been built on this machine; the local WSL build is the verified standalone runtime.
 
 ## Tests
 
