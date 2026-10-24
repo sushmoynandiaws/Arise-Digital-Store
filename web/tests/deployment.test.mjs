@@ -6,7 +6,7 @@ const config=JSON.parse(readFileSync(new URL('../../vercel.json',import.meta.url
 test('services route API, callback and health to Rust; storefront and assets to Vite',()=>{
   const target=path=>config.rewrites.find(rule=>new RegExp(`^${rule.source}$`).test(path))?.destination;
   for(const path of ['/api','/api/catalog','/api/auth/callback','/api/orders/id/reveal','/health'])assert.deepEqual(target(path),{service:'app'});
-  for(const path of ['/','/shops/studio-north','/products/id','/purchases/id','/assets/app.js'])assert.deepEqual(target(path),{service:'web'});
+  for(const path of ['/','/shops/studio-north','/shops/studio-north/products/design-kit','/products/id','/purchases/id','/assets/app.js'])assert.deepEqual(target(path),{service:'web'});
   assert.equal(config.rewrites.at(-1).source,'/(.*)');
 });
 test('runtime/build settings belong to services and entrypoints exist',()=>{

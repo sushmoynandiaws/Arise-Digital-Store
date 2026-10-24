@@ -64,6 +64,7 @@ import {
   deliveryLabel,
 } from "./api";
 import type { Catalog, Shop, Product, Session, Quote, Purchase } from "./types";
+import { productForRoute, productPath } from "./product";
 
 type Market = {
   catalog: Catalog | null;
@@ -78,7 +79,8 @@ const useMarket = () => useContext(Context);
 function useRouteShop() {
   const { catalog } = useMarket();
   const { pathname } = useLocation();
-  const shopSlug = matchPath("/shops/:slug", pathname)?.params.slug;
+  const shopSlug = matchPath("/shops/:slug", pathname)?.params.slug ||
+    matchPath("/shops/:slug/products/:productSlug", pathname)?.params.slug;
   if (shopSlug)
     return catalog?.shops.find(
       (shop) => shop.slug === shopSlug || shop.id === shopSlug,
@@ -393,7 +395,7 @@ function ProductCard({ product }: { product: Product }) {
   return (
     <article className="product-card">
       <Link
-        to={`/products/${product.id}`}
+        to={productPath(product, catalog!)}
         className="product-art-link"
         aria-label={`View ${product.name}`}
       >
@@ -410,7 +412,7 @@ function ProductCard({ product }: { product: Product }) {
           <span className="tiny-avatar">{shop?.name.slice(0, 1) || "S"}</span>
           {shop?.name || "Independent shop"}
         </Link>
-        <Link to={`/products/${product.id}`} className="product-title">
+        <Link to={productPath(product, catalog!)} className="product-title">
           {product.name}
         </Link>
         <div className="product-meta">
@@ -437,7 +439,7 @@ function ProductCard({ product }: { product: Product }) {
           </span>
           <Link
             className="card-buy"
-            to={`/products/${product.id}`}
+            to={productPath(product, catalog!)}
             aria-label={`View ${product.name}`}
           >
             <ArrowUpRight size={18} />
@@ -1000,14 +1002,24 @@ function supportHref(value: string) {
       : "#seller-support";
 }
 function ProductPage() {
-  const { id } = useParams();
+  const route = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { catalog, catalogError } = useMarket();
   const [variant, setVariant] = useState("");
   const [report, setReport] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const product = catalog?.products.find((p) => p.id === id);
+  const product = catalog ? productForRoute(catalog, route) : undefined;
+  useEffect(() => {
+    if (!product || !catalog) return;
+    const previousTitle = document.title;
+    document.title = `${product.name} | ${catalog.shops.find((shop) => shop.id === product.shop_id)?.name || "Arise Digital Store"}`;
+    const canonical = productPath(product, catalog);
+    if (location.pathname !== canonical) navigate(canonical + location.search + location.hash, { replace: true });
+    return () => { document.title = previousTitle; };
+  }, [product?.id, product?.name, catalog, location.pathname, location.search, location.hash, navigate]);
   useEffect(
     () =>
       setVariant(
@@ -1026,7 +1038,9 @@ function ProductPage() {
   if (!catalog) return <Loading />;
   if (!product) return <NotFound />;
   const shop = catalog.shops.find((s) => s.id === product.shop_id)!;
-  const selected = product.variants.find((v) => v.id === variant);
+  const selected = product.variants.find((v) => v.id === variant) ||
+    product.variants.find((v) => v.stock > 0) || product.variants[0];
+  const available = Boolean(product.sales_enabled && selected && selected.stock > 0);
   return (
     <main id="main" className="container detail-page">
       <nav className="breadcrumbs" aria-label="Breadcrumb">
@@ -1038,24 +1052,28 @@ function ProductPage() {
           {product.category}
         </Link>
         <span>/</span>
-        <span>{product.name}</span>
+        <span aria-current="page">{product.name}</span>
       </nav>
       <div className="product-detail">
-        <Art product={product} large />
+        <div className="product-visual">
+          <Art product={product} large />
+          <div className="product-assurances">
+            <span><Monitor size={16} />Digital product</span>
+            <span><ShieldCheck size={16} />Private delivery</span>
+            <span><ShoppingBag size={16} />No shipping needed</span>
+          </div>
+        </div>
         <div className="product-summary">
+          <span className="product-category">{product.category}</span>
+          <h1>{product.name}</h1>
           <Link className="by-shop" to={`/shops/${shop.slug}`}>
             <span className="tiny-avatar">{shop.name.slice(0, 1)}</span>
             {shop.name}
             <ArrowUpRight size={13} />
           </Link>
-          <h1>{product.name}</h1>
-          <p className="summary-description">
-            {product.description.split("\n")[0] ||
-              "A digital product from an independent AriseSell shop."}
-          </p>
           <div className="detail-price">
             {selected ? money(selected.price) : money(minimumPrice(product))}
-            <span>BDT · one-time purchase</span>
+            <span>One-time payment · BDT</span>
           </div>
           {product.variants.length > 1 && (
             <label className="field">
@@ -1074,13 +1092,13 @@ function ProductPage() {
             </label>
           )}
           <div className="detail-availability">
-            {selected && selected.stock > 0 ? (
-              <>
+            {available ? (
+              <span className="product-stock">
                 <span className="status-dot" />
-                {selected.stock} available
-              </>
+                {selected!.stock} in stock
+              </span>
             ) : (
-              <span className="muted">Currently sold out</span>
+              <span className="product-stock unavailable">{product.sales_enabled ? "Sold out" : "Purchases paused"}</span>
             )}
             <span>
               {product.delivery_mode === "automatic" ? (
@@ -1096,7 +1114,7 @@ function ProductPage() {
               )}
             </span>
           </div>
-          {selected && selected.stock > 0 ? (
+          {available && selected ? (
             <Link
               className="button primary full-width buy-now"
               to={`/checkout/${product.id}?variant=${selected.id}`}
@@ -1106,7 +1124,7 @@ function ProductPage() {
             </Link>
           ) : (
             <button className="button primary full-width" disabled>
-              Currently unavailable
+              {product.sales_enabled ? "Currently unavailable" : "Purchases paused"}
             </button>
           )}
           <p className="checkout-note">
@@ -1121,7 +1139,10 @@ function ProductPage() {
                   ? "Ready after payment verification"
                   : product.delivery_estimate || "Prepared by the seller"}
               </strong>
-              <p>{product.delivery_note}</p>
+              <p>{product.delivery_mode === "automatic"
+                ? "Your items become available after your payment is verified."
+                : "The seller prepares your order after payment is verified."}</p>
+              <a className="text-link" href="#product-delivery">View delivery details <ArrowDown size={13} /></a>
             </div>
           </div>
           <Link className="visit-shop" to={`/shops/${shop.slug}`}>
@@ -1134,15 +1155,37 @@ function ProductPage() {
           </Link>
         </div>
       </div>
+      <nav className="product-section-nav" aria-label="Product information">
+        <a href="#product-overview">Overview</a>
+        <a href="#product-delivery">Delivery</a>
+        <a href="#product-terms">Purchase terms</a>
+      </nav>
       <div className="product-description">
-        <div>
-          <h2>Good to know</h2>
-          <p className="preserve-lines">
-            {product.description ||
-              "The seller has not provided an additional description."}
-          </p>
-          <h2>Purchase terms</h2>
-          <p className="preserve-lines">{product.purchase_terms}</p>
+        <div className="product-sections">
+          <section id="product-overview" className="product-section">
+            <span className="eyebrow">THE DETAILS</span>
+            <h2>About this product</h2>
+            <p className="preserve-lines">
+              {product.description ||
+                "The seller has not provided an additional description."}
+            </p>
+          </section>
+          <section id="product-delivery" className="product-section">
+            <span className="eyebrow">AFTER YOUR PURCHASE</span>
+            <h2>How delivery works</h2>
+            <p>{product.delivery_mode === "automatic"
+              ? "Once your payment is verified, open My purchases to access your items privately."
+              : product.delivery_estimate || "Once your payment is verified, the seller prepares your items. Follow your order in My purchases for updates."}</p>
+            {product.delivery_note && product.delivery_note !== product.description &&
+              <div className="product-delivery-instructions"><h3>Seller’s delivery instructions</h3><p className="preserve-lines">{product.delivery_note}</p></div>}
+          </section>
+          <section id="product-terms" className="product-section">
+            <span className="eyebrow">BEFORE YOU BUY</span>
+            <h2>Purchase terms</h2>
+            {product.purchase_terms && product.purchase_terms === product.description
+              ? <p>The seller’s purchase terms are included in the <a className="text-link" href="#product-overview">product description above</a>. Please read them before ordering.</p>
+              : <p className="preserve-lines">{product.purchase_terms || "Contact the seller to confirm purchase terms before ordering."}</p>}
+          </section>
         </div>
         <aside className="help-card">
           <Mail size={24} />
@@ -1285,7 +1328,7 @@ function Checkout() {
   }
   return (
     <main id="main" className="container checkout-page">
-      <Link to={`/products/${product.id}`} className="back-link">
+      <Link to={productPath(product, catalog!)} className="back-link">
         <ArrowLeft size={16} />
         Back to product
       </Link>
@@ -2940,6 +2983,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/products" element={<Products />} />
         <Route path="/products/:id" element={<ProductPage />} />
+        <Route path="/shops/:slug/products/:productSlug" element={<ProductPage />} />
         <Route path="/shops" element={<Shops />} />
         <Route path="/shops/:slug" element={<ShopPage />} />
         <Route path="/checkout/:id" element={<Checkout />} />
