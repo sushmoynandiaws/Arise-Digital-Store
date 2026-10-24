@@ -5,7 +5,8 @@
       "root": ".",
       "runtime": "rust",
       "entrypoint": "api/app.rs",
-      "devCommand": "cargo run --locked --bin marketplace-api"
+      "devCommand": "cargo run --locked --bin arise-digital-store",
+      "routes": [{ "src": "/(.*)", "dest": "/index" }]
     },
     "web": {
       "root": "web",
@@ -15,14 +16,14 @@
       "outputDirectory": "dist",
       "routes": [
         { "handle": "filesystem" },
-        { "src": "/:path((?!@vite/|@id/|@fs/|src/|node_modules/|assets/).*)", "dest": "/index.html" }
+        { "src": "/(.*)", "dest": "/index.html" }
       ]
     }
   },
   "rewrites": [
-    { "source": "/api", "destination": { "service": "app", "path": "/api/app" } },
-    { "source": "/api/(.*)", "destination": { "service": "app", "path": "/api/app" } },
-    { "source": "/health", "destination": { "service": "app", "path": "/api/app" } },
+    { "source": "/api", "destination": { "service": "app" } },
+    { "source": "/api/(.*)", "destination": { "service": "app" } },
+    { "source": "/health", "destination": { "service": "app" } },
     { "source": "/(.*)", "destination": { "service": "web" } }
   ]
 }

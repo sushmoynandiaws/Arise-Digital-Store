@@ -9,7 +9,7 @@ Import this repository as **one Vercel project with Root Directory `.`**, not `w
 | `app` | `.` | Native Rust, `api/app.rs` | `/api`, `/api/*`, `/health` |
 | `web` | `web` | Vite static frontend | Remaining paths, including `/shops/:slug`, product/checkout/purchase pages and assets |
 
-The most specific public rules come first. Vercel preserves the original API path while selecting the Rust service's single `/api/app` function. The web service has its own SPA fallback so refreshing a shared shop link works. Unknown API requests remain API 404 responses and never become storefront HTML.
+The most specific public rules come first. Vercel selects the Rust service and preserves the original API path. Its service-local catch-all selects the generated `/index` function; `/api/app` is not a deployed lookup path. The web service checks static files before falling back to `/index.html`, so refreshing a shared shop link works. Unknown API requests remain API 404 responses and never become storefront HTML.
 
 There are **no internal service bindings** because neither service calls the other from a server function. The Vite bundle runs in the customer's browser and uses same-origin `/api/*`, reaching the public `app` route. Its build cannot read a runtime binding. Rust calls the existing, external AriseSell API using `ARISESELL_API_URL` and a bridge key; that API is not deployed from this repository. PostgreSQL is an external database connection, not a Vercel service. No unused service, proxy function, or browser-visible binding URL has been introduced.
 
@@ -43,6 +43,8 @@ TO arise_marketplace_runtime;
 Replace `arisesell` if the existing database has another name. The runtime login must have no owner/superuser role, no migration privileges, and no inherited access to AriseSell commerce tables. Do not revoke existing grants from the production application's roles as part of this setup. Migrations are deliberate operator actions; the serverless function never creates schemas on cold starts.
 
 Vercel needs a reachable PostgreSQL hostname and verified TLS certificate (`sslmode=verify-full`). A VPS Docker hostname or `localhost` cannot be reached from Vercel. Configure the appropriate network access without broadly exposing the production database. Each function instance uses a small pool of up to three connections; size database/pooler capacity for the deployment's concurrency.
+
+The deployed VPS uses a separate PgBouncer listener at `187.53.134.195:6432` backed by the existing `arisesell_db` database. It requires both a client certificate and SCRAM authentication, admits only the marketplace runtime role, and leaves the PostgreSQL container's port private. See [the pooler operations guide](deploy/pgbouncer/README.md). Its private CA and client certificate are supplied through SQLx's existing `PGSSLROOTCERT`, `PGSSLCERT`, and `PGSSLKEY` environment variables as PEM contents; the client private key is a sensitive Vercel variable. `sslmode=verify-full` remains mandatory and validates the certificate's IP subject alternative name.
 
 ## 3. Add Vercel environment variables
 
