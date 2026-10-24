@@ -1,0 +1,12 @@
+/target/
+/web/node_modules/
+/web/dist/
+/data/
+/.env
+*.db*
+__pycache__/
+*.log
+/.tools/
+/test-results/
+/web/test-results/
+/artifacts/

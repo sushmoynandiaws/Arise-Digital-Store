@@ -1,0 +1,79 @@
+export type Variant = {
+  id: string;
+  name: string;
+  price: string;
+  stock: number;
+};
+export type Product = {
+  id: string;
+  shop_id: string;
+  name: string;
+  category: string;
+  description: string;
+  image_url: string;
+  variants: Variant[];
+  currency: string;
+  delivery_mode: "automatic" | "manual";
+  delivery_estimate: string;
+  delivery_note: string;
+  purchase_terms: string;
+  required_buyer_fields: string[];
+  sales_enabled: boolean;
+  selected?: boolean;
+};
+export type Shop = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  logo_url: string;
+  cover_url: string;
+  support: string;
+  published: boolean;
+  payment_methods?: string[];
+};
+export type Catalog = { shops: Shop[]; products: Product[]; synced_at: string };
+export type User = { id: string; name: string; email: string; admin: boolean };
+export type Session = {
+  user: User | null;
+  csrf: string;
+  demo: boolean;
+  source_web: string;
+};
+export type Quote = {
+  draft_id: string;
+  quote_hash: string;
+  snapshot: {
+    total: string;
+    name: string;
+    variant: string;
+    quantity: number;
+    digital_config: {
+      purchase_terms: string;
+      delivery_note: string;
+      delivery_mode: string;
+    };
+  };
+};
+export type Purchase = {
+  id: string;
+  ref: string;
+  shop: Shop;
+  name: string;
+  quantity: number;
+  total: string;
+  currency: string;
+  payment_status: string;
+  delivery_status: string;
+  delivery_mode: string;
+  delivery_estimate: string;
+  created_at: string;
+  ready: boolean;
+  payment: {
+    provider: string;
+    account: string;
+    amount: string;
+    trx_id: string | null;
+    expires_at: string;
+  } | null;
+};

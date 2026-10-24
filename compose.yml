@@ -1,0 +1,16 @@
+services:
+  marketplace:
+    build: .
+    env_file: .env
+    environment:
+      BIND_ADDRESS: 0.0.0.0:8088
+      DEMO_MODE: "false"
+    ports:
+      - "127.0.0.1:8088:8088"
+    volumes:
+      - marketplace-data:/app/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  marketplace-data:

@@ -1,0 +1,8 @@
+target
+web/node_modules
+web/dist
+.env
+data
+artifacts
+web/test-results
+.git

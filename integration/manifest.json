@@ -1,0 +1,22 @@
+{
+  "source_repository": "Sushmoy-Nandi/arise-sell",
+  "base_revision": "1f0e5b8436e36f097ee7c3b8818f6d576b256ea0",
+  "files": [
+    "backend/app/core/config.py",
+    "backend/app/main.py",
+    "backend/app/services/digital_checkout.py",
+    "backend/app/services/digital_fulfilment.py",
+    "frontend/app/signup/page.tsx",
+    "frontend/app/verify-email/page.tsx",
+    "frontend/components/marketing/SignupForm.tsx",
+    "frontend/lib/login-return-path.ts",
+    "frontend/lib/api-client.ts",
+    "frontend/app/console/fulfilment/page.tsx",
+    "frontend/locales/bn.json",
+    "backend/app/api/v1/marketplace.py",
+    "backend/tests/test_marketplace.py",
+    "frontend/app/marketplace/connect/page.tsx",
+    "frontend/scripts/test-marketplace-return.mjs"
+  ],
+  "production_deployed": false
+}

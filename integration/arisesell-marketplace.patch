@@ -1,0 +1,1007 @@
+diff --git a/backend/app/core/config.py b/backend/app/core/config.py
+index e164dc05..2125f509 100644
+--- a/backend/app/core/config.py
++++ b/backend/app/core/config.py
+@@ -79,6 +79,8 @@ class Settings(BaseSettings):
+     SMTP_TLS: bool = True
+     SMTP_SSL: bool = False
+     FRONTEND_URL: str = "https://arisesell.com"
++    MARKETPLACE_BRIDGE_KEY: str = ""
++    MARKETPLACE_REDIRECT_URI: str = ""
+ 
+     @property
+     def resolved_smtp_password(self) -> str:
+diff --git a/backend/app/main.py b/backend/app/main.py
+index 5ff955c6..051b28eb 100644
+--- a/backend/app/main.py
++++ b/backend/app/main.py
+@@ -26,6 +26,7 @@ from app.api.v1.threads import router as threads_router
+ from app.api.v1.orders import router as orders_router
+ from app.api.v1.catalog import router as catalog_router
+ from app.api.v1.digital import router as digital_router
++from app.api.v1.marketplace import router as marketplace_router
+ from app.api.v1.comments import router as comments_router
+ from app.api.v1.pipeline import router as pipeline_router
+ from app.api.v1.campaigns import router as campaigns_router
+@@ -393,6 +394,7 @@ app.include_router(threads_router, prefix="/api/v1")
+ app.include_router(orders_router, prefix="/api/v1")
+ app.include_router(catalog_router, prefix="/api/v1")
+ app.include_router(digital_router, prefix="/api/v1")
++app.include_router(marketplace_router, prefix="/api/v1")
+ app.include_router(comments_router, prefix="/api/v1")
+ app.include_router(pipeline_router, prefix="/api/v1")
+ app.include_router(campaigns_router, prefix="/api/v1")
+diff --git a/backend/app/services/digital_checkout.py b/backend/app/services/digital_checkout.py
+index 36395a4b..33bf42b4 100644
+--- a/backend/app/services/digital_checkout.py
++++ b/backend/app/services/digital_checkout.py
+@@ -25,7 +25,9 @@ async def bound_conversation(db, business, channel_id, conversation_id, recipien
+     conversation = await db.scalar(select(Conversation).where(Conversation.id == conversation_id,
+         Conversation.business_id == business.id, Conversation.channel_id == channel_id))
+     from app.services.channel_dispatcher import channel_recipient
+-    if not channel or not conversation or channel_recipient(channel.channel_type, conversation.handle) != recipient or channel.channel_type not in {"whatsapp", "messenger", "facebook", "instagram"}:
++    supported = channel and (channel.channel_type in {"whatsapp", "messenger", "facebook", "instagram"} or
++        (channel.channel_type == "marketplace" and channel.external_id == "arise-digital-store" and channel.is_live))
++    if not channel or not conversation or channel_recipient(channel.channel_type, conversation.handle) != recipient or not supported:
+         raise HTTPException(404, "Customer conversation not found")
+     return channel, conversation
+ 
+diff --git a/backend/app/services/digital_fulfilment.py b/backend/app/services/digital_fulfilment.py
+index d6b1432e..229c19c2 100644
+--- a/backend/app/services/digital_fulfilment.py
++++ b/backend/app/services/digital_fulfilment.py
+@@ -54,6 +54,15 @@ async def queue_delivery(db, business, order, *, actor, key=None):
+     from app.services.digital_checkout import bound_conversation
+     channel, conversation = await bound_conversation(db, business, uuid.UUID(meta["channel_id"]),
+         uuid.UUID(meta["conversation_id"]), meta["recipient"])
++    if channel.channel_type == "marketplace":
++        # Marketplace buyers retrieve their paid items through the bound purchase endpoint, not a social outbox.
++        for fulfilment in await units_for(db, order):
++            if fulfilment.status == "awaiting_manual" and fulfilment.stock_unit_id:
++                fulfilment.status = "queued"
++        await event(db, business.id, order.id, "delivery_queued", actor, key=key, request={})
++        await db.flush()
++        await project_status(db, order)
++        return order
+     for fulfilment in await units_for(db, order):
+         if fulfilment.status not in {"queued", "awaiting_manual"} or not fulfilment.stock_unit_id or fulfilment.outbound_part_id:
+             continue
+diff --git a/frontend/app/console/fulfilment/page.tsx b/frontend/app/console/fulfilment/page.tsx
+index 48f422ee..79d006fb 100644
+--- a/frontend/app/console/fulfilment/page.tsx
++++ b/frontend/app/console/fulfilment/page.tsx
+@@ -161,6 +161,7 @@ function getChannelLabel(channel?: string): string {
+   if (ch === "whatsapp") return "WhatsApp";
+   if (ch === "messenger" || ch === "facebook") return "Messenger";
+   if (ch === "instagram") return "Instagram";
++  if (ch === "marketplace") return "Arise Digital Store";
+   return "Website";
+ }
+ 
+@@ -231,7 +232,7 @@ function ChannelAttributionBadge({
+   }
+   return (
+     <span
+-      title={uiCopy.text("Website / Online Store")}
++      title={uiCopy.text(ch === "marketplace" ? "Arise Digital Store" : "Website / Online Store")}
+       className={cx(
+         "inline-flex items-center justify-center rounded-md bg-amber/10 text-amber dark:text-amber border border-amber/25 shadow-2xs shrink-0 select-none",
+         showLabel ? "gap-1 px-1.5 py-0.5 text-[11px] font-semibold" : "size-5",
+@@ -239,7 +240,7 @@ function ChannelAttributionBadge({
+       )}
+     >
+       <IconGlobe width={11.5} height={11.5} className="shrink-0" />
+-      {showLabel && <span>{uiCopy.text("Website")}</span>}
++      {showLabel && <span>{uiCopy.text(ch === "marketplace" ? "Arise Digital Store" : "Website")}</span>}
+     </span>
+   );
+ }
+diff --git a/frontend/app/signup/page.tsx b/frontend/app/signup/page.tsx
+index 1410150f..fe02c305 100644
+--- a/frontend/app/signup/page.tsx
++++ b/frontend/app/signup/page.tsx
+@@ -12,7 +12,8 @@ export const metadata: Metadata = {
+     "Start your 14-day free trial. Setup your 24/7 AI sales assistant in 2 minutes.",
+ };
+ 
+-export default function SignupPage() {
++export default async function SignupPage({searchParams}: {searchParams: Promise<{from?: string}>}) {
++  const {from} = await searchParams;
+   return (
+     <div className="relative min-h-screen bg-canvas selection:bg-signal-wash selection:text-signal flex flex-col justify-between overflow-x-hidden">
+       {/* Background ambient lighting effects */}
+@@ -56,7 +57,7 @@ export default function SignupPage() {
+             <span><UiText>Back to Home</UiText></span>
+           </Link>
+         </div>
+-        <SignupForm />
++        <SignupForm returnTo={from || null} />
+       </main>
+ 
+       {/* Bottom security trust markers */}
+diff --git a/frontend/app/verify-email/page.tsx b/frontend/app/verify-email/page.tsx
+index 4f1a1dcf..55675e4f 100644
+--- a/frontend/app/verify-email/page.tsx
++++ b/frontend/app/verify-email/page.tsx
+@@ -18,6 +18,7 @@ import { useLang } from "@/lib/i18n";
+ import { useAuth } from "@/lib/auth-context";
+ import { BRAND } from "@/lib/brand";
+ import { cx } from "@/lib/format";
++import { verificationLoginPath } from "@/lib/login-return-path";
+ 
+ function VerifyEmailForm() {
+   const uiCopy = useUiCopy();
+@@ -25,6 +26,7 @@ function VerifyEmailForm() {
+   const searchParams = useSearchParams();
+   const emailParam = searchParams.get("email") || "";
+   const tokenParam = searchParams.get("token") || "";
++  const returnTo = searchParams.get("from");
+   const [challengeId, setChallengeId] = useState(searchParams.get("challenge_id") || "");
+ 
+   const { t } = useLang();
+@@ -62,7 +64,7 @@ function VerifyEmailForm() {
+               "ইমেইল ভেরিফিকেশন সফল হয়েছে! অনুগ্রহ করে লগইন করুন।",
+             ),
+           );
+-          const target = "/login";
++          const target = verificationLoginPath(returnTo, window.localStorage);
+           setTimeout(() => {
+             window.location.replace(target);
+           }, 600);
+@@ -87,7 +89,7 @@ function VerifyEmailForm() {
+     };
+ 
+     runAutoVerify();
+-  }, [tokenParam, verifyEmail, t]);
++  }, [tokenParam, verifyEmail, t, returnTo]);
+ 
+   // 2. Countdown timer for resend code
+   useEffect(() => {
+@@ -192,7 +194,7 @@ function VerifyEmailForm() {
+             "ইমেইল ভেরিফিকেশন সফল হয়েছে! অনুগ্রহ করে লগইন করুন।",
+           ),
+         );
+-        const target = "/login";
++        const target = verificationLoginPath(returnTo, window.localStorage);
+         setTimeout(() => {
+           window.location.replace(target);
+         }, 600);
+diff --git a/frontend/components/marketing/SignupForm.tsx b/frontend/components/marketing/SignupForm.tsx
+index 0dea35be..1e0d8537 100644
+--- a/frontend/components/marketing/SignupForm.tsx
++++ b/frontend/components/marketing/SignupForm.tsx
+@@ -20,8 +20,9 @@ import { cx } from "@/lib/format";
+ 
+ import { useAuth } from "@/lib/auth-context";
+ import { useGoogleAuth } from "@/lib/use-google-auth";
++import { loginReturnPath, rememberMarketplaceSignupReturn } from "@/lib/login-return-path";
+ 
+-export default function SignupForm() {
++export default function SignupForm({returnTo = null}: {returnTo?: string | null}) {
+   const uiCopy = useUiCopy();
+   const router = useRouter();
+   const { t } = useLang();
+@@ -41,6 +42,7 @@ export default function SignupForm() {
+   const { triggerGoogleLogin: handleGoogleSignup, googleLoading } =
+     useGoogleAuth({
+       redirectPath: "/signup",
++      returnTo: returnTo || undefined,
+       onError: (errMsg) => setError(errMsg),
+     });
+ 
+@@ -137,12 +139,13 @@ export default function SignupForm() {
+       });
+ 
+       if (res.success) {
++        rememberMarketplaceSignupReturn(returnTo, window.localStorage);
+         if (res.needs_verification) {
+           router.push(
+-            `/verify-email?email=${encodeURIComponent(email.trim())}&challenge_id=${encodeURIComponent(res.challenge_id || "")}`,
++            `/verify-email?email=${encodeURIComponent(email.trim())}&challenge_id=${encodeURIComponent(res.challenge_id || "")}${returnTo ? `&from=${encodeURIComponent(returnTo)}` : ""}`,
+           );
+         } else {
+-          const target = res.user?.is_superadmin ? "/admin" : "/onboarding";
++          const target = returnTo ? loginReturnPath(returnTo, window.location.origin) : res.user?.is_superadmin ? "/admin" : "/onboarding";
+           router.replace(target);
+           router.refresh();
+         }
+diff --git a/frontend/lib/api-client.ts b/frontend/lib/api-client.ts
+index e636cd76..415be432 100644
+--- a/frontend/lib/api-client.ts
++++ b/frontend/lib/api-client.ts
+@@ -262,7 +262,7 @@ export interface OrderItem {
+   phone: string;
+   address: string;
+   district: string;
+-  channel: "whatsapp" | "messenger" | "instagram" | "web";
++  channel: "whatsapp" | "messenger" | "instagram" | "web" | "marketplace";
+   lines: OrderLineItem[];
+   delivery: number;
+   discount: number;
+diff --git a/frontend/lib/login-return-path.ts b/frontend/lib/login-return-path.ts
+index 710fafc6..83d4ddd2 100644
+--- a/frontend/lib/login-return-path.ts
++++ b/frontend/lib/login-return-path.ts
+@@ -7,3 +7,26 @@ export function loginReturnPath(value: string | null, origin: string): string {
+     return "/console";
+   }
+ }
++
++const MARKETPLACE_SIGNUP_RETURN = "arise_marketplace_signup_return";
++type ReturnStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
++
++export function rememberMarketplaceSignupReturn(value: string | null, storage: ReturnStorage): void {
++  try {
++    if (value?.startsWith("/marketplace/connect?")) {
++      storage.setItem(MARKETPLACE_SIGNUP_RETURN, JSON.stringify({value, expires: Date.now() + 600_000}));
++    } else storage.removeItem(MARKETPLACE_SIGNUP_RETURN);
++  } catch { /* The explicit return query still supports verification when storage is unavailable. */ }
++}
++
++export function verificationLoginPath(explicit: string | null, storage: ReturnStorage): string {
++  let remembered: string | null = null;
++  try {
++    const raw = storage.getItem(MARKETPLACE_SIGNUP_RETURN);
++    storage.removeItem(MARKETPLACE_SIGNUP_RETURN);
++    const saved = raw ? JSON.parse(raw) : null;
++    if (typeof saved?.value === "string" && saved.value.startsWith("/marketplace/connect?") && saved.expires > Date.now()) remembered = saved.value;
++  } catch { /* Verification must remain usable without browser storage. */ }
++  const destination = explicit || remembered;
++  return destination ? `/login?from=${encodeURIComponent(destination)}` : "/login";
++}
+diff --git a/frontend/locales/bn.json b/frontend/locales/bn.json
+index e056dc90..1248c2c1 100644
+--- a/frontend/locales/bn.json
++++ b/frontend/locales/bn.json
+@@ -6957,5 +6957,21 @@
+   "Remove from stock": "স্টক থেকে সরান",
+   "Item removed from sale.": "আইটেমটি বিক্রির স্টক থেকে সরানো হয়েছে।",
+   "Stock removed. Close and reopen this panel to refresh the list.": "স্টক থেকে সরানো হয়েছে। তালিকা হালনাগাদ করতে প্যানেলটি বন্ধ করে আবার খুলুন।",
+-  "Could not remove this item. It may be reserved for an order, or your access has changed. Refresh stock and retry.": "আইটেমটি সরানো যায়নি। এটি কোনো অর্ডারের জন্য বরাদ্দ থাকতে পারে অথবা আপনার অনুমতি বদলেছে। প্যানেলটি বন্ধ করে আবার খুলে চেষ্টা করুন।"
++  "Could not remove this item. It may be reserved for an order, or your access has changed. Refresh stock and retry.": "আইটেমটি সরানো যায়নি। এটি কোনো অর্ডারের জন্য বরাদ্দ থাকতে পারে অথবা আপনার অনুমতি বদলেছে। প্যানেলটি বন্ধ করে আবার খুলে চেষ্টা করুন।",
++  "Arise Digital Store": "Arise Digital Store",
++  "Your shop. A bigger audience.": "আপনার দোকান। আরও বেশি ক্রেতা।",
++  "Use your AriseSell account to open your digital storefront. Choose what to publish after connecting.": "আপনার AriseSell অ্যাকাউন্ট দিয়ে ডিজিটাল দোকান খুলুন। সংযোগের পরে কোন পণ্য প্রকাশ করবেন বেছে নিন।",
++  "This connection link is incomplete. Return to Arise Digital Store and choose Continue with AriseSell again.": "সংযোগের লিংকটি অসম্পূর্ণ। Arise Digital Store-এ ফিরে আবার Continue with AriseSell বেছে নিন।",
++  "Checking your account…": "আপনার অ্যাকাউন্ট যাচাই করা হচ্ছে…",
++  "Sign in to AriseSell": "AriseSell-এ লগইন করুন",
++  "Create an account": "অ্যাকাউন্ট খুলুন",
++  "Continue as": "এই অ্যাকাউন্ট দিয়ে এগিয়ে যান:",
++  "Connect your account and digital stores.": "আপনার অ্যাকাউন্ট ও ডিজিটাল দোকান সংযুক্ত করুন।",
++  "Choose your public shop profile and products.": "দোকানের প্রোফাইল ও প্রকাশের জন্য পণ্য বেছে নিন।",
++  "Keep payments, stock and delivery managed in AriseSell.": "পেমেন্ট, স্টক ও ডেলিভারি AriseSell থেকেই পরিচালনা করুন।",
++  "Your password and private stock are never shared with the marketplace browser.": "আপনার পাসওয়ার্ড ও গোপন স্টক marketplace-এর ব্রাউজারে পাঠানো হয় না।",
++  "Continue to Arise Digital Store": "Arise Digital Store-এ এগিয়ে যান",
++  "Return to AriseSell": "AriseSell-এ ফিরে যান",
++  "Loading secure connection…": "নিরাপদ সংযোগ প্রস্তুত হচ্ছে…",
++  "Unable to connect. Please retry.": "সংযোগ করা যায়নি। আবার চেষ্টা করুন।"
+ }
+diff --git a/backend/app/api/v1/marketplace.py b/backend/app/api/v1/marketplace.py
+new file mode 100644
+--- /dev/null
++++ b/backend/app/api/v1/marketplace.py
+@@ -0,0 +1,427 @@
++"""Opt-in marketplace bridge; commerce remains authoritative in AriseSell."""
++from __future__ import annotations
++
++import base64
++import hashlib
++import hmac
++import json
++import secrets
++import uuid
++from datetime import timedelta
++from urllib.parse import urlencode, urlsplit
++
++from fastapi import APIRouter, Depends, HTTPException, Request, Response
++from jose import JWTError, jwt
++from pydantic import BaseModel, ConfigDict, EmailStr, Field, TypeAdapter, field_validator
++from sqlalchemy import func, select
++from sqlalchemy.orm import selectinload
++
++from app.core.config import settings
++from app.core.database import get_db
++from app.core.deps import get_current_active_user, get_current_user_payload
++from app.core.redis import get_redis_client
++from app.models.channel import ConnectedChannel
++from app.models.commerce import CheckoutDraft
++from app.models.conversation import Conversation, Message
++from app.models.digital import DigitalStockUnit
++from app.models.order import Order
++from app.models.product import Product
++from app.models.tenant import Business
++from app.models.user import User
++from app.schemas.digital import AcceptRequest, PaymentProofRequest, QuoteRequest
++from app.services import digital_checkout as checkout
++from app.services.ai_quota_service import is_store_owner
++from app.services.digital_inventory import active_store, config_for, decrypt_stock, event, fingerprint, lock_business, receiving_accounts, utc, utcnow
++from app.services.session_service import require_active_session
++
++router = APIRouter(prefix="/marketplace", tags=["Arise Digital Store"])
++
++
++def configured():
++    uri = settings.MARKETPLACE_REDIRECT_URI
++    parsed = urlsplit(uri)
++    local = parsed.hostname in {"localhost", "127.0.0.1", "::1"}
++    if (len(settings.MARKETPLACE_BRIDGE_KEY) < 32 or not parsed.netloc or parsed.username or parsed.password
++            or parsed.query or parsed.fragment or parsed.path != "/api/auth/callback"
++            or not (parsed.scheme == "https" or parsed.scheme == "http" and local)):
++        raise HTTPException(503, "Arise Digital Store integration is not configured")
++
++
++def bridge(request: Request, response: Response):
++    response.headers["Cache-Control"] = "no-store"
++    configured()
++    supplied = request.headers.get("X-Marketplace-Key", "")
++    if not hmac.compare_digest(supplied.encode(), settings.MARKETPLACE_BRIDGE_KEY.encode()):
++        raise HTTPException(401, "Marketplace service authentication is required")
++
++
++class Input(BaseModel):
++    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, hide_input_in_errors=True)
++
++
++class Authorization(Input):
++    state: str = Field(min_length=32, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
++    code_challenge: str = Field(min_length=43, max_length=43, pattern=r"^[A-Za-z0-9_-]+$")
++    redirect_uri: str = Field(max_length=2000)
++
++
++class Exchange(Input):
++    code: str = Field(min_length=32, max_length=256)
++    code_verifier: str = Field(min_length=43, max_length=128, pattern=r"^[A-Za-z0-9._~-]+$")
++    redirect_uri: str = Field(max_length=2000)
++
++
++class Listing(Input):
++    published: bool
++    name: str = Field(min_length=2, max_length=100)
++    description: str = Field(min_length=10, max_length=1500)
++    support: str = Field(default="", max_length=255)
++    logo_url: str = Field(default="", max_length=2000)
++    cover_url: str = Field(default="", max_length=2000)
++    product_ids: list[uuid.UUID] = Field(max_length=500)
++
++    @field_validator("support")
++    @classmethod
++    def public_support(cls, value):
++        import re
++        if not value or re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value):
++            return value
++        parsed = urlsplit(value)
++        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
++            raise ValueError("Use a support email address or HTTPS website")
++        return value
++
++    @field_validator("logo_url", "cover_url")
++    @classmethod
++    def public_image(cls, value):
++        if value:
++            url = urlsplit(value)
++            if url.scheme != "https" or not url.hostname or url.username or url.password:
++                raise ValueError("Use an HTTPS image URL without credentials")
++        return value
++
++
++class BuyerFields(Input):
++    name: str = Field(min_length=1, max_length=100)
++    email: str = Field(default="", max_length=255)
++    phone: str = Field(default="", max_length=32)
++
++    @field_validator("email")
++    @classmethod
++    def email_address(cls, value):
++        return str(TypeAdapter(EmailStr).validate_python(value)) if value else value
++
++
++class MarketQuote(QuoteRequest):
++    shop_id: uuid.UUID
++    buyer: BuyerFields
++
++
++class MarketAccept(AcceptRequest):
++    shop_id: uuid.UUID
++    product_id: uuid.UUID
++    draft_id: uuid.UUID
++
++
++@router.post("/authorize")
++async def authorize(req: Authorization, response: Response, user=Depends(get_current_active_user),
++                    payload=Depends(get_current_user_payload)):
++    configured()
++    response.headers["Cache-Control"] = "no-store"
++    if req.redirect_uri != settings.MARKETPLACE_REDIRECT_URI:
++        raise HTTPException(400, "This marketplace redirect is not registered")
++    code = secrets.token_urlsafe(32)
++    redis = await get_redis_client()
++    await redis.set("marketplace:code:" + fingerprint(code), json.dumps({"sub": str(user.id), "sid": payload["sid"],
++        "challenge": req.code_challenge, "redirect_uri": req.redirect_uri}), ex=180)
++    return {"redirect": req.redirect_uri + "?" + urlencode({"code": code, "state": req.state})}
++
++
++@router.post("/token", dependencies=[Depends(bridge)])
++async def exchange(req: Exchange, db=Depends(get_db)):
++    if req.redirect_uri != settings.MARKETPLACE_REDIRECT_URI:
++        raise HTTPException(400, "This marketplace redirect is not registered")
++    redis = await get_redis_client()
++    raw = await redis.getdel("marketplace:code:" + fingerprint(req.code))
++    if not raw:
++        raise HTTPException(400, "Authorization code expired or has already been used")
++    data = json.loads(raw)
++    challenge = base64.urlsafe_b64encode(hashlib.sha256(req.code_verifier.encode()).digest()).decode().rstrip("=")
++    if not hmac.compare_digest(challenge, data["challenge"]) or data["redirect_uri"] != req.redirect_uri:
++        raise HTTPException(400, "Authorization proof does not match")
++    await require_active_session(db, data)
++    claims = {"sub": data["sub"], "sid": data["sid"], "aud": "arise-digital-store", "type": "marketplace",
++        "exp": utcnow() + timedelta(hours=12)}
++    return {"access_token": jwt.encode(claims, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM), "expires_in": 43200}
++
++
++async def market_user(request: Request, db=Depends(get_db)):
++    authorization = request.headers.get("Authorization", "")
++    if not authorization.startswith("Bearer "):
++        raise HTTPException(401, "Continue with AriseSell to sign in")
++    try:
++        data = jwt.decode(authorization[7:], settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM], audience="arise-digital-store")
++        if data.get("type") != "marketplace":
++            raise ValueError
++        user_id = uuid.UUID(data["sub"])
++    except (JWTError, ValueError, KeyError, TypeError):
++        raise HTTPException(401, "Marketplace sign-in expired; continue with AriseSell again") from None
++    await require_active_session(db, data)
++    user = await db.get(User, user_id)
++    if not user or not user.is_active or not user.is_verified or user.scheduled_deletion_at:
++        raise HTTPException(403, "This AriseSell account is unavailable")
++    return user
++
++
++async def optional_user(request: Request, db=Depends(get_db)):
++    return await market_user(request, db) if request.headers.get("Authorization") else None
++
++
++async def owned_store(db, user, shop_id):
++    business = await db.get(Business, shop_id)
++    if not business or business.commerce_mode != "digital" or not is_store_owner(user, business):
++        raise HTTPException(404, "Digital store not found")
++    return business
++
++
++def shop_json(business):
++    listing = (business.settings_data or {}).get("marketplace_listing") or {}
++    return {"id": str(business.id), "slug": business.slug, "name": listing.get("name") or business.name,
++        "description": listing.get("description") or "", "logo_url": listing.get("logo_url") or business.logo_url or "",
++        "cover_url": listing.get("cover_url") or "", "support": listing.get("support") or "",
++        "published": listing.get("published") is True}
++
++
++async def products_json(db, business, *, published=False):
++    listing = (business.settings_data or {}).get("marketplace_listing") or {}
++    selected = set(listing.get("product_ids") or [])
++    products = list(await db.scalars(select(Product).where(Product.business_id == business.id,
++        Product.fulfilment_kind == "digital", Product.digital_archived.is_(False)).options(selectinload(Product.variants))))
++    available = dict((await db.execute(select(DigitalStockUnit.variant_id, func.count()).where(
++        DigitalStockUnit.business_id == business.id, DigitalStockUnit.state == "available").group_by(DigitalStockUnit.variant_id))).all())
++    result = []
++    for product in products:
++        config = config_for(product)
++        if published and (str(product.id) not in selected or not config.sales_enabled):
++            continue
++        variants = [{"id": str(v.id), "name": v.label, "price": str(v.price),
++            "stock": available.get(v.id, 0) if config.delivery_mode == "automatic" else v.stock} for v in product.variants]
++        result.append({"id": str(product.id), "shop_id": str(business.id), "name": product.name,
++            "category": product.category, "description": product.blurb or "", "image_url": product.image_url,
++            "variants": variants, "currency": "BDT", "delivery_mode": config.delivery_mode,
++            "delivery_estimate": config.delivery_estimate, "delivery_note": config.delivery_note,
++            "purchase_terms": config.purchase_terms, "required_buyer_fields": config.required_buyer_fields,
++            "sales_enabled": config.sales_enabled, "selected": str(product.id) in selected})
++    return result
++
++
++@router.get("/me", dependencies=[Depends(bridge)])
++async def me(user=Depends(market_user), db=Depends(get_db)):
++    from app.api.v1.orders import _resolve_user_business_ids
++    ids = await _resolve_user_business_ids(user, db)
++    businesses = list(await db.scalars(select(Business).where(Business.id.in_(ids), Business.commerce_mode == "digital"))) if ids else []
++    return {"user": {"id": str(user.id), "name": f"{user.first_name} {user.last_name}".strip(),
++        "email": user.email, "admin": user.is_superadmin},
++        "shops": [shop_json(b) for b in businesses if is_store_owner(user, b)]}
++
++
++@router.get("/stores/{shop_id}/catalog", dependencies=[Depends(bridge)])
++async def seller_catalog(shop_id: uuid.UUID, user=Depends(market_user), db=Depends(get_db)):
++    business = await owned_store(db, user, shop_id)
++    return {"shop": shop_json(business), "products": await products_json(db, business),
++        "payment_methods": list(receiving_accounts(business)), "active": active_store(business)}
++
++
++@router.put("/stores/{shop_id}/listing", dependencies=[Depends(bridge)])
++async def save_listing(shop_id: uuid.UUID, req: Listing, user=Depends(market_user), db=Depends(get_db)):
++    business = await owned_store(db, user, shop_id)
++    business = await lock_business(db, business.id)
++    if not is_store_owner(user, business):
++        raise HTTPException(404, "Digital store not found")
++    products = await products_json(db, business)
++    available = {p["id"] for p in products if not req.published or p["sales_enabled"]}
++    if len(set(req.product_ids)) != len(req.product_ids) or any(str(id) not in available for id in req.product_ids):
++        raise HTTPException(409, "Select active digital products belonging to this store")
++    if req.published and (not req.product_ids or not receiving_accounts(business) or not active_store(business)):
++        raise HTTPException(409, "Choose at least one active product and connect a receiving payment account before publishing")
++    business.settings_data = {**(business.settings_data or {}), "marketplace_listing": req.model_dump(mode="json")}
++    await db.commit()
++    return {"shop": shop_json(business), "synced_at": utcnow().isoformat()}
++
++
++@router.get("/feed", dependencies=[Depends(bridge)])
++async def feed(db=Depends(get_db)):
++    businesses = list(await db.scalars(select(Business).where(Business.commerce_mode == "digital")))
++    shops, products = [], []
++    for business in businesses:
++        if not active_store(business) or not receiving_accounts(business) or not shop_json(business)["published"]:
++            continue
++        shops.append({**shop_json(business), "payment_methods": list(receiving_accounts(business))})
++        products.extend(await products_json(db, business, published=True))
++    return {"shops": shops, "products": products, "synced_at": utcnow().isoformat()}
++
++
++def buyer_id(request):
++    value = request.headers.get("X-Marketplace-Buyer", "")
++    if len(value) != 64 or any(c not in "0123456789abcdef" for c in value):
++        raise HTTPException(400, "A marketplace customer session is required")
++    return hashlib.sha256(value.encode()).hexdigest()
++
++
++async def public_product(db, shop_id, product_id):
++    business = await lock_business(db, shop_id)
++    if not business or not active_store(business) or not shop_json(business)["published"]:
++        raise HTTPException(404, "Shop is unavailable")
++    listing = (business.settings_data or {}).get("marketplace_listing") or {}
++    if str(product_id) not in (listing.get("product_ids") or []):
++        raise HTTPException(404, "Product is not published on this shop")
++    return business
++
++
++async def context(db, business, identity, fields=None):
++    await lock_business(db, business.id)
++    channel = await db.scalar(select(ConnectedChannel).where(ConnectedChannel.business_id == business.id,
++        ConnectedChannel.channel_type == "marketplace", ConnectedChannel.external_id == "arise-digital-store"))
++    if not channel:
++        channel = ConnectedChannel(business_id=business.id, channel_type="marketplace", external_id="arise-digital-store", label="Arise Digital Store", is_live=True)
++        db.add(channel)
++        await db.flush()
++    if not channel.is_live:
++        raise HTTPException(409, "This shop's marketplace connection is paused")
++    conversation = await db.scalar(select(Conversation).where(Conversation.business_id == business.id,
++        Conversation.channel_id == channel.id, Conversation.handle == identity))
++    if not conversation:
++        conversation = Conversation(business_id=business.id, channel_id=channel.id, channel_type="marketplace", handle=identity,
++            customer_name=(fields or {}).get("name") or "Marketplace customer")
++        db.add(conversation)
++        await db.flush()
++    return channel, conversation
++
++
++@router.post("/checkout/quote", dependencies=[Depends(bridge)])
++async def create_quote(req: MarketQuote, request: Request, user=Depends(optional_user), db=Depends(get_db)):
++    identity = buyer_id(request)
++    business = await public_product(db, req.shop_id, req.product_id)
++    channel, conversation = await context(db, business, identity, req.buyer.model_dump())
++    draft = await checkout.create_quote(db, business, channel, conversation, identity,
++        QuoteRequest(**req.model_dump(include={"product_id", "variant_id", "quantity", "provider"})))
++    draft.data = {**draft.data, "buyer_fields": req.buyer.model_dump(), "marketplace_buyer": identity,
++        "marketplace_user_id": str(user.id) if user else None}
++    await db.commit()
++    return {"draft_id": str(draft.id), "quote_hash": draft.data["quote_hash"], "snapshot": draft.data["snapshot"]}
++
++
++@router.post("/checkout/accept", dependencies=[Depends(bridge)])
++async def accept_quote(req: MarketAccept, request: Request, user=Depends(optional_user), db=Depends(get_db)):
++    identity = buyer_id(request)
++    business = await public_product(db, req.shop_id, req.product_id)
++    channel, conversation = await context(db, business, identity)
++    draft = await db.get(CheckoutDraft, req.draft_id)
++    if not draft or (draft.data or {}).get("snapshot", {}).get("product_id") != str(req.product_id):
++        raise HTTPException(404, "Checkout not found")
++    started_by = (draft.data or {}).get("marketplace_user_id")
++    if started_by and (not user or str(user.id) != started_by):
++        raise HTTPException(409, "Sign in with the account that started this checkout")
++    order = await checkout.accept_quote(db, business, channel, conversation, identity, req.draft_id,
++        AcceptRequest(**req.model_dump(include={"quote_hash", "idempotency_key", "provider", "accepted"})), "marketplace:" + req.idempotency_key)
++    order.checkout_data = {**order.checkout_data, "marketplace_buyer": identity,
++        "marketplace_user_id": (draft.data or {}).get("marketplace_user_id")}
++    await db.commit()
++    return await order_json(db, order)
++
++
++def order_owned(order, identity, user):
++    data = order.checkout_data or {}
++    if not data.get("marketplace_buyer"):
++        return False
++    if data.get("marketplace_user_id"):
++        return bool(user and data["marketplace_user_id"] == str(user.id))
++    return hmac.compare_digest(data["marketplace_buyer"], identity)
++
++
++async def bound_order(db, request, order_id, user):
++    identity = buyer_id(request)
++    order = await db.get(Order, order_id)
++    if not order or order.fulfilment_kind != "digital" or not order_owned(order, identity, user):
++        raise HTTPException(404, "Purchase not found")
++    return await checkout.lock_order(db, order.business_id, order.id)
++
++
++async def order_json(db, order):
++    payment = await checkout.payment_request_for(db, order)
++    business = await db.get(Business, order.business_id)
++    quote = (order.checkout_data or {}).get("digital_quote") or {}
++    units = await checkout.units_for(db, order)
++    return {"id": str(order.id), "ref": order.ref, "shop": shop_json(business), "name": quote.get("name"),
++        "quantity": quote.get("quantity"), "total": quote.get("total"), "currency": "BDT", "payment_status": order.payment_status,
++        "delivery_status": order.digital_status, "delivery_mode": (quote.get("digital_config") or {}).get("delivery_mode"),
++        "delivery_estimate": (quote.get("digital_config") or {}).get("delivery_estimate"),
++        "created_at": utc(order.placed_at).isoformat(),
++        "ready": order.payment_status == "paid" and bool(units) and all(u.stock_unit_id and u.status in {"queued", "accepted", "delivered"} for u in units),
++        "payment": {"provider": payment.provider, "account": payment.receiving_account, "amount": str(payment.amount),
++            "trx_id": payment.proof_trx_id, "expires_at": utc(payment.expires_at).isoformat()} if payment else None}
++
++
++@router.get("/orders", dependencies=[Depends(bridge)])
++async def orders(request: Request, user=Depends(optional_user), db=Depends(get_db)):
++    identity = buyer_id(request)
++    from sqlalchemy import and_, or_
++    where = [and_(Order.checkout_data["marketplace_buyer"].as_string() == identity,
++        Order.checkout_data["marketplace_user_id"].as_string().is_(None))]
++    if user:
++        where.append(Order.checkout_data["marketplace_user_id"].as_string() == str(user.id))
++    entries = list(await db.scalars(select(Order).where(Order.fulfilment_kind == "digital", or_(*where))
++        .order_by(Order.placed_at.desc()).limit(100)))
++    return {"orders": [await order_json(db, order) for order in entries]}
++
++
++@router.get("/orders/{order_id}", dependencies=[Depends(bridge)])
++async def order_status(order_id: uuid.UUID, request: Request, user=Depends(optional_user), db=Depends(get_db)):
++    order = await bound_order(db, request, order_id, user)
++    payment = await checkout.payment_request_for(db, order)
++    if payment:
++        await checkout.expire_request(db, payment)
++    await db.commit()
++    return await order_json(db, order)
++
++
++@router.post("/orders/{order_id}/proof", dependencies=[Depends(bridge)])
++async def proof(order_id: uuid.UUID, req: PaymentProofRequest, request: Request, user=Depends(optional_user), db=Depends(get_db)):
++    order = await bound_order(db, request, order_id, user)
++    business = await db.get(Business, order.business_id)
++    payment = await checkout.payment_request_for(db, order)
++    if not payment:
++        raise HTTPException(409, "Payment request not found")
++    await checkout.expire_request(db, payment)
++    if payment.status in {"expired", "cancelled"}:
++        raise HTTPException(409, "This payment request expired. Please start a new checkout.")
++    await checkout.submit_proof(db, business, payment, req.trx_id)
++    await db.commit()
++    return await order_json(db, order)
++
++
++@router.post("/orders/{order_id}/reveal", dependencies=[Depends(bridge)])
++async def reveal(order_id: uuid.UUID, request: Request, user=Depends(optional_user), db=Depends(get_db)):
++    order = await bound_order(db, request, order_id, user)
++    business = await db.get(Business, order.business_id)
++    if order.payment_status != "paid" or not active_store(business) or order.digital_status == "needs_attention":
++        raise HTTPException(409, "Your items will be available after verified payment and preparation")
++    result = []
++    for fulfilment in await checkout.units_for(db, order):
++        if not fulfilment.stock_unit_id or fulfilment.status not in {"queued", "accepted", "delivered"}:
++            raise HTTPException(409, "The seller is still preparing this order")
++        stock = await db.get(DigitalStockUnit, fulfilment.stock_unit_id)
++        if not stock or stock.business_id != business.id or stock.state != "allocated":
++            raise HTTPException(409, "Your delivery needs seller review")
++        result.append({"item": fulfilment.unit_index, "content": decrypt_stock(stock)})
++        stock.exposed_at = stock.exposed_at or utcnow()
++        if fulfilment.status != "delivered":
++            fulfilment.status, fulfilment.accepted_at, fulfilment.delivered_at = "delivered", utcnow(), utcnow()
++            await event(db, business.id, order.id, "marketplace_delivery_opened", "customer", reference=fulfilment.id)
++    if not result:
++        raise HTTPException(409, "No delivery items are available")
++    from app.services.digital_fulfilment import project_status
++    await db.flush()
++    await project_status(db, order)
++    await db.commit()
++    return {"items": result, "delivery_status": order.digital_status}
+diff --git a/backend/tests/test_marketplace.py b/backend/tests/test_marketplace.py
+new file mode 100644
+--- /dev/null
++++ b/backend/tests/test_marketplace.py
+@@ -0,0 +1,229 @@
++"""Marketplace integration uses the existing stock, payment and fulfilment transactions."""
++import base64
++import hashlib
++import json
++import uuid
++from unittest.mock import AsyncMock
++
++import fakeredis.aioredis
++import pytest
++from fastapi import FastAPI
++from httpx import AsyncClient, ASGITransport
++from sqlalchemy import func, select
++
++from app.api.v1 import marketplace as market
++from app.core.config import settings
++from app.core.database import get_db
++from app.core.deps import get_current_active_user, get_current_user_payload
++from app.models.digital import DigitalOrderEvent, DigitalPaymentRequest, DigitalStockUnit
++from app.models.order import Order
++from app.models.product_image import OutboundPart
++from app.models.user import User, UserSession
++from app.schemas.digital import PrepareRequest
++from app.services import digital_checkout as checkout, digital_fulfilment as delivery
++from tests.test_digital_sales import digital_engine, sales, stock, pay  # noqa: F401
++
++KEY = "marketplace-test-service-key-at-least-32-bytes"
++BUYER = "a" * 64
++
++
++@pytest.fixture
++async def market_api(sales, monkeypatch):
++    await sales.db.run_sync(lambda db: UserSession.__table__.create(db.connection(), checkfirst=True))
++    monkeypatch.setattr(settings, "MARKETPLACE_BRIDGE_KEY", KEY)
++    monkeypatch.setattr(settings, "MARKETPLACE_REDIRECT_URI", "http://localhost:8088/api/auth/callback")
++    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
++    monkeypatch.setattr(market, "get_redis_client", AsyncMock(return_value=redis))
++    user = User(id=sales.owner.id, business_id=sales.business.id, first_name="Test", last_name="Seller", email=sales.owner.email,
++        hashed_password="test-only-not-a-real-password", is_active=True, is_verified=True)
++    session = UserSession(user_id=user.id, session_token="marketplace-test-session", device_name="Test", is_active=True)
++    sales.db.add_all([user, session])
++    sales.business.settings_data = {**sales.business.settings_data, "marketplace_listing": {"published": True,
++        "name": "Test shop", "description": "Authorized digital license products", "support": "help@example.test", "product_ids": [str(sales.product.id)]}}
++    await sales.db.commit()
++    app = FastAPI()
++    app.include_router(market.router, prefix="/api/v1")
++    async def database():
++        async with sales.factory() as db:
++            try:
++                yield db
++            except Exception:
++                await db.rollback()
++                raise
++    app.dependency_overrides[get_db] = database
++    app.dependency_overrides[get_current_active_user] = lambda: user
++    app.dependency_overrides[get_current_user_payload] = lambda: {"sub": str(user.id), "sid": str(session.id)}
++    sales.market_user, sales.market_session = user, session
++    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://source.test", headers={"X-Marketplace-Key": KEY, "X-Marketplace-Buyer": BUYER}) as client:
++        yield client
++    await redis.aclose()
++
++
++async def quote_and_accept(client, sales, *, identity=BUYER, quantity=1):
++    response = await client.post("/api/v1/marketplace/checkout/quote", headers={"X-Marketplace-Buyer": identity}, json={
++        "shop_id": str(sales.business.id), "product_id": str(sales.product.id), "variant_id": str(sales.variant.id),
++        "quantity": quantity, "provider": "bkash", "buyer": {"name": "Marketplace buyer"}})
++    assert response.status_code == 200, response.text
++    quoted = response.json()
++    payload = {"shop_id": str(sales.business.id), "product_id": str(sales.product.id), "draft_id": quoted["draft_id"],
++        "quote_hash": quoted["quote_hash"], "idempotency_key": "market-buy-" + identity[:10], "provider": "bkash", "accepted": True}
++    return await client.post("/api/v1/marketplace/checkout/accept", headers={"X-Marketplace-Buyer": identity}, json=payload), payload
++
++
++async def sign_in(client):
++    verifier = "v" * 64
++    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
++    response = await client.post("/api/v1/marketplace/authorize", json={"state": "s" * 64, "code_challenge": challenge,
++        "redirect_uri": settings.MARKETPLACE_REDIRECT_URI})
++    assert response.status_code == 200, response.text
++    from urllib.parse import parse_qs, urlsplit
++    code = parse_qs(urlsplit(response.json()["redirect"]).query)["code"][0]
++    return {"code": code, "code_verifier": verifier, "redirect_uri": settings.MARKETPLACE_REDIRECT_URI}
++
++
++async def test_marketplace_guest_order_uses_authoritative_stock_and_verified_payment(market_api, sales):
++    await stock(sales, 2)
++    feed = await market_api.get("/api/v1/marketplace/feed")
++    assert feed.status_code == 200 and feed.headers["cache-control"] == "no-store"
++    assert feed.json()["products"][0]["variants"][0]["stock"] == 2
++    assert "PRIVATE-LICENSE" not in feed.text and "payload_encrypted" not in feed.text
++    accepted, payload = await quote_and_accept(market_api, sales)
++    assert accepted.status_code == 200, accepted.text
++    order_id = accepted.json()["id"]
++    assert accepted.json()["payment"]["expires_at"].endswith("+00:00")
++    assert accepted.json()["created_at"].endswith("+00:00")
++    order = await sales.db.get(Order, uuid.UUID(order_id))
++    await sales.db.refresh(sales.variant)
++    assert order.business_id == sales.business.id and order.channel_type == "marketplace"
++    assert sales.variant.stock == 1 and not accepted.json()["ready"]
++    repeated = await market_api.post("/api/v1/marketplace/checkout/accept", json=payload)
++    assert repeated.json()["id"] == order_id
++    assert await sales.db.scalar(select(func.count()).select_from(Order)) == 1
++    unverified = await market_api.post(f"/api/v1/marketplace/orders/{order_id}/proof", json={"trx_id": "NOTREAL123"})
++    assert unverified.status_code == 200 and unverified.json()["payment_status"] == "pending_verification"
++    assert (await market_api.post(f"/api/v1/marketplace/orders/{order_id}/reveal")).status_code == 409
++    await pay(sales, order)
++    status = await market_api.get(f"/api/v1/marketplace/orders/{order_id}")
++    assert status.json()["ready"] and "PRIVATE-LICENSE" not in status.text
++    assert await sales.db.scalar(select(func.count()).select_from(OutboundPart)) == 0
++    revealed = await market_api.post(f"/api/v1/marketplace/orders/{order_id}/reveal")
++    assert revealed.status_code == 200 and "PRIVATE-LICENSE" in revealed.text
++    assert revealed.json()["delivery_status"] == "delivered"
++    assert (await market_api.post(f"/api/v1/marketplace/orders/{order_id}/reveal")).json() == revealed.json()
++    assert all("PRIVATE-LICENSE" not in json.dumps(event.safe_data) for event in await sales.db.scalars(select(DigitalOrderEvent)))
++    assert len((await market_api.get("/api/v1/marketplace/orders")).json()["orders"]) == 1
++
++
++async def test_marketplace_order_and_private_delivery_are_customer_bound(market_api, sales):
++    await stock(sales)
++    accepted, _ = await quote_and_accept(market_api, sales)
++    order_id = accepted.json()["id"]
++    other = {"X-Marketplace-Buyer": "b" * 64}
++    for path in [f"/orders/{order_id}"]:
++        assert (await market_api.get("/api/v1/marketplace" + path, headers=other)).status_code == 404
++    assert (await market_api.post(f"/api/v1/marketplace/orders/{order_id}/reveal", headers=other)).status_code == 404
++    assert (await market_api.post(f"/api/v1/marketplace/orders/{order_id}/proof", headers=other, json={"trx_id": "GUESS123"})).status_code == 404
++    assert not (await market_api.get("/api/v1/marketplace/orders", headers=other)).json()["orders"]
++
++
++async def test_marketplace_signed_in_buyer_can_retrieve_their_order_on_another_browser(market_api, sales):
++    await stock(sales)
++    token = (await market_api.post("/api/v1/marketplace/token", json=await sign_in(market_api))).json()["access_token"]
++    market_api.headers["Authorization"] = "Bearer " + token
++    accepted, _ = await quote_and_accept(market_api, sales)
++    order_id = accepted.json()["id"]
++    another_browser = {"X-Marketplace-Buyer": "b" * 64}
++    assert (await market_api.get(f"/api/v1/marketplace/orders/{order_id}", headers=another_browser)).status_code == 200
++    assert len((await market_api.get("/api/v1/marketplace/orders", headers=another_browser)).json()["orders"]) == 1
++    market_api.headers.pop("Authorization")
++    assert (await market_api.get(f"/api/v1/marketplace/orders/{order_id}", headers=another_browser)).status_code == 404
++    assert (await market_api.get(f"/api/v1/marketplace/orders/{order_id}")).status_code == 404
++    assert not (await market_api.get("/api/v1/marketplace/orders")).json()["orders"]
++
++
++async def test_marketplace_account_checkout_cannot_be_accepted_after_sign_out(market_api, sales):
++    await stock(sales)
++    token = (await market_api.post("/api/v1/marketplace/token", json=await sign_in(market_api))).json()["access_token"]
++    market_api.headers["Authorization"] = "Bearer " + token
++    response = await market_api.post("/api/v1/marketplace/checkout/quote", json={
++        "shop_id": str(sales.business.id), "product_id": str(sales.product.id), "variant_id": str(sales.variant.id),
++        "quantity": 1, "provider": "bkash", "buyer": {"name": "Signed in buyer"}})
++    assert response.status_code == 200, response.text
++    quoted = response.json()
++    market_api.headers.pop("Authorization")
++    response = await market_api.post("/api/v1/marketplace/checkout/accept", json={
++        "shop_id": str(sales.business.id), "product_id": str(sales.product.id), "draft_id": quoted["draft_id"],
++        "quote_hash": quoted["quote_hash"], "idempotency_key": "account-checkout-after-logout", "provider": "bkash", "accepted": True})
++    assert response.status_code == 409
++    assert await sales.db.scalar(select(func.count()).select_from(Order)) == 0
++
++
++async def test_marketplace_manual_delivery_needs_seller_prepare_and_send(market_api, sales):
++    sales.product.digital_config = {**sales.product.digital_config, "delivery_mode": "manual"}
++    sales.variant.stock = 2
++    await sales.db.commit()
++    response, _ = await quote_and_accept(market_api, sales)
++    assert response.status_code == 200, response.text
++    order = await sales.db.get(Order, uuid.UUID(response.json()["id"]))
++    await pay(sales, order)
++    unit = (await checkout.units_for(sales.db, order))[0]
++    assert unit.status == "awaiting_manual"
++    await delivery.prepare_delivery(sales.db, sales.business, order, PrepareRequest(idempotency_key="manual-marketplace",
++        units=[{"fulfilment_id": unit.id, "content": "PRIVATE-MANUAL-DELIVERY"}]), sales.owner.id)
++    await sales.db.commit()
++    assert (await market_api.post(f"/api/v1/marketplace/orders/{order.id}/reveal")).status_code == 409
++    await delivery.queue_delivery(sales.db, sales.business, order, actor=sales.owner.id, key="manual-market-send")
++    await sales.db.commit()
++    response = await market_api.post(f"/api/v1/marketplace/orders/{order.id}/reveal")
++    assert response.status_code == 200 and "PRIVATE-MANUAL-DELIVERY" in response.text
++
++
++async def test_marketplace_last_unit_cannot_be_sold_twice(market_api, sales):
++    await stock(sales, 1)
++    first, _ = await quote_and_accept(market_api, sales)
++    assert first.status_code == 200
++    second, _ = await quote_and_accept(market_api, sales, identity="b" * 64)
++    assert second.status_code == 409
++    assert await sales.db.scalar(select(func.count()).select_from(Order)) == 1
++    assert await sales.db.scalar(select(func.count()).select_from(DigitalPaymentRequest)) == 1
++
++
++async def test_marketplace_pkce_is_single_use_and_bound_to_live_arisesell_session(market_api, sales):
++    exchange = await sign_in(market_api)
++    response = await market_api.post("/api/v1/marketplace/token", json=exchange)
++    assert response.status_code == 200, response.text
++    token = response.json()["access_token"]
++    assert (await market_api.post("/api/v1/marketplace/token", json=exchange)).status_code == 400
++    headers = {"Authorization": "Bearer " + token}
++    assert (await market_api.get("/api/v1/marketplace/me", headers=headers)).status_code == 200
++    sales.market_session.is_active = False
++    await sales.db.commit()
++    assert (await market_api.get("/api/v1/marketplace/me", headers=headers)).status_code == 401
++
++
++async def test_marketplace_rejects_wrong_pkce_and_unregistered_redirect(market_api):
++    exchange = await sign_in(market_api)
++    exchange["code_verifier"] = "x" * 64
++    assert (await market_api.post("/api/v1/marketplace/token", json=exchange)).status_code == 400
++    assert (await market_api.post("/api/v1/marketplace/authorize", json={"state": "s" * 64,
++        "code_challenge": "x" * 43, "redirect_uri": "https://attacker.test/api/auth/callback"})).status_code == 400
++
++
++async def test_marketplace_listing_is_owned_and_selection_remains_in_arisesell(market_api, sales):
++    token = (await market_api.post("/api/v1/marketplace/token", json=await sign_in(market_api))).json()["access_token"]
++    headers = {"Authorization": "Bearer " + token}
++    body = {"published": True, "name": "Updated shop", "description": "Authorized product marketplace shop", "support": "help@example.test", "product_ids": [str(sales.product.id)]}
++    assert (await market_api.put(f"/api/v1/marketplace/stores/{uuid.uuid4()}/listing", headers=headers, json=body)).status_code == 404
++    bad = {**body, "product_ids": [str(uuid.uuid4())]}
++    assert (await market_api.put(f"/api/v1/marketplace/stores/{sales.business.id}/listing", headers=headers, json=bad)).status_code == 409
++    assert (await market_api.put(f"/api/v1/marketplace/stores/{sales.business.id}/listing", headers=headers, json=body)).status_code == 200
++    assert (await market_api.get("/api/v1/marketplace/feed")).json()["shops"][0]["name"] == "Updated shop"
++    body["published"] = False
++    assert (await market_api.put(f"/api/v1/marketplace/stores/{sales.business.id}/listing", headers=headers, json=body)).status_code == 200
++    assert not (await market_api.get("/api/v1/marketplace/feed")).json()["products"]
++
++
++async def test_marketplace_source_bridge_is_disabled_without_configuration(market_api, monkeypatch):
++    assert (await market_api.get("/api/v1/marketplace/feed", headers={"X-Marketplace-Key": "wrong"})).status_code == 401
++    monkeypatch.setattr(settings, "MARKETPLACE_BRIDGE_KEY", "")
++    assert (await market_api.get("/api/v1/marketplace/feed")).status_code == 503
+diff --git a/frontend/app/marketplace/connect/page.tsx b/frontend/app/marketplace/connect/page.tsx
+new file mode 100644
+--- /dev/null
++++ b/frontend/app/marketplace/connect/page.tsx
+@@ -0,0 +1,31 @@
++"use client";
++import {Suspense,useState} from "react";
++import {useSearchParams} from "next/navigation";
++import Link from "next/link";
++import {useAuth} from "@/lib/auth-context";
++import {api} from "@/lib/api-client";
++import {Button,Wordmark} from "@/components/ui/primitives";
++import {UiText,useUiCopy} from "@/lib/i18n";
++
++function ConnectForm() {
++  const copy=useUiCopy();
++  const params=useSearchParams();const {user,loading}=useAuth();
++  const [busy,setBusy]=useState(false);const [error,setError]=useState("");
++  const payload={state:params.get("state")||"",code_challenge:params.get("code_challenge")||"",redirect_uri:params.get("redirect_uri")||""};
++  const returnTo=`/marketplace/connect?${params.toString()}`;
++  const valid=/^[A-Za-z0-9_-]{32,128}$/.test(payload.state)&&/^[A-Za-z0-9_-]{43}$/.test(payload.code_challenge)&&!!payload.redirect_uri;
++  async function connect() {
++    if(busy)return;setBusy(true);setError("");
++    try {const result=await api.request<{redirect:string}>("/marketplace/authorize",{method:"POST",body:JSON.stringify(payload)});window.location.assign(result.redirect);}
++    catch(error){setError(error instanceof Error?error.message:copy.text("Unable to connect. Please retry."));setBusy(false);}
++  }
++  return <main className="min-h-screen bg-canvas px-4 py-16 text-text"><section className="mx-auto max-w-lg space-y-6 rounded-2xl border border-line bg-surface p-7 shadow-sm">
++    <Wordmark/><div><p className="mb-2 text-sm font-semibold text-signal"><UiText>Arise Digital Store</UiText></p><h1 className="text-2xl font-semibold"><UiText>Your shop. A bigger audience.</UiText></h1><p className="mt-3 text-text-2"><UiText>Use your AriseSell account to open your digital storefront. Choose what to publish after connecting.</UiText></p></div>
++    {!valid?<p role="alert" className="text-coral"><UiText>This connection link is incomplete. Return to Arise Digital Store and choose Continue with AriseSell again.</UiText></p>:loading?<p role="status"><UiText>Checking your account…</UiText></p>:!user?<div className="flex flex-wrap gap-3"><Button href={`/login?from=${encodeURIComponent(returnTo)}`}><UiText>Sign in to AriseSell</UiText></Button><Button variant="outline" href={`/signup?from=${encodeURIComponent(returnTo)}`}><UiText>Create an account</UiText></Button></div>:<>
++      <p><UiText>Continue as</UiText> <strong>{user.email}</strong></p><ul className="list-disc space-y-2 pl-5 text-sm text-text-2"><li><UiText>Connect your account and digital stores.</UiText></li><li><UiText>Choose your public shop profile and products.</UiText></li><li><UiText>Keep payments, stock and delivery managed in AriseSell.</UiText></li></ul><p className="text-xs text-text-3"><UiText>Your password and private stock are never shared with the marketplace browser.</UiText></p>
++      {error&&<p role="alert" className="text-sm text-coral">{error}</p>}<Button disabled={busy} onClick={connect}>{copy.text(busy?"Connecting…":"Continue to Arise Digital Store")}</Button>
++    </>}
++    <Link href="/console" className="block text-sm text-text-3 underline"><UiText>Return to AriseSell</UiText></Link>
++  </section></main>;
++}
++export default function MarketplaceConnectPage(){return <Suspense fallback={<p role="status"><UiText>Loading secure connection…</UiText></p>}><ConnectForm/></Suspense>;}
+diff --git a/frontend/scripts/test-marketplace-return.mjs b/frontend/scripts/test-marketplace-return.mjs
+new file mode 100644
+--- /dev/null
++++ b/frontend/scripts/test-marketplace-return.mjs
+@@ -0,0 +1,22 @@
++import fs from "node:fs";
++import vm from "node:vm";
++import assert from "node:assert/strict";
++import ts from "typescript";
++const exports={};
++vm.runInNewContext(ts.transpileModule(fs.readFileSync("lib/login-return-path.ts","utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,URL,Date});
++const values=new Map();
++const storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};
++const target="/marketplace/connect?state=browser-bound-state&code_challenge=public-challenge";
++exports.rememberMarketplaceSignupReturn(target,storage);
++assert.equal(exports.verificationLoginPath(null,storage),`/login?from=${encodeURIComponent(target)}`,"A verification link in a new tab returns to the original marketplace flow");
++assert.equal(values.size,0,"The one-time return is cleared after verification");
++assert.equal(exports.verificationLoginPath(null,storage),"/login");
++exports.rememberMarketplaceSignupReturn(target,storage);
++assert.equal(exports.verificationLoginPath("/console",storage),"/login?from=%2Fconsole");assert.equal(values.size,0);
++exports.rememberMarketplaceSignupReturn("https://attacker.test",storage);assert.equal(values.size,0);
++storage.setItem("arise_marketplace_signup_return",JSON.stringify({value:target,expires:Date.now()-1}));assert.equal(exports.verificationLoginPath(null,storage),"/login");
++storage.setItem("arise_marketplace_signup_return",JSON.stringify({value:"//attacker.test",expires:Date.now()+60000}));assert.equal(exports.verificationLoginPath(null,storage),"/login");
++assert.equal(exports.loginReturnPath("https://attacker.test", "https://arisesell.com"),"/console");
++const blocked={getItem(){throw new Error("storage blocked")},setItem(){throw new Error("storage blocked")},removeItem(){throw new Error("storage blocked")}};
++exports.rememberMarketplaceSignupReturn(target,blocked);assert.equal(exports.verificationLoginPath(target,blocked),`/login?from=${encodeURIComponent(target)}`);
++console.log("Marketplace signup/verification return paths preserve PKCE navigation, expire safely, and never allow external login redirects.");
