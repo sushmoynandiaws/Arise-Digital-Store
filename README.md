@@ -8,7 +8,7 @@ A Rust marketplace for independent AriseSell digital shops. Includes a responsiv
 
 - **Rust / Axum:** public catalog gateway, PKCE sign-in callback, encrypted server-side sessions, CSRF protection, moderation, customer reports, and checkout/order API boundary.
 - **React / TypeScript / Vite:** storefront, search and filters, shop pages, product details, checkout, purchase access, seller dashboard, and admin UI.
-- **SQLite:** marketplace sessions, temporary sign-in state, moderation and reports. Migration `migrations/001_marketplace.sql` applies on startup. This first release supports one marketplace application instance sharing one local SQLite database.
+- **Marketplace metadata:** local standalone development uses SQLite and `migrations/001_marketplace.sql`; serverless deployments use the separate `arise_marketplace` schema in the existing AriseSell PostgreSQL database. Apply `migrations/002_postgres.sql` once with an admin connection, then give the app a least-privilege marketplace-only role. Commerce records remain owned by AriseSell.
 - **AriseSell / existing PostgreSQL:** authoritative products, prices, private stock, payment receipts, reservations, orders and fulfilment. No second payment verifier or stock allocator exists in Rust.
 - Catalog reads fetch current public data from AriseSell. The UI refreshes every 30 seconds while visible and on focus. Checkout rechecks current ownership, publication, price, terms and availability inside AriseSell transactions.
 - AriseSell integration is opt-in and unavailable until its dedicated bridge key and exact callback are configured.
@@ -74,7 +74,7 @@ AriseSell needs its existing Redis service for single-use authorization codes. S
 
 Signed-in purchases require that same authenticated AriseSell account, including when returning from another browser. A guest cookie alone cannot open an account-associated purchase after logout. The purchase-history sign-in button returns directly to purchase history.
 
-Run `docker compose up --build -d` for the new application, then place it behind an HTTPS reverse proxy matching `PUBLIC_ORIGIN`. Back up the marketplace data volume and protect its encryption key. The Dockerfile is supplied but has not been built on this machine; the local WSL build is the verified runtime.
+For a single-instance standalone deployment, run `docker compose up --build -d` and place it behind an HTTPS reverse proxy matching `PUBLIC_ORIGIN`. Back up the marketplace data volume and protect its encryption key. For Vercel multi-service deployment, follow [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md); serverless instances require shared PostgreSQL metadata storage. The Dockerfile has not been built on this machine; the local WSL build is the verified standalone runtime.
 
 ## Tests
 
@@ -104,5 +104,5 @@ Browser tests cover storefront filters, shop navigation, mobile/landscape reflow
 - No commissions, platform wallet, subscription billing, or automated refund rules were added.
 - The initial feed returns published public metadata as one bounded-per-shop selection (up to 500 selected products per shop). Large deployments need server-side catalog pagination/search and a deployment-specific load test before broad rollout. Multi-instance operation requires a shared marketplace database and distributed rate limiting.
 
-Design decisions are in `design-system/arise-digital-store/`. Dependencies: [Axum](https://docs.rs/axum/latest/axum/), [rusqlite](https://docs.rs/rusqlite/latest/rusqlite/), and the official [Rust installation guide](https://rust-lang.org/tools/install/).
+Design decisions are in `design-system/arise-digital-store/`. Dependencies: [Axum](https://docs.rs/axum/latest/axum/), [SQLx](https://docs.rs/sqlx/latest/sqlx/), and the official [Rust installation guide](https://rust-lang.org/tools/install/).
 "# Arise-Digital-Store" 

@@ -3,6 +3,9 @@
 /web/dist/
 /data/
 /.env
+.env.*
+!.env.example
+/.vercel/
 *.db*
 __pycache__/
 *.log

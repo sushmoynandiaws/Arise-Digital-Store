@@ -51,9 +51,10 @@ test("seller uses PKCE connection and updates the source-owned shop profile",asy
   await expect(page.getByRole("heading",{name:"Your shop profile"})).toBeVisible();await page.getByLabel("Choose your AriseSell store").selectOption({label:"Studio North"});
   await expect(page.getByLabel("Shop name",{exact:true})).toHaveValue("Studio North");await page.getByLabel("Tell customers about your shop").fill("Thoughtful design assets and templates for your next creative chapter.");
   await page.getByRole("button",{name:"Save shop changes"}).click();await expect(page.getByRole("status").filter({hasText:"Your shop is live."})).toBeVisible();
-  await expect(page.getByLabel("Your store link",{exact:true})).toHaveValue("http://localhost:8088/shops/studio-north");
+  const storeLink=`${new URL(page.url()).origin}/shops/studio-north`;
+  await expect(page.getByLabel("Your store link",{exact:true})).toHaveValue(storeLink);
   await context.grantPermissions(["clipboard-read","clipboard-write"]);await page.getByRole("button",{name:"Copy store link",exact:true}).click();
-  await expect(page.getByRole("button",{name:"Copied",exact:true})).toBeVisible();expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe("http://localhost:8088/shops/studio-north");
+  await expect(page.getByRole("button",{name:"Copied",exact:true})).toBeVisible();expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe(storeLink);
   await page.screenshot({path:"../artifacts/seller-dashboard.png",fullPage:true});
   await page.setViewportSize({width:375,height:812});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
   await expect(page.getByLabel("Your store link",{exact:true})).toBeVisible();

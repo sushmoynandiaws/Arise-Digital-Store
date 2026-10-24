@@ -1,3 +1,4 @@
+use arise_digital_store::db::connect_pool;
 use arise_digital_store::{AppState, Config, app::router, digest, now, validate_origin};
 use axum::{
     Json, Router,
@@ -7,7 +8,6 @@ use axum::{
     routing::{get, post},
 };
 use http_body_util::BodyExt;
-use rusqlite::{Connection, params};
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
 use tower::ServiceExt;
@@ -17,7 +17,26 @@ const PRODUCT: &str = "22222222-2222-4222-8222-222222222222";
 const BUYER: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 type Requests = Arc<Mutex<Vec<(String, Value)>>>;
 
+fn postgres_test_url() -> Option<String> {
+    let value = std::env::var("MARKETPLACE_TEST_DATABASE_URL").ok()?;
+    let parsed = url::Url::parse(&value).unwrap();
+    assert_eq!(
+        parsed.path(),
+        "/arise_marketplace_test",
+        "Tests may reset only their disposable database"
+    );
+    assert!(matches!(parsed.host_str(), Some("localhost" | "127.0.0.1")));
+    Some(value)
+}
+async fn metadata_pool() -> sqlx::AnyPool {
+    connect_pool("sqlite::memory:").await.unwrap()
+}
+
 async fn setup() -> (AppState, Requests, tokio::task::JoinHandle<()>) {
+    setup_with_pool(metadata_pool().await).await
+}
+
+async fn setup_with_pool(pool: sqlx::AnyPool) -> (AppState, Requests, tokio::task::JoinHandle<()>) {
     let calls: Requests = Arc::new(Mutex::new(Vec::new()));
     let captured = calls.clone();
     let source=Router::new()
@@ -41,7 +60,7 @@ async fn setup() -> (AppState, Requests, tokio::task::JoinHandle<()>) {
             encryption_key: [8; 32],
             demo: true,
         },
-        Connection::open_in_memory().unwrap(),
+        pool,
     )
     .ok()
     .unwrap();
@@ -61,20 +80,14 @@ fn write(path: &str, payload: Value) -> Request<Body> {
         .body(Body::from(payload.to_string()))
         .unwrap()
 }
-fn sign_in(state: &AppState, access: &str) -> String {
+async fn sign_in(state: &AppState, access: &str) -> String {
     let session = "b".repeat(64);
-    state
-        .db
-        .lock()
-        .unwrap()
-        .execute(
-            "INSERT INTO sessions VALUES(?1,?2,?3)",
-            params![
-                digest(&session),
-                state.seal(access).ok().unwrap(),
-                now() + 3600
-            ],
-        )
+    sqlx::query("INSERT INTO sessions VALUES($1,$2,$3)")
+        .bind(digest(&session))
+        .bind(state.seal(access).ok().unwrap())
+        .bind(now() + 3600)
+        .execute(&state.db)
+        .await
         .unwrap();
     session
 }
@@ -148,14 +161,20 @@ async fn source_tokens_are_encrypted_and_tampering_is_rejected() {
     );
     let changed = if first.starts_with('A') { 'B' } else { 'A' };
     assert!(state.unseal(&format!("{changed}{}", &first[1..])).is_err());
-    let session = sign_in(&state, "PRIVATE-SOURCE-ACCESS-TOKEN");
+    let session = sign_in(&state, "PRIVATE-SOURCE-ACCESS-TOKEN").await;
     assert_eq!(
-        state.access_token(Some(&session)).ok().flatten().unwrap(),
+        state
+            .access_token(Some(&session))
+            .await
+            .ok()
+            .flatten()
+            .unwrap(),
         "PRIVATE-SOURCE-ACCESS-TOKEN"
     );
     assert!(
         state
             .access_token(Some(&"c".repeat(64)))
+            .await
             .ok()
             .flatten()
             .is_none()
@@ -268,7 +287,7 @@ async fn customer_sign_in_returns_to_purchases_and_rejects_external_destinations
 async fn moderation_requires_admin_and_removes_hidden_products_from_browse_and_checkout() {
     let (state, _, server) = setup().await;
     let app = router(state.clone());
-    let session = sign_in(&state, "seller");
+    let session = sign_in(&state, "seller").await;
     let payload = json!({"kind":"product","target_id":PRODUCT,"hidden":true,"reason":"Reported test listing"});
     let mut request = write("/api/admin/moderation", payload.clone());
     request.headers_mut().insert(
@@ -281,13 +300,11 @@ async fn moderation_requires_admin_and_removes_hidden_products_from_browse_and_c
         app.clone().oneshot(request).await.unwrap().status(),
         StatusCode::FORBIDDEN
     );
-    state
-        .db
-        .lock()
-        .unwrap()
-        .execute("DELETE FROM sessions", [])
+    sqlx::query("DELETE FROM sessions")
+        .execute(&state.db)
+        .await
         .unwrap();
-    let session = sign_in(&state, "admin");
+    let session = sign_in(&state, "admin").await;
     let mut request = write("/api/admin/moderation", payload);
     request.headers_mut().insert(
         "Cookie",
@@ -345,7 +362,7 @@ async fn source_failure_never_falls_back_to_a_fake_catalog() {
 #[tokio::test]
 async fn logout_removes_account_session_and_rotates_the_private_buyer_capability() {
     let (state, _, server) = setup().await;
-    let session = sign_in(&state, "seller");
+    let session = sign_in(&state, "seller").await;
     let mut request = write("/api/auth/logout", json!({}));
     *request.method_mut() = axum::http::Method::POST;
     request.headers_mut().insert(
@@ -372,14 +389,21 @@ async fn logout_removes_account_session_and_rotates_the_private_buyer_capability
             .iter()
             .any(|c| c.starts_with("arise_buyer=") && !c.contains(BUYER))
     );
-    assert!(state.access_token(Some(&session)).ok().flatten().is_none());
+    assert!(
+        state
+            .access_token(Some(&session))
+            .await
+            .ok()
+            .flatten()
+            .is_none()
+    );
     server.abort();
 }
 
 #[tokio::test]
 async fn revoked_source_login_clears_both_account_access_and_old_guest_capability() {
     let (state, _, server) = setup().await;
-    let session = sign_in(&state, "revoked");
+    let session = sign_in(&state, "revoked").await;
     let response = router(state.clone())
         .oneshot(
             Request::builder()
@@ -413,7 +437,14 @@ async fn revoked_source_login_clears_both_account_access_and_old_guest_capabilit
     let data = body(response).await;
     assert!(data["user"].is_null());
     assert_ne!(data["csrf"], digest(BUYER));
-    assert!(state.access_token(Some(&session)).ok().flatten().is_none());
+    assert!(
+        state
+            .access_token(Some(&session))
+            .await
+            .ok()
+            .flatten()
+            .is_none()
+    );
     server.abort();
 }
 
@@ -434,4 +465,238 @@ fn url_configuration_rejects_insecure_remote_origins_and_credentials() {
     ] {
         assert!(validate_origin(url).is_ok());
     }
+}
+
+#[tokio::test]
+async fn rate_limits_admit_only_the_allowed_number_under_concurrent_requests() {
+    let (state, _, server) = setup().await;
+    let mut requests = Vec::new();
+    for _ in 0..20 {
+        let state = state.clone();
+        requests.push(tokio::spawn(async move {
+            state.rate_limit("concurrent-client", 5).await.is_ok()
+        }));
+    }
+    let mut admitted = 0;
+    for request in requests {
+        admitted += usize::from(request.await.unwrap());
+    }
+    assert_eq!(admitted, 5);
+    server.abort();
+}
+
+#[tokio::test]
+async fn serverless_api_preserves_public_paths_and_never_serves_a_storefront_fallback() {
+    let (state, _, server) = setup().await;
+    let app = arise_digital_store::app::api_router(state);
+    for (path, expected) in [
+        ("/health", StatusCode::OK),
+        ("/api/catalog", StatusCode::OK),
+        ("/api/unknown", StatusCode::NOT_FOUND),
+        ("/shops/test-shop", StatusCode::NOT_FOUND),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(Request::builder().uri(path).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), expected);
+        assert!(
+            response.headers()["content-type"]
+                .to_str()
+                .unwrap()
+                .starts_with("application/json")
+        );
+    }
+    server.abort();
+}
+
+#[tokio::test]
+async fn only_native_vercel_ingress_uses_platform_forwarded_client_ips() {
+    let (state, _, server) = setup().await;
+    let request = || {
+        Request::builder()
+            .uri("/api/auth/start")
+            .header("x-forwarded-for", "203.0.113.5")
+            .body(Body::empty())
+            .unwrap()
+    };
+    assert_eq!(
+        arise_digital_store::app::api_router(state.clone())
+            .oneshot(request())
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::SEE_OTHER
+    );
+    assert_eq!(
+        router(state.clone())
+            .oneshot(request())
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::SEE_OTHER
+    );
+    let forwarded: i64 = sqlx::query_scalar("SELECT attempts FROM rate_limits WHERE bucket=$1")
+        .bind("ip:203.0.113.5")
+        .fetch_one(&state.db)
+        .await
+        .unwrap();
+    assert_eq!(forwarded, 1);
+    let direct: i64 = sqlx::query_scalar("SELECT attempts FROM rate_limits WHERE bucket=$1")
+        .bind("ip:test")
+        .fetch_one(&state.db)
+        .await
+        .unwrap();
+    assert_eq!(direct, 1);
+    server.abort();
+}
+
+#[tokio::test]
+async fn production_runtime_refuses_demo_or_loopback_commerce_origins() {
+    let (state, _, server) = setup().await;
+    let mut config = (*state.config).clone();
+    assert!(config.validate_serverless(false).is_err());
+    assert!(config.validate_serverless(true).is_ok());
+    config.demo = false;
+    config.origin = "https://store.example.test".into();
+    config.source_api = "https://arisesell.com/api/v1".into();
+    config.source_web = "https://arisesell.com".into();
+    assert!(config.validate_serverless(false).is_ok());
+    config.demo = true;
+    assert!(config.validate_serverless(true).is_err());
+    server.abort();
+}
+
+#[test]
+fn serverless_storage_rejects_ephemeral_files_and_unverified_remote_database_connections() {
+    use arise_digital_store::db::validate_database_url;
+    assert!(validate_database_url("sqlite::memory:", true).is_err());
+    assert!(
+        validate_database_url(
+            "postgresql://user@remote.example/store?sslmode=verify-full&sslmode=disable",
+            true
+        )
+        .is_err()
+    );
+    assert!(
+        validate_database_url(
+            "postgresql://user:secret@remote.example/store?sslmode=disable",
+            true
+        )
+        .is_err()
+    );
+    assert!(validate_database_url("postgresql+asyncpg://user@remote.example/store", true).is_err());
+    assert!(
+        validate_database_url(
+            "postgresql://user:secret@remote.example/store?sslmode=verify-full",
+            true
+        )
+        .is_ok()
+    );
+    assert!(
+        validate_database_url(
+            "postgresql://user@127.0.0.1:55438/arise_marketplace_test",
+            true
+        )
+        .is_ok()
+    );
+    assert!(validate_database_url("sqlite::memory:", false).is_ok());
+}
+
+#[tokio::test]
+#[ignore = "requires disposable local MARKETPLACE_TEST_DATABASE_URL; run with --ignored --test-threads=1"]
+async fn postgres_state_survives_separate_function_instances_without_commerce_table_access() {
+    let url = postgres_test_url().expect("Set the disposable local PostgreSQL test URL");
+    let pool = connect_pool(&url).await.unwrap();
+    sqlx::raw_sql("TRUNCATE arise_marketplace.auth_requests,arise_marketplace.sessions,arise_marketplace.moderation,arise_marketplace.reports,arise_marketplace.rate_limits;").execute(&pool).await.unwrap();
+    let (first, calls, server) = setup_with_pool(pool).await;
+    let second = AppState::new((*first.config).clone(), connect_pool(&url).await.unwrap()).unwrap();
+    let session = sign_in(&first, "admin").await;
+    assert_eq!(
+        second
+            .access_token(Some(&session))
+            .await
+            .ok()
+            .flatten()
+            .as_deref(),
+        Some("admin")
+    );
+    let one = router(first.clone());
+    let two = router(second.clone());
+    let start = one
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/auth/start")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let location = url::Url::parse(start.headers()["location"].to_str().unwrap()).unwrap();
+    let nonce = location
+        .query_pairs()
+        .find(|(key, _)| key == "state")
+        .unwrap()
+        .1
+        .into_owned();
+    let request = || {
+        Request::builder()
+            .uri(format!("/api/auth/callback?state={nonce}&code=single-code"))
+            .header("Cookie", format!("arise_auth_state={nonce}"))
+            .body(Body::empty())
+            .unwrap()
+    };
+    let (left, right) = tokio::join!(one.oneshot(request()), two.oneshot(request()));
+    let redirects: Vec<_> = [left.unwrap(), right.unwrap()]
+        .into_iter()
+        .map(|response| response.headers()["location"].to_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(
+        redirects
+            .iter()
+            .filter(|path| path.as_str() == "/seller")
+            .count(),
+        1
+    );
+    assert_eq!(calls.lock().unwrap().len(), 1);
+    let mut moderation = write(
+        "/api/admin/moderation",
+        json!({"kind":"product","target_id":PRODUCT,"hidden":true,"reason":"Persistence across instances"}),
+    );
+    moderation.headers_mut().insert(
+        "Cookie",
+        format!("arise_buyer={BUYER}; arise_session={session}")
+            .parse()
+            .unwrap(),
+    );
+    assert_eq!(
+        router(second.clone())
+            .oneshot(moderation)
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    let feed = body(
+        router(first)
+            .oneshot(
+                Request::builder()
+                    .uri("/api/catalog")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(feed["products"].as_array().unwrap().is_empty());
+    assert!(
+        sqlx::query("SELECT * FROM public.commerce_sentinel")
+            .fetch_all(&second.db)
+            .await
+            .is_err()
+    );
+    server.abort();
 }

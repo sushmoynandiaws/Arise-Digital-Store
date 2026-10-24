@@ -2,6 +2,9 @@ target
 web/node_modules
 web/dist
 .env
+.env.*
+.tools
+.vercel
 data
 artifacts
 web/test-results

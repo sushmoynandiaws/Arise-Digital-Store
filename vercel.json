@@ -1,0 +1,28 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "app": {
+      "root": ".",
+      "runtime": "rust",
+      "entrypoint": "api/app.rs",
+      "devCommand": "cargo run --locked --bin arise-digital-store"
+    },
+    "web": {
+      "root": "web",
+      "framework": "vite",
+      "installCommand": "npm ci",
+      "buildCommand": "npm run build",
+      "outputDirectory": "dist",
+      "routes": [
+        { "handle": "filesystem" },
+        { "src": "/:path((?!@vite/|@id/|@fs/|src/|node_modules/|assets/).*)", "dest": "/index.html" }
+      ]
+    }
+  },
+  "rewrites": [
+    { "source": "/api", "destination": { "service": "app", "path": "/api/app" } },
+    { "source": "/api/(.*)", "destination": { "service": "app", "path": "/api/app" } },
+    { "source": "/health", "destination": { "service": "app", "path": "/api/app" } },
+    { "source": "/(.*)", "destination": { "service": "web" } }
+  ]
+}

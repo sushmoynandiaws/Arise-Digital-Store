@@ -4,11 +4,11 @@ pub mod source;
 
 use aes_gcm::{Aes256Gcm, KeyInit};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use rusqlite::Connection;
 use sha2::{Digest, Sha256};
+use sqlx::AnyPool;
 use std::{
     env,
-    sync::{Arc, Mutex},
+    sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 use url::Url;
@@ -67,6 +67,23 @@ impl Config {
     pub fn callback(&self) -> String {
         format!("{}/api/auth/callback", self.origin)
     }
+    pub fn validate_serverless(&self, local_development: bool) -> Result<(), String> {
+        if local_development
+            && [&self.origin, &self.source_api, &self.source_web]
+                .iter()
+                .all(|value| is_loopback(value))
+        {
+            return Ok(());
+        }
+        if self.demo
+            || [&self.origin, &self.source_api, &self.source_web]
+                .iter()
+                .any(|value| !value.starts_with("https://"))
+        {
+            return Err("Vercel requires DEMO_MODE=false and explicit HTTPS PUBLIC_ORIGIN, ARISESELL_API_URL and ARISESELL_WEB_URL".into());
+        }
+        Ok(())
+    }
 }
 pub fn is_loopback(value: &str) -> bool {
     Url::parse(value)
@@ -104,15 +121,13 @@ pub fn digest(value: &str) -> String {
 }
 #[derive(Clone)]
 pub struct AppState {
-    pub db: Arc<Mutex<Connection>>,
+    pub db: AnyPool,
     pub config: Arc<Config>,
     pub http: reqwest::Client,
     pub cipher: Arc<Aes256Gcm>,
 }
 impl AppState {
-    pub fn new(config: Config, db: Connection) -> Result<Self, String> {
-        db.execute_batch(include_str!("../migrations/001_marketplace.sql"))
-            .map_err(|_| "Could not apply marketplace migrations")?;
+    pub fn new(config: Config, db: AnyPool) -> Result<Self, String> {
         let cipher = Aes256Gcm::new_from_slice(&config.encryption_key)
             .map_err(|_| "Invalid encryption key")?;
         let http = reqwest::Client::builder()
@@ -121,7 +136,7 @@ impl AppState {
             .build()
             .map_err(|_| "Could not create AriseSell client")?;
         Ok(Self {
-            db: Arc::new(Mutex::new(db)),
+            db,
             config: Arc::new(config),
             http,
             cipher: Arc::new(cipher),

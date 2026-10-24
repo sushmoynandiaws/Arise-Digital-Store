@@ -8,10 +8,10 @@ use axum::{
     routing::{get, post, put},
 };
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use rusqlite::{OptionalExtension, params};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use sqlx::Row;
 use tower_http::services::{ServeDir, ServeFile};
 
 pub type Result<T> = std::result::Result<T, AppError>;
@@ -39,7 +39,15 @@ impl IntoResponse for AppError {
     }
 }
 pub fn router(state: AppState) -> Router {
-    Router::new()
+    build_router(state, true)
+}
+pub fn api_router(state: AppState) -> Router {
+    build_router(state, false).layer(axum::Extension(VercelIngress))
+}
+#[derive(Clone, Copy)]
+struct VercelIngress;
+fn build_router(state: AppState, serve_web: bool) -> Router {
+    let routes = Router::new()
         .route(
             "/health",
             get(|| async { Json(json!({"status":"ok","service":"arise-digital-store"})) }),
@@ -67,10 +75,15 @@ pub fn router(state: AppState) -> Router {
             axum::routing::any(|| async {
                 AppError::new(StatusCode::NOT_FOUND, "API route not found.")
             }),
-        )
-        .fallback_service(
+        );
+    let routes = if serve_web {
+        routes.fallback_service(
             ServeDir::new("web/dist").not_found_service(ServeFile::new("web/dist/index.html")),
         )
+    } else {
+        routes.fallback(|| async { AppError::new(StatusCode::NOT_FOUND, "API route not found.") })
+    };
+    routes
         .layer(DefaultBodyLimit::max(65536))
         .layer(middleware::from_fn_with_state(state.clone(), security))
         .with_state(state)
@@ -128,16 +141,29 @@ async fn security(State(state): State<AppState>, request: Request, next: Next) -
         }
     }
     if mutation || request.uri().path() == "/api/auth/start" {
-        let ip = request
+        let forwarded = request
             .extensions()
-            .get::<ConnectInfo<std::net::SocketAddr>>()
-            .map(|v| v.0.ip().to_string())
+            .get::<VercelIngress>()
+            .and_then(|_| request.headers().get("x-forwarded-for"))
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.split(',').next())
+            .and_then(|value| value.trim().parse::<std::net::IpAddr>().ok());
+        let ip = forwarded
+            .map(|ip| ip.to_string())
+            .or_else(|| {
+                request
+                    .extensions()
+                    .get::<ConnectInfo<std::net::SocketAddr>>()
+                    .map(|v| v.0.ip().to_string())
+            })
             .unwrap_or_else(|| "test".into());
-        if let Err(error) = state.rate_limit(&format!("ip:{ip}"), 6000) {
+        if let Err(error) = state.rate_limit(&format!("ip:{ip}"), 6000).await {
             return error.into_response();
         }
         if let Some(buyer) = cookie(request.headers(), "arise_buyer")
-            && let Err(error) = state.rate_limit(&format!("actions:{}", digest(&buyer)), 180)
+            && let Err(error) = state
+                .rate_limit(&format!("actions:{}", digest(&buyer)), 180)
+                .await
         {
             return error.into_response();
         }
@@ -161,11 +187,15 @@ async fn security(State(state): State<AppState>, request: Request, next: Next) -
     }
     response
 }
-fn access(state: &AppState, headers: &HeaderMap) -> Result<Option<String>> {
-    state.access_token(cookie(headers, "arise_session").as_deref())
+async fn access(state: &AppState, headers: &HeaderMap) -> Result<Option<String>> {
+    state
+        .access_token(cookie(headers, "arise_session").as_deref())
+        .await
 }
-fn required_access(state: &AppState, headers: &HeaderMap) -> Result<String> {
-    access(state, headers)?.ok_or_else(AppError::unauthorized)
+async fn required_access(state: &AppState, headers: &HeaderMap) -> Result<String> {
+    access(state, headers)
+        .await?
+        .ok_or_else(AppError::unauthorized)
 }
 fn buyer(headers: &HeaderMap) -> Result<String> {
     cookie(headers, "arise_buyer").ok_or_else(|| {
@@ -183,11 +213,11 @@ fn uuid(value: &str) -> Result<()> {
 async fn session(State(state): State<AppState>, headers: HeaderMap) -> Result<Response> {
     let mut guest = cookie(&headers, "arise_buyer").unwrap_or_else(token);
     let mut revoked = false;
-    let mut response = if let Some(access) = access(&state, &headers)? {
+    let mut response = if let Some(access) = access(&state, &headers).await? {
         match state.source(reqwest::Method::GET,"/marketplace/me",Some(&access),None,None).await {
             Ok(me)=>Json(json!({"user":me["user"],"csrf":digest(&guest),"demo":state.config.demo,"source_web":state.config.source_web})).into_response(),
             Err(error) if matches!(error.0,StatusCode::UNAUTHORIZED|StatusCode::FORBIDDEN)=>{
-                if let Some(session)=cookie(&headers,"arise_session") {state.db.lock().map_err(|_|AppError::internal())?.execute("DELETE FROM sessions WHERE token_hash=?1",[digest(&session)]).map_err(|_|AppError::internal())?;}
+                if let Some(session)=cookie(&headers,"arise_session") {sqlx::query("DELETE FROM sessions WHERE token_hash=$1").bind(digest(&session)).execute(&state.db).await.map_err(|_|AppError::internal())?;}
                 revoked=true;
                 guest=token();
                 Json(json!({"user":null,"csrf":digest(&guest),"demo":state.config.demo,"source_web":state.config.source_web})).into_response()
@@ -231,20 +261,23 @@ async fn auth_start(
     let verifier = token();
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
     {
-        let db = state.db.lock().map_err(|_| AppError::internal())?;
-        db.execute("DELETE FROM auth_requests WHERE expires_at<?1", [now()])
+        sqlx::query("DELETE FROM auth_requests WHERE expires_at<$1")
+            .bind(now())
+            .execute(&state.db)
+            .await
             .map_err(|_| AppError::internal())?;
-        db.execute("DELETE FROM sessions WHERE expires_at<?1", [now()])
+        sqlx::query("DELETE FROM sessions WHERE expires_at<$1")
+            .bind(now())
+            .execute(&state.db)
+            .await
             .map_err(|_| AppError::internal())?;
-        db.execute(
-            "INSERT INTO auth_requests VALUES(?1,?2,?3)",
-            params![
-                digest(&nonce),
-                state.seal(&json!({"verifier":verifier,"return_path":return_path}).to_string())?,
-                now() + 600
-            ],
-        )
-        .map_err(|_| AppError::internal())?;
+        sqlx::query("INSERT INTO auth_requests VALUES($1,$2,$3)")
+            .bind(digest(&nonce))
+            .bind(state.seal(&json!({"verifier":verifier,"return_path":return_path}).to_string())?)
+            .bind(now() + 600)
+            .execute(&state.db)
+            .await
+            .map_err(|_| AppError::internal())?;
     }
     let mut url = url::Url::parse(&format!("{}/marketplace/connect", state.config.source_web))
         .map_err(|_| AppError::internal())?;
@@ -275,7 +308,14 @@ async fn auth_callback(
         ));
     }
     let verifier: Option<String> = {
-        state.db.lock().map_err(|_|AppError::internal())?.query_row("DELETE FROM auth_requests WHERE state_hash=?1 AND expires_at>?2 RETURNING verifier",params![digest(&query.state),now()],|row|row.get(0)).optional().map_err(|_|AppError::internal())?
+        sqlx::query_scalar(
+            "DELETE FROM auth_requests WHERE state_hash=$1 AND expires_at>$2 RETURNING verifier",
+        )
+        .bind(digest(&query.state))
+        .bind(now())
+        .fetch_optional(&state.db)
+        .await
+        .map_err(|_| AppError::internal())?
     };
     let verifier = verifier.ok_or_else(|| {
         AppError::new(
@@ -302,16 +342,25 @@ async fn auth_callback(
     let session = token();
     let encrypted = state.seal(source_token)?;
     {
-        let db = state.db.lock().map_err(|_| AppError::internal())?;
+        let mut transaction = state.db.begin().await.map_err(|_| AppError::internal())?;
         if let Some(old) = cookie(&headers, "arise_session") {
-            db.execute("DELETE FROM sessions WHERE token_hash=?1", [digest(&old)])
+            sqlx::query("DELETE FROM sessions WHERE token_hash=$1")
+                .bind(digest(&old))
+                .execute(&mut *transaction)
+                .await
                 .map_err(|_| AppError::internal())?;
         }
-        db.execute(
-            "INSERT INTO sessions VALUES(?1,?2,?3)",
-            params![digest(&session), encrypted, now() + lifetime],
-        )
-        .map_err(|_| AppError::internal())?;
+        sqlx::query("INSERT INTO sessions VALUES($1,$2,$3)")
+            .bind(digest(&session))
+            .bind(encrypted)
+            .bind(now() + lifetime)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|_| AppError::internal())?;
+        transaction
+            .commit()
+            .await
+            .map_err(|_| AppError::internal())?;
     }
     let mut response = Redirect::to(return_path).into_response();
     set_cookie(&mut response, &state, "arise_session", &session, lifetime);
@@ -327,14 +376,10 @@ async fn auth_callback(
 }
 async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Result<Response> {
     if let Some(session) = cookie(&headers, "arise_session") {
-        state
-            .db
-            .lock()
-            .map_err(|_| AppError::internal())?
-            .execute(
-                "DELETE FROM sessions WHERE token_hash=?1",
-                [digest(&session)],
-            )
+        sqlx::query("DELETE FROM sessions WHERE token_hash=$1")
+            .bind(digest(&session))
+            .execute(&state.db)
+            .await
             .map_err(|_| AppError::internal())?;
     }
     let mut response = Json(json!({"ok":true})).into_response();
@@ -352,17 +397,11 @@ async fn feed(state: &AppState) -> Result<Value> {
     let mut feed = state
         .source(reqwest::Method::GET, "/marketplace/feed", None, None, None)
         .await?;
-    let hidden: Vec<(String, String)> = {
-        let db = state.db.lock().map_err(|_| AppError::internal())?;
-        let mut statement = db
-            .prepare("SELECT kind,target_id FROM moderation WHERE hidden=1")
+    let hidden: Vec<(String, String)> =
+        sqlx::query_as("SELECT kind,target_id FROM moderation WHERE hidden=1")
+            .fetch_all(&state.db)
+            .await
             .map_err(|_| AppError::internal())?;
-        statement
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
-            .map_err(|_| AppError::internal())?
-            .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|_| AppError::internal())?
-    };
     if let Some(shops) = feed["shops"].as_array_mut() {
         shops.retain(|shop| {
             !hidden
@@ -392,7 +431,7 @@ async fn catalog(State(state): State<AppState>) -> Result<Json<Value>> {
     Ok(Json(feed(&state).await?))
 }
 async fn seller(State(state): State<AppState>, headers: HeaderMap) -> Result<Json<Value>> {
-    let access = required_access(&state, &headers)?;
+    let access = required_access(&state, &headers).await?;
     Ok(Json(
         state
             .source(
@@ -411,7 +450,7 @@ async fn seller_catalog(
     Path(id): Path<String>,
 ) -> Result<Json<Value>> {
     uuid(&id)?;
-    let access = required_access(&state, &headers)?;
+    let access = required_access(&state, &headers).await?;
     Ok(Json(
         state
             .source(
@@ -431,7 +470,7 @@ async fn save_listing(
     Json(body): Json<Value>,
 ) -> Result<Json<Value>> {
     uuid(&id)?;
-    let access = required_access(&state, &headers)?;
+    let access = required_access(&state, &headers).await?;
     Ok(Json(
         state
             .source(
@@ -466,7 +505,7 @@ async fn commerce(
     body: Option<Value>,
 ) -> Result<Json<Value>> {
     let buyer = buyer(headers)?;
-    let access = access(state, headers)?;
+    let access = access(state, headers).await?;
     Ok(Json(
         state
             .source(method, path, access.as_deref(), Some(&buyer), body)
@@ -579,7 +618,9 @@ async fn report(
             "Describe the issue in 10 to 1,000 characters.",
         ));
     }
-    state.rate_limit(&format!("reports:{}", digest(&buyer)), 5)?;
+    state
+        .rate_limit(&format!("reports:{}", digest(&buyer)), 5)
+        .await?;
     let catalog = feed(&state).await?;
     if !catalog["products"]
         .as_array()
@@ -587,11 +628,21 @@ async fn report(
     {
         return Err(AppError::new(StatusCode::NOT_FOUND, "Product not found."));
     }
-    state.db.lock().map_err(|_|AppError::internal())?.execute("INSERT INTO reports(id,product_id,reason,reporter_hash,created_at) VALUES(?1,?2,?3,?4,?5)",params![uuid::Uuid::new_v4().to_string(),body.product_id,reason,digest(&buyer),now()]).map_err(|_|AppError::internal())?;
+    sqlx::query(
+        "INSERT INTO reports(id,product_id,reason,reporter_hash,created_at) VALUES($1,$2,$3,$4,$5)",
+    )
+    .bind(uuid::Uuid::new_v4().to_string())
+    .bind(body.product_id)
+    .bind(reason)
+    .bind(digest(&buyer))
+    .bind(now())
+    .execute(&state.db)
+    .await
+    .map_err(|_| AppError::internal())?;
     Ok(Json(json!({"ok":true})))
 }
 async fn require_admin(state: &AppState, headers: &HeaderMap) -> Result<String> {
-    let access = required_access(state, headers)?;
+    let access = required_access(state, headers).await?;
     let me = state
         .source(
             reqwest::Method::GET,
@@ -617,13 +668,12 @@ async fn admin(State(state): State<AppState>, headers: HeaderMap) -> Result<Json
     let catalog = state
         .source(reqwest::Method::GET, "/marketplace/feed", None, None, None)
         .await?;
-    let db = state.db.lock().map_err(|_| AppError::internal())?;
-    let mut reports=db.prepare("SELECT id,product_id,reason,created_at,resolved FROM reports ORDER BY created_at DESC LIMIT 200").map_err(|_|AppError::internal())?;
-    let reports=reports.query_map([],|row|Ok(json!({"id":row.get::<_,String>(0)?,"product_id":row.get::<_,String>(1)?,"reason":row.get::<_,String>(2)?,"created_at":row.get::<_,i64>(3)?,"resolved":row.get::<_,bool>(4)?}))).map_err(|_|AppError::internal())?.collect::<std::result::Result<Vec<_>,_>>().map_err(|_|AppError::internal())?;
-    let mut moderation = db
-        .prepare("SELECT kind,target_id,hidden,reason FROM moderation")
-        .map_err(|_| AppError::internal())?;
-    let moderation=moderation.query_map([],|row|Ok(json!({"kind":row.get::<_,String>(0)?,"target_id":row.get::<_,String>(1)?,"hidden":row.get::<_,bool>(2)?,"reason":row.get::<_,String>(3)?}))).map_err(|_|AppError::internal())?.collect::<std::result::Result<Vec<_>,_>>().map_err(|_|AppError::internal())?;
+    let reports = sqlx::query("SELECT id,product_id,reason,created_at,CAST(resolved AS BIGINT) AS resolved FROM reports ORDER BY created_at DESC LIMIT 200").fetch_all(&state.db).await.map_err(|_|AppError::internal())?.into_iter().map(|row| {
+        Ok(json!({"id":row.try_get::<String,_>("id")?,"product_id":row.try_get::<String,_>("product_id")?,"reason":row.try_get::<String,_>("reason")?,"created_at":row.try_get::<i64,_>("created_at")?,"resolved":row.try_get::<i64,_>("resolved")? != 0}))
+    }).collect::<std::result::Result<Vec<Value>,sqlx::Error>>().map_err(|_|AppError::internal())?;
+    let moderation = sqlx::query("SELECT kind,target_id,CAST(hidden AS BIGINT) AS hidden,reason FROM moderation").fetch_all(&state.db).await.map_err(|_|AppError::internal())?.into_iter().map(|row| {
+        Ok(json!({"kind":row.try_get::<String,_>("kind")?,"target_id":row.try_get::<String,_>("target_id")?,"hidden":row.try_get::<i64,_>("hidden")? != 0,"reason":row.try_get::<String,_>("reason")?}))
+    }).collect::<std::result::Result<Vec<Value>,sqlx::Error>>().map_err(|_|AppError::internal())?;
     Ok(Json(
         json!({"catalog":catalog,"reports":reports,"moderation":moderation}),
     ))
@@ -651,7 +701,7 @@ async fn moderate(
             "Choose a shop or product and provide a reason.",
         ));
     }
-    state.db.lock().map_err(|_|AppError::internal())?.execute("INSERT INTO moderation VALUES(?1,?2,?3,?4,?5,?6) ON CONFLICT(kind,target_id) DO UPDATE SET hidden=excluded.hidden,reason=excluded.reason,actor=excluded.actor,updated_at=excluded.updated_at",params![body.kind,body.target_id,body.hidden,body.reason.trim(),actor,now()]).map_err(|_|AppError::internal())?;
+    sqlx::query("INSERT INTO moderation VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(kind,target_id) DO UPDATE SET hidden=excluded.hidden,reason=excluded.reason,actor=excluded.actor,updated_at=excluded.updated_at").bind(body.kind).bind(body.target_id).bind(i64::from(body.hidden)).bind(body.reason.trim()).bind(actor).bind(now()).execute(&state.db).await.map_err(|_|AppError::internal())?;
     Ok(Json(json!({"ok":true})))
 }
 async fn resolve_report(
@@ -661,12 +711,12 @@ async fn resolve_report(
 ) -> Result<Json<Value>> {
     require_admin(&state, &headers).await?;
     uuid(&id)?;
-    let count = state
-        .db
-        .lock()
+    let count = sqlx::query("UPDATE reports SET resolved=1 WHERE id=$1")
+        .bind(id)
+        .execute(&state.db)
+        .await
         .map_err(|_| AppError::internal())?
-        .execute("UPDATE reports SET resolved=1 WHERE id=?1", [id])
-        .map_err(|_| AppError::internal())?;
+        .rows_affected();
     if count == 0 {
         return Err(AppError::new(StatusCode::NOT_FOUND, "Report not found."));
     }
