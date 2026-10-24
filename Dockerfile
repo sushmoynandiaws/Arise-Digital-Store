@@ -16,10 +16,10 @@ RUN cargo build --locked --release
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/* && useradd --system --uid 10001 --create-home marketplace
 WORKDIR /app
-COPY --from=backend /app/target/release/marketplace-api /app/marketplace-api
+COPY --from=backend /app/target/release/arise-digital-store /app/arise-digital-store
 COPY --from=frontend /app/web/dist /app/web/dist
 RUN mkdir /app/data && chown marketplace:marketplace /app/data
 USER marketplace
 ENV BIND_ADDRESS=0.0.0.0:8088
 EXPOSE 8088
-CMD ["/app/marketplace-api"]
+CMD ["/app/arise-digital-store"]
