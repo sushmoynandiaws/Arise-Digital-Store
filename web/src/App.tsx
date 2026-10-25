@@ -806,8 +806,7 @@ function Footer() {
     .filter((p) => (shop ? p.shop_id === shop.id : true) && p.sales_enabled)
     .slice(0, 5);
 
-  const tradeLicenceNumber = shop?.contact?.phone ? `2201010${shop.contact.phone.replace(/\D/g, "").slice(-8) || "800020367"}` : "2201010800020367";
-  const dbidNumber = "453105002";
+
 
   return (
     <footer className="dark-theme-footer store-footer">
@@ -881,49 +880,9 @@ function Footer() {
             </ul>
           </div>
 
-          {/* Column 3: Trust Badges & Social Community */}
-          <div className="dark-footer-col dark-trust-col">
-            <div className="dark-cert-cards-group">
-              <div className="dark-cert-card">
-                <div className="cert-emblem cert-gold">
-                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
-                    <circle cx="12" cy="12" r="10" fill="#EAB308" fillOpacity="0.2" stroke="#EAB308" strokeWidth="1.5" />
-                    <path d="M12 6l1.8 3.6 4 .6-2.9 2.8.7 4-3.6-1.9-3.6 1.9.7-4-2.9-2.8 4-.6L12 6z" fill="#EAB308" />
-                  </svg>
-                </div>
-                <div className="cert-meta">
-                  <span className="cert-title">{lang === "bn" ? "ট্রেড লাইসেন্স নং:" : "COCC Trade Licence No:"}</span>
-                  <strong className="cert-num">{tradeLicenceNumber}</strong>
-                </div>
-              </div>
-
-              <div className="dark-cert-card">
-                <div className="cert-emblem cert-purple">
-                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
-                    <rect x="2" y="2" width="20" height="20" rx="5" fill="#8B5CF6" fillOpacity="0.2" stroke="#8B5CF6" strokeWidth="1.5" />
-                    <path d="M8 12l3 3 6-6" stroke="#8B5CF6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-                <div className="cert-meta">
-                  <span className="cert-title">{lang === "bn" ? "ডিজিটাল বিজনেস আইডি (DBID):" : "DBID No :"}</span>
-                  <strong className="cert-num">{dbidNumber}</strong>
-                </div>
-              </div>
-            </div>
-
-            <div className="dark-fanpage-section">
-              <span className="dark-fanpage-label">{lang === "bn" ? "অফিসিয়াল সোশ্যাল পেইজ" : "FACEBOOK FAN PAGE"}</span>
-              <div className="dark-fanpage-card">
-                <div className="fanpage-avatar">
-                  {shop ? <ShopAvatar shop={shop} /> : <span className="fanpage-initial">A</span>}
-                </div>
-                <strong className="fanpage-name">{brandName}</strong>
-                <span className="fanpage-check" title="Verified Page">
-                  <Check size={14} />
-                </span>
-              </div>
-            </div>
-
+          {/* Column 3: Social Community */}
+          <div className="dark-footer-col dark-social-col">
+            <span className="dark-footer-heading">{lang === "bn" ? "সোশ্যাল মিডিয়া ও সাপোর্ট" : "COMMUNITY & SOCIAL"}</span>
             <div className="dark-social-pills-row">
               <a
                 href={shop?.social_links?.instagram || "https://instagram.com"}
@@ -952,6 +911,17 @@ function Footer() {
                 <IconFacebook size={14} />
                 <span>Facebook</span>
               </a>
+              {phone && (
+                <a
+                  href={supportHref(phone)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="dark-social-pill"
+                >
+                  <IconWhatsApp size={14} />
+                  <span>WhatsApp</span>
+                </a>
+              )}
             </div>
           </div>
 
@@ -993,24 +963,7 @@ function Footer() {
           </div>
         </div>
 
-        {/* Bottom Payment Banner: Matching 2nd Image exactly */}
-        <div className="dark-footer-payment-strip">
-          <div className="payment-strip-inner">
-            <span className="pay-with-label">{lang === "bn" ? "Pay with" : "Pay with"}</span>
-            <div className="payment-logos-divider" />
-            <div className="payment-logos-row">
-              <img src="/payment-methods/visa.svg" alt="VISA" className="pay-logo-img visa-logo" title="VISA Card" />
-              <img src="/payment-methods/mastercard.svg" alt="Mastercard" className="pay-logo-img mc-logo" title="Mastercard" />
-              <img src="/payment-methods/amex.svg" alt="American Express" className="pay-logo-img amex-logo" title="American Express" />
-              <img src="/payment-methods/bkash.svg" alt="bKash" className="pay-logo-img bkash-logo" title="bKash" />
-              <img src="/payment-methods/nagad.svg" alt="Nagad" className="pay-logo-img nagad-logo" title="Nagad" />
-              <img src="/payment-methods/rocket.svg" alt="Rocket" className="pay-logo-img rocket-logo" title="Dutch-Bangla Rocket" />
-              <img src="/payment-methods/cellfin.svg" alt="CellFin" className="pay-logo-img cellfin-logo" title="CellFin" />
-              <img src="/payment-methods/upay.svg" alt="upay" className="pay-logo-img upay-logo" title="upay" />
-              <img src="/payment-methods/efps.svg" alt="Verified by EFPS" className="pay-logo-img efps-logo" title="Verified by EFPS" />
-            </div>
-          </div>
-        </div>
+
 
         {/* Sub-bottom Bar */}
         <div className="dark-footer-subbottom">

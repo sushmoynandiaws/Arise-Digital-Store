@@ -160,31 +160,21 @@ test("styles.css includes all corresponding responsive tokens and classes", () =
   assert.ok(stylesCode.includes(".track-order-page"));
 });
 
-test("Dark theme footer matches SubscriptionsBD structure with certificates and payment strip", () => {
-  // App.tsx contains new footer components
+test("Dark theme footer has clean 4-column layout, social pills, and policy modal without unwanted cards or payment strip", () => {
+  // App.tsx contains footer components
   assert.ok(appCode.includes("function PolicyModal("));
   assert.ok(appCode.includes("dark-theme-footer"));
-  assert.ok(appCode.includes("COCC Trade Licence No:"));
-  assert.ok(appCode.includes("DBID No :"));
-  assert.ok(appCode.includes("FACEBOOK FAN PAGE"));
-  assert.ok(appCode.includes("dark-footer-payment-strip"));
-  assert.ok(appCode.includes("payment-methods/visa.svg"));
-  assert.ok(appCode.includes("payment-methods/mastercard.svg"));
-  assert.ok(appCode.includes("payment-methods/amex.svg"));
-  assert.ok(appCode.includes("payment-methods/bkash.svg"));
-  assert.ok(appCode.includes("payment-methods/nagad.svg"));
-  assert.ok(appCode.includes("payment-methods/rocket.svg"));
-  assert.ok(appCode.includes("payment-methods/cellfin.svg"));
-  assert.ok(appCode.includes("payment-methods/upay.svg"));
-  assert.ok(appCode.includes("payment-methods/efps.svg"));
+  assert.ok(appCode.includes("dark-social-pills-row"));
+  assert.ok(appCode.includes("dark-footer-links-list"));
+
+  // Red-boxed elements removed
+  assert.ok(!appCode.includes("COCC Trade Licence No:"));
+  assert.ok(!appCode.includes("DBID No :"));
+  assert.ok(!appCode.includes("dark-footer-payment-strip"));
 
   // styles.css contains dark footer styling
   assert.ok(stylesCode.includes(".dark-theme-footer"));
   assert.ok(stylesCode.includes(".dark-footer-grid"));
-  assert.ok(stylesCode.includes(".dark-cert-card"));
-  assert.ok(stylesCode.includes(".dark-fanpage-card"));
   assert.ok(stylesCode.includes(".dark-social-pill"));
-  assert.ok(stylesCode.includes(".dark-footer-payment-strip"));
-  assert.ok(stylesCode.includes(".pay-logo-img"));
   assert.ok(stylesCode.includes(".policy-modal-card"));
 });
