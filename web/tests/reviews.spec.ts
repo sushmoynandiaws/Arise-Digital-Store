@@ -15,7 +15,7 @@ test("verified customers can publish and edit one review, and products show real
       if (failReviews) { failReviews = false; return route.fulfill({ status: 503, json: { error: "Reviews are temporarily unavailable." } }); }
       return route.fulfill({ json: { count: review ? 1 : 0, average: review?.rating ?? null, has_more: false, reviews: review ? [review] : [] } });
     }
-    if (endpoint === "/api/orders/order-test") return route.fulfill({ json: { id: "order-test", product_id: product.id, ref: "ORD-TEST", shop, name: product.name, quantity: 1, total: "10.00", currency: "BDT", payment_status: "paid", delivery_status: "delivered", delivery_mode: "automatic", created_at: new Date().toISOString(), ready: true, payment: null, can_review: eligible, review } });
+    if (endpoint === "/api/orders/order-test") return route.fulfill({ json: { id: "order-test", product_id: product.id, buyer_name: "Checkout buyer", ref: "ORD-TEST", shop, name: product.name, quantity: 1, total: "10.00", currency: "BDT", payment_status: "paid", delivery_status: "delivered", delivery_mode: "automatic", created_at: new Date().toISOString(), ready: true, payment: null, can_review: eligible, review } });
     if (endpoint === "/api/orders/order-test/review") {
       const body = route.request().postDataJSON();
       expect(Object.keys(body).sort()).toEqual(["comment", "display_name", "rating"]);
@@ -31,13 +31,16 @@ test("verified customers can publish and edit one review, and products show real
   await expect(page.getByText("No reviews yet.", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Close product details" }).click();
   await page.goto("/purchases/order-test");
+  await expect(page.getByLabel("Your public name", { exact: true })).toHaveValue("Checkout buyer");
   await page.getByRole("radio", { name: "4 stars", exact: true }).check();
   await page.getByLabel("Your public name", { exact: true }).fill("ক্রেতা");
   await page.getByRole("textbox", { name: "Your review", exact: true }).fill("The course was useful and delivery was straightforward.");
   await page.getByRole("button", { name: "Publish review", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Your review", exact: true })).toBeVisible();
   await expect(page.getByText("Verified purchase", { exact: true })).toBeVisible();
+  await page.reload();
   await page.getByRole("button", { name: "Edit your review", exact: true }).click();
+  await expect(page.getByLabel("Your public name", { exact: true })).toHaveValue("ক্রেতা");
   await page.getByRole("radio", { name: "3 stars", exact: true }).check();
   await page.getByRole("textbox", { name: "Your review", exact: true }).fill("Useful course. <script>alert('review')</script> is plain text here.");
   await page.getByRole("button", { name: "Update review", exact: true }).click();

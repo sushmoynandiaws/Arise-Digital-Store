@@ -70,6 +70,7 @@ export type Purchase = {
   created_at: string;
   ready: boolean;
   product_id?: string;
+  buyer_name?: string | null;
   can_review?: boolean;
   review?: ProductReview | null;
   payment: {

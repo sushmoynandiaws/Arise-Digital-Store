@@ -53,7 +53,7 @@ export function PurchaseReview({ order }: { order: Purchase }) {
   const [review, setReview] = useState(order.review ?? null);
   const [editing, setEditing] = useState(!order.review);
   const [rating, setRating] = useState(order.review?.rating ?? 5);
-  const [name, setName] = useState(order.review?.display_name ?? "Verified customer");
+  const [name, setName] = useState(order.review?.display_name || order.buyer_name?.trim() || "Verified customer");
   const [comment, setComment] = useState(order.review?.comment ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
