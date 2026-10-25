@@ -22,6 +22,7 @@ const catalog: Catalog = { shops: [shop, otherShop], products, synced_at: "2026-
 const readyOrder: Purchase = { id: "sample-order", ref: "SAMPLE-001", shop, name: products[0].name, product_id: products[0].id, quantity: 1, total: "490.00", currency: "BDT", payment_status: "paid", delivery_status: "delivered", delivery_mode: "automatic", delivery_estimate: "", created_at: "2026-10-25T10:00:00Z", ready: true, payment: null, buyer_name: "Sample Buyer", buyer_email: "buyer@example.test", can_review: true };
 
 async function preview(page: Page, options: { signedIn?: boolean; admin?: boolean; empty?: boolean; failure?: boolean } = {}) {
+  await page.route("https://example.test/**", route => route.fulfill({ status: 200, contentType: "text/html", body: "" }));
   await page.route("**/api/**", async route => {
     const endpoint = new URL(route.request().url()).pathname;
     if (endpoint === "/api/session") return route.fulfill({ json: { user: options.signedIn ? { id: "sample-user", name: "Sample Seller", email: "seller@example.test", admin: !!options.admin } : null, csrf: "sample-csrf", demo: true, source_web: "https://example.test" } });
@@ -67,6 +68,11 @@ for (const width of [320, 768, 1024, 1440]) {
       await page.goto(path);
       await expect(page.locator("h1")).toHaveCount(1);
       await expect(page.locator("#main")).toBeVisible();
+      if (name === "checkout") for (const method of ["bKash", "Nagad", "Rocket"]) {
+        const option = page.locator(".payment-method").filter({ hasText: method });
+        await expect(option.locator(".payment-logo")).toBeVisible();
+        expect(await option.locator(".payment-logo").evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+      }
       if (name === "seller-workspace") await expect(page.getByRole("heading", { name: "Shop profile" })).toBeVisible();
       if (name === "admin") await expect(page.getByRole("heading", { name: "Published shops" })).toBeVisible();
       await page.evaluate(() => document.fonts.ready);

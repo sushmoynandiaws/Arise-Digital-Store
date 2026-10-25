@@ -342,8 +342,7 @@ textarea { resize: vertical; }
 .payment-method input { width: 16px; height: 16px; min-height: 16px; }
 .payment-method > svg { display: none; }
 .payment-method.chosen { border-color: var(--primary); background: var(--primary-light); }
-.wallet-icon { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; color: var(--primary); background: var(--primary-light); font-size: var(--text-small); font-weight: 800; }
-.payment-method.chosen .wallet-icon { background: var(--surface); }
+.payment-logo { display: block; width: 88px; height: 32px; object-fit: contain; }
 .checkout-payable { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 24px; margin-top: 12px; border-top: 1px solid var(--line); font-size: var(--text-label); font-weight: 650; }
 .checkout-payable small { display: block; color: var(--muted); font-size: var(--text-small); font-weight: 500; margin-top: 4px; }
 .checkout-payable strong { font-size: var(--text-price); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }

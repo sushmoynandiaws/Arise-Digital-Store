@@ -28,7 +28,6 @@ import {
   X,
   Check,
   CheckCircle2,
-  ShieldCheck,
   Zap,
   ChevronDown,
   LayoutGrid,
@@ -48,7 +47,6 @@ import {
   LogOut,
   Layers,
   Play,
-  Monitor,
   Command,
   Bot,
 } from "./icons.js";
@@ -79,6 +77,11 @@ type Market = {
 };
 const Context = createContext<Market>(null!);
 const useMarket = () => useContext(Context);
+const paymentLogos: Record<string, string> = {
+  bkash: "/payment-methods/bkash.svg",
+  nagad: "/payment-methods/nagad.svg",
+  rocket: "/payment-methods/rocket.svg",
+};
 function useRouteShop() {
   const { catalog } = useMarket();
   const { pathname } = useLocation();
@@ -160,12 +163,6 @@ function Header() {
   }, [open]);
   return (
     <header className="site-header">
-      <div className="top-ticker-bar">
-        <div className="container ticker-inner">
-          <span>Digital products from independent shops</span>
-          <span>Payment verified before private delivery</span>
-        </div>
-      </div>
       <div className="header-inner">
         {shop ? (
           <Link
@@ -327,7 +324,6 @@ function Footer() {
       </div>
       <div className="footer-bottom">
         <span>© {new Date().getFullYear()} Arise Digital Store</span>
-        <span>Products, payments and delivery connected through AriseSell.</span>
         <span className="powered">
           Powered by <strong>AriseSell</strong>
         </span>
@@ -457,11 +453,6 @@ function Art({
           {product.category || "Digital Product"}
         </span>
       </div>}
-      <span className="art-tag">
-        {product.delivery_mode === "automatic"
-          ? "Automatic delivery"
-          : "Seller-prepared delivery"}
-      </span>
     </div>
   );
 }
@@ -617,20 +608,6 @@ function Home() {
                 </Link>
               ))}
             </div>
-            <div className="hero-note">
-              <span>
-                <LockKeyhole size={15} />
-                Seller payment options at checkout
-              </span>
-              <span>
-                <Zap size={15} />
-                Automatic or seller-prepared delivery
-              </span>
-              <span>
-                <Store size={15} />
-                Buy directly from the shop
-              </span>
-            </div>
           </div>
           <aside className="discovery-shelf" aria-labelledby="discovery-title">
             <div className="discovery-heading"><span className="discovery-symbol"><ShoppingBag size={22} /></span><div><p>Product preview</p><h2 id="discovery-title">Explore the catalog</h2></div></div>
@@ -642,26 +619,6 @@ function Home() {
             </div> : catalog ? <p className="discovery-empty">No products are published yet.</p> : catalogError ? <p className="discovery-empty">Products could not be loaded. Use Try again in the product section below.</p> : <Loading />}
             <Link className="discovery-footer" to="/products">Browse all products <ArrowRight size={18} /></Link>
           </aside>
-        </section>
-        <section className="benefit-strip">
-          <div className="container">
-            <span>
-              <Layers />
-              Browse digital products
-            </span>
-            <span>
-              <Store />
-              Independent digital shops
-            </span>
-            <span>
-              <LockKeyhole />
-              Private access to your items
-            </span>
-            <span>
-              <RefreshCw />
-              Connected with AriseSell
-            </span>
-          </div>
         </section>
         <section className="container section">
           <SectionTitle
@@ -1173,12 +1130,6 @@ function ProductPage() {
       <div className="product-detail">
         <div className="product-visual">
           <Art product={product} large />
-          <div className="product-assurances">
-            <span><Monitor size={16} />Digital product</span>
-            <span><ShieldCheck size={16} />Private delivery</span>
-            <span><ShoppingBag size={16} />No shipping needed</span>
-          </div>
-          <div className="product-image-caption"><ShieldCheck size={18} /><span>Delivered privately to your purchase history.<small>No shipping address needed.</small></span></div>
           <section id="customer-reviews" tabIndex={-1} className="product-visual-reviews" aria-label="Customer reviews">
             <h2 className="product-reviews-heading">Customer reviews</h2>
             <ProductReviews key={product.id} productId={product.id} />
@@ -1276,10 +1227,6 @@ function ProductPage() {
               <button type="button" onClick={() => selectSection("reviews")}>Reviews</button>
             </div>
           </div>
-          <p className="checkout-note">
-            <LockKeyhole size={14} />
-            Your items stay private. Delivery follows verified payment.
-          </p>
         </div>
       </div>
       <dialog ref={infoDialog} className="product-info-dialog" aria-labelledby="product-info-title"
@@ -1600,10 +1547,14 @@ function Checkout() {
                       checked={provider === method}
                       onChange={() => setProvider(method)}
                     />
-                    <span className={`wallet-icon ${method}`}>
-                      {method.slice(0, 1).toUpperCase()}
-                    </span>
-                    <strong>{paymentMethodLabel(method)}</strong>
+                    {paymentLogos[method] ? (
+                      <>
+                        <img className="payment-logo" src={paymentLogos[method]} alt="" />
+                        <strong>{paymentMethodLabel(method)}</strong>
+                      </>
+                    ) : (
+                      <strong>{paymentMethodLabel(method)}</strong>
+                    )}
                     <CheckCircle2 size={18} />
                   </label>
                 ))}
@@ -1708,10 +1659,6 @@ function Checkout() {
               Edit order details
             </button>
           )}
-          <p className="checkout-note">
-            <LockKeyhole size={14} />
-            Payment is verified before your digital items are delivered.
-          </p>
         </form>
         <aside className="panel order-summary" aria-label="Order summary">
           <Art product={product} />
