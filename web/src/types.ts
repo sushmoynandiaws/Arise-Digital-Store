@@ -58,6 +58,7 @@ export type Shop = {
   contact?: ShopContact;
   pages?: Partial<Record<"privacy" | "returns" | "terms" | "about" | "contact", string>>;
   volume_discount_enabled?: boolean;
+  payment_account_types?: Record<string, "merchant" | "personal">;
 };
 export type Catalog = { shops: Shop[]; products: Product[]; synced_at: string };
 export type User = { id: string; name: string; email: string; admin: boolean };
@@ -115,6 +116,8 @@ export type Purchase = {
     amount: string;
     trx_id: string | null;
     expires_at: string;
+    account_type?: "merchant" | "personal";
+    instructions?: string;
   } | null;
 };
 export type ProductReview = {

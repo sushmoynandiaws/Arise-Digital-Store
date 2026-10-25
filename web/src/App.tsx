@@ -57,6 +57,11 @@ import {
   Play,
   Command,
   Bot,
+  AlertTriangle,
+  Building2,
+  UserCheck,
+  Wallet,
+  Info,
 } from "./icons.js";
 import {
   api,
@@ -3181,6 +3186,230 @@ function CopyButton({
     </button>
   );
 }
+
+export function getSellerPaymentAccountType(shopId?: string, provider?: string): "merchant" | "personal" {
+  if (!provider) return "personal";
+  const pKey = provider.toLowerCase();
+  try {
+    if (shopId) {
+      const specific = localStorage.getItem(`arise_payment_account_type_${shopId}_${pKey}`);
+      if (specific === "merchant" || specific === "personal") return specific;
+    }
+    const general = localStorage.getItem(`arise_payment_account_type_${pKey}`);
+    if (general === "merchant" || general === "personal") return general;
+  } catch {}
+  return "personal";
+}
+
+export function setSellerPaymentAccountType(shopId: string | undefined, provider: string, type: "merchant" | "personal") {
+  if (!provider) return;
+  const pKey = provider.toLowerCase();
+  try {
+    if (shopId) {
+      localStorage.setItem(`arise_payment_account_type_${shopId}_${pKey}`, type);
+    }
+    localStorage.setItem(`arise_payment_account_type_${pKey}`, type);
+  } catch {}
+}
+
+export function detectPaymentAccountType(payment: any, shop?: Shop | null): "merchant" | "personal" {
+  if (!payment) return "personal";
+
+  // 1. Direct explicit property
+  const direct = (payment.account_type || payment.type || "").toString().toLowerCase();
+  if (direct.includes("merchant") || direct.includes("payment")) return "merchant";
+  if (direct.includes("personal") || direct.includes("send_money")) return "personal";
+
+  // 2. Instructions or note text
+  const text = (payment.instructions || payment.note || "").toString().toLowerCase();
+  if (text.includes("merchant") || text.includes("মার্চেন্ট") || text.includes("make payment") || text.includes("পেমেন্ট")) {
+    return "merchant";
+  }
+  if (text.includes("personal") || text.includes("পার্সোনাল") || text.includes("send money") || text.includes("সেন্ড মানি")) {
+    return "personal";
+  }
+
+  // 3. Shop metadata
+  if (shop?.payment_account_types && payment.provider) {
+    const val = shop.payment_account_types[payment.provider.toLowerCase()];
+    if (val === "merchant" || val === "personal") return val;
+  }
+
+  // 4. Shop ID or general in localStorage
+  if (payment.provider) {
+    return getSellerPaymentAccountType(shop?.id, payment.provider);
+  }
+
+  return "personal";
+}
+
+export function PaymentInstructionCard({
+  order,
+  session,
+}: {
+  order: Purchase;
+  session?: Session | null;
+}) {
+  const { t, lang } = useLang();
+  if (!order.payment) return null;
+
+  const payment = order.payment;
+  const provider = paymentMethodLabel(payment.provider);
+  const accountType = detectPaymentAccountType(payment, order.shop);
+  const isMerchant = accountType === "merchant";
+
+  return (
+    <div className="payment-instruction-card">
+      <div className="payment-card-header">
+        <div className="payment-provider-badge">
+          <span className={`provider-dot ${payment.provider.toLowerCase()}`} />
+          <h3>{t("payWith")} {provider}</h3>
+        </div>
+        <div className={`account-type-badge ${isMerchant ? "merchant" : "personal"}`}>
+          {isMerchant ? <Building2 size={15} /> : <UserCheck size={15} />}
+          <span>{isMerchant ? t("merchantAccount") : t("personalAccount")}</span>
+        </div>
+      </div>
+
+      <div
+        className={`payment-type-alert ${isMerchant ? "merchant-alert" : "personal-alert"}`}
+        role="alert"
+      >
+        <div className="alert-icon-wrap">
+          {isMerchant ? <AlertTriangle size={22} /> : <Info size={22} />}
+        </div>
+        <div className="alert-content">
+          <strong>
+            {isMerchant
+              ? (lang === "bn" ? "মার্চেন্ট একাউন্ট সতর্কতা:" : "Merchant Account Notice:")
+              : (lang === "bn" ? "পার্সোনাল একাউন্ট সতর্কতা:" : "Personal Account Notice:")}
+          </strong>
+          <p>{isMerchant ? t("merchantAlert") : t("personalAlert")}</p>
+          <div className="action-pill-highlight">
+            {lang === "bn" ? "প্রয়োজনীয় অপশন: " : "Required Option: "}
+            <strong>{isMerchant ? t("makePaymentOption") : t("sendMoneyOption")}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div className="payment-steps-container">
+        <h4 className="payment-steps-heading">
+          {lang === "bn"
+            ? `কীভাবে ${provider} দিয়ে টাকা পাঠাবেন (ধাপে ধাপে):`
+            : `How to complete payment via ${provider} (Step-by-step):`}
+        </h4>
+        <ol className="payment-steps-list">
+          <li className="payment-step-item">
+            <div className="step-indicator">1</div>
+            <div className="step-body">
+              <strong>{t("stepOpenWallet")}</strong>
+              <p className="muted">
+                {lang === "bn"
+                  ? `আপনার ফোনে ${provider} অ্যাপটি ওপেন করুন অথবা USSD ডায়াল করুন`
+                  : `Open the ${provider} mobile app on your smartphone`}
+              </p>
+            </div>
+          </li>
+
+          <li className="payment-step-item highlight-step">
+            <div className="step-indicator">2</div>
+            <div className="step-body">
+              <strong>{t("stepSelectPaymentOption")}</strong>
+              <div className="step-action-tag">
+                {isMerchant ? (
+                  <span className="action-choice merchant">
+                    👉 <strong>Payment</strong> / <strong>পেমেন্ট</strong>
+                  </span>
+                ) : (
+                  <span className="action-choice personal">
+                    👉 <strong>Send Money</strong> / <strong>সেন্ড মানি</strong>
+                  </span>
+                )}
+              </div>
+              <p className="step-warning-sub">
+                {isMerchant
+                  ? (lang === "bn" ? "মার্চেন্ট নম্বরে সেন্ড মানি (Send Money) করলে পেমেন্ট হবে না।" : "Do NOT use Send Money for merchant accounts.")
+                  : (lang === "bn" ? "পার্সোনাল নম্বরে পেমেন্ট (Payment) অপশন কাজ করবে না।" : "Do NOT use Payment option for personal accounts.")}
+              </p>
+            </div>
+          </li>
+
+          <li className="payment-step-item">
+            <div className="step-indicator">3</div>
+            <div className="step-body">
+              <strong>{t("receivingAccount")}</strong>
+              <div className="step-data-row">
+                <span className="step-data-val">{payment.account}</span>
+                <CopyButton value={payment.account} label={t("copyBtn")} />
+              </div>
+            </div>
+          </li>
+
+          <li className="payment-step-item">
+            <div className="step-indicator">4</div>
+            <div className="step-body">
+              <strong>{t("exactAmount")}</strong>
+              <div className="step-data-row">
+                <span className="step-data-val amount-highlight">{money(payment.amount)}</span>
+                <CopyButton value={payment.amount} label={t("copyBtn")} />
+              </div>
+              <small className="muted">
+                {lang === "bn"
+                  ? "ঠিক এই টাকার পরিমাণ পাঠাবেন (কম বা বেশি পাঠালে ভেরিফিকেশন হবে না)"
+                  : "Send the exact specified amount to prevent verification failures"}
+              </small>
+            </div>
+          </li>
+
+          <li className="payment-step-item">
+            <div className="step-indicator">5</div>
+            <div className="step-body">
+              <strong>{lang === "bn" ? "রেফারেন্স নম্বর (Reference)" : "Order Reference (Ref)"}</strong>
+              <div className="step-data-row">
+                <span className="step-data-val ref-code">{order.ref}</span>
+                <CopyButton value={order.ref} label={t("copyBtn")} />
+              </div>
+              <small className="muted">
+                {lang === "bn"
+                  ? "রেফারেন্সে এই কোডটি লিখুন যাতে অর্ডার সাথে সাথে নিশ্চিত করা যায়"
+                  : "Enter this reference code in the reference field"}
+              </small>
+            </div>
+          </li>
+
+          <li className="payment-step-item">
+            <div className="step-indicator">6</div>
+            <div className="step-body">
+              <strong>{t("stepSubmitTrxId")}</strong>
+              <p className="muted">
+                {lang === "bn"
+                  ? "লেনদেন শেষে প্রাপ্ত TrxID (Transaction ID) টি কপি করে নিচের বক্সে বসিয়ে সাবমিট করুন।"
+                  : "After confirming the transaction, copy the TrxID from your SMS or app and submit below."}
+              </p>
+            </div>
+          </li>
+        </ol>
+      </div>
+
+      <p className="muted form-hint payment-expiry-note">
+        <Clock size={14} />
+        <span>
+          {lang === "bn"
+            ? `পেমেন্টের সময় শেষ হবে ${new Date(payment.expires_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} মিনিটে।`
+            : `Payment request expires at ${new Date(payment.expires_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`}
+        </span>
+      </p>
+
+      {session?.demo && (
+        <p className="notice">
+          Demo only: use TrxID{" "}
+          <strong>DEMO{order.ref.replace(/\D/g, "")}</strong> to
+          simulate the test receipt. No money is transferred.
+        </p>
+      )}
+    </div>
+  );
+}
 function PurchasePage() {
   const { id } = useParams();
   const { session, sessionError } = useMarket();
@@ -3320,51 +3549,7 @@ function PurchasePage() {
         )}
         {paymentOpen && !cancelled && order.payment && !expired && (
           <>
-            <div className="payment-instructions">
-              <h3>
-                Pay with{" "}
-                {paymentMethodLabel(order.payment.provider)}
-              </h3>
-              <p>
-                Send the exact amount to the seller’s receiving account. Then
-                enter the transaction ID below.
-              </p>
-              <DynamicPaymentQR
-                provider={order.payment.provider}
-                account={order.payment.account}
-                amount={order.payment.amount}
-                orderRef={order.ref}
-              />
-              <div className="payment-account">
-                <div>
-                  <span>Receiving account</span>
-                  <strong>{order.payment.account}</strong>
-                </div>
-                <CopyButton value={order.payment.account} />
-              </div>
-              <div className="payment-account">
-                <div>
-                  <span>Exact amount</span>
-                  <strong>{money(order.payment.amount)}</strong>
-                </div>
-                <CopyButton value={order.payment.amount} />
-              </div>
-              <p className="muted form-hint">
-                Payment request expires at{" "}
-                {new Date(order.payment.expires_at).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-                .
-              </p>
-              {session?.demo && (
-                <p className="notice">
-                  Demo only: use TrxID{" "}
-                  <strong>DEMO{order.ref.replace(/\D/g, "")}</strong> to
-                  simulate the test receipt. No money is transferred.
-                </p>
-              )}
-            </div>
+            <PaymentInstructionCard order={order} session={session} />
             <form
               className="proof-form"
               onSubmit={async (e) => {
@@ -3574,8 +3759,10 @@ function PurchasePage() {
 function Seller() {
   const [connection] = useSearchParams();
   const { session, sessionError, refreshSession, reloadCatalog } = useMarket();
+  const { t, lang } = useLang();
   const [shops, setShops] = useState<Shop[] | null>(null),
     [selected, setSelected] = useState("");
+  const [paymentAccountTypesUpdated, setPaymentAccountTypesUpdated] = useState(0);
   const [data, setData] = useState<{
     shop: Shop;
     products: Product[];
@@ -4146,6 +4333,87 @@ function Seller() {
                           </div>
                         </div>
                       )}
+                    </section>
+                    <section className="panel seller-panel" aria-labelledby="shop-payment-settings-title">
+                      <div className="seller-panel-heading">
+                        <div>
+                          <span className="eyebrow">Payment Setup</span>
+                          <h2 id="shop-payment-settings-title">{t("sellerPaymentSettingsTitle")}</h2>
+                        </div>
+                        <Wallet size={24} aria-hidden="true" />
+                      </div>
+                      <p className="muted">
+                        {t("sellerPaymentSettingsDesc")}
+                      </p>
+                      <div className="seller-payment-methods-list">
+                        {(data.payment_methods.length ? data.payment_methods : ["bkash", "nagad", "rocket"]).map((providerKey) => {
+                          const pKey = providerKey.toLowerCase();
+                          const currentType = getSellerPaymentAccountType(selected, pKey);
+                          return (
+                            <div key={pKey} className="seller-payment-method-row">
+                              <div className="payment-method-header-bar">
+                                <div className="payment-method-info">
+                                  <span className={`provider-dot ${pKey}`} />
+                                  <strong>{paymentMethodLabel(pKey)}</strong>
+                                </div>
+                                <span className={`account-type-badge ${currentType}`}>
+                                  {currentType === "merchant" ? <Building2 size={13} /> : <UserCheck size={13} />}
+                                  {currentType === "merchant" ? t("merchantAccount") : t("personalAccount")}
+                                </span>
+                              </div>
+                              <div className="payment-type-selector" role="radiogroup" aria-label={`Account type for ${paymentMethodLabel(pKey)}`}>
+                                <button
+                                  type="button"
+                                  className={`type-toggle-pill ${currentType === "personal" ? "active" : ""}`}
+                                  onClick={() => {
+                                    setSellerPaymentAccountType(selected, pKey, "personal");
+                                    setPaymentAccountTypesUpdated((v) => v + 1);
+                                  }}
+                                >
+                                  <UserCheck size={15} />
+                                  <span>{t("personalSendMoneyLabel")}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`type-toggle-pill ${currentType === "merchant" ? "active" : ""}`}
+                                  onClick={() => {
+                                    setSellerPaymentAccountType(selected, pKey, "merchant");
+                                    setPaymentAccountTypesUpdated((v) => v + 1);
+                                  }}
+                                >
+                                  <Building2 size={15} />
+                                  <span>{t("merchantPaymentLabel")}</span>
+                                </button>
+                              </div>
+                              <div className="payment-type-feedback-hint">
+                                {currentType === "merchant" ? (
+                                  <span className="feedback-text merchant">
+                                    ✓ {lang === "bn" ? "ক্রেতারা 'পেমেন্ট করুন' (Payment) নির্দেশনা ও সেন্ড মানি না করার স্পষ্ট সতর্কতা দেখতে পাবেন।" : "Buyers will be instructed to use 'Make Payment' and warned not to Send Money."}
+                                  </span>
+                                ) : (
+                                  <span className="feedback-text personal">
+                                    ✓ {lang === "bn" ? "ক্রেতারা 'সেন্ড মানি করুন' (Send Money) নির্দেশনা ও পেমেন্ট অপশন না ব্যবহারের সতর্কতা দেখতে পাবেন।" : "Buyers will be instructed to use 'Send Money' and warned not to use Payment."}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="sync-bar payment-sync-bar">
+                        <span className="muted form-hint">
+                          {lang === "bn" ? "একাউন্ট টাইপ তাৎক্ষণিকভাবে সেভ হয় এবং চেকআউটে প্রতিফলিত হয়।" : "Account types are saved instantly and reflected at customer checkout."}
+                        </span>
+                        <a
+                          className="text-link"
+                          href={`${session.source_web}/console/${data.shop.slug}/integrations`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {lang === "bn" ? "AriseSell-এ পেমেন্ট নম্বর ম্যানেজ করুন" : "Manage payment numbers in AriseSell"}
+                          <ExternalLink size={14} />
+                        </a>
+                      </div>
                     </section>
                     <section className="panel seller-panel">
                       <div className="seller-panel-heading">

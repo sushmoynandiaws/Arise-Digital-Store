@@ -2520,3 +2520,316 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
 .shop-reviews-page-header {
   margin-bottom: 8px;
 }
+
+/* Payment Account Instructions (Merchant vs Personal) */
+.payment-instruction-card {
+  margin: 16px 0 24px;
+  padding: 22px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+}
+.payment-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.payment-provider-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.payment-provider-badge h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.account-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+.account-type-badge.merchant {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+.account-type-badge.personal {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+}
+
+/* Warning & Guidance Alert */
+.payment-type-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 10px;
+  margin: 18px 0;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.payment-type-alert.merchant-alert {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-left: 5px solid #d97706;
+  color: #78350f;
+}
+.payment-type-alert.personal-alert {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-left: 5px solid #0284c7;
+  color: #0c4a6e;
+}
+.alert-icon-wrap {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.payment-type-alert.merchant-alert .alert-icon-wrap {
+  color: #d97706;
+}
+.payment-type-alert.personal-alert .alert-icon-wrap {
+  color: #0284c7;
+}
+.alert-content strong {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+.alert-content p {
+  margin: 0 0 8px;
+}
+.action-pill-highlight {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.05);
+}
+.payment-type-alert.merchant-alert .action-pill-highlight {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+.payment-type-alert.personal-alert .action-pill-highlight {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #7dd3fc;
+}
+
+/* Numbered Step-by-Step Payment Instructions */
+.payment-steps-container {
+  margin-top: 20px;
+}
+.payment-steps-heading {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 14px;
+}
+.payment-steps-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.payment-step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--canvas-subtle);
+  border: 1px solid var(--border-subtle);
+  transition: border-color 160ms ease;
+}
+.payment-step-item.highlight-step {
+  background: rgba(124, 58, 237, 0.04);
+  border-color: rgba(124, 58, 237, 0.35);
+}
+.step-indicator {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+.step-body {
+  flex: 1;
+  min-width: 0;
+}
+.step-body strong {
+  display: block;
+  font-size: 14px;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+.step-body p.muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.step-action-tag {
+  margin: 6px 0;
+}
+.action-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.action-choice.merchant {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+.action-choice.personal {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #93c5fd;
+}
+.step-warning-sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #b91c1c;
+  font-weight: 600;
+}
+.step-data-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+.step-data-val {
+  font-size: 15px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: var(--ink);
+  letter-spacing: 0.5px;
+}
+.step-data-val.amount-highlight {
+  font-size: 17px;
+  color: var(--primary);
+  font-family: inherit;
+}
+.step-data-val.ref-code {
+  color: #0369a1;
+}
+.payment-expiry-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Seller Payment Settings in /seller */
+.seller-payment-methods-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
+}
+.seller-payment-method-row {
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--canvas-subtle);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.payment-method-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.payment-method-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.payment-type-selector {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.type-toggle-pill {
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+.type-toggle-pill:hover {
+  border-color: var(--primary);
+}
+.type-toggle-pill.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25);
+}
+.payment-type-feedback-hint {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+.feedback-text.merchant {
+  color: #15803d;
+}
+.feedback-text.personal {
+  color: #1d4ed8;
+}
+.payment-sync-bar {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}

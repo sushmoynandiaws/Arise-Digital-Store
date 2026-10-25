@@ -153,6 +153,16 @@ test("App.tsx integrates all advanced e-commerce components and routes", () => {
   assert.ok(appCode.includes("purchase-sharing-actions"));
   assert.ok(appCode.includes("wa.me/?text="));
   assert.ok(appCode.includes("copyRecoveryLink"));
+
+  // Payment Instruction Card (Merchant vs Personal detection & clear step instructions)
+  assert.ok(appCode.includes("function PaymentInstructionCard("));
+  assert.ok(appCode.includes("detectPaymentAccountType"));
+  assert.ok(appCode.includes("getSellerPaymentAccountType"));
+  assert.ok(appCode.includes("setSellerPaymentAccountType"));
+  assert.ok(appCode.includes("merchantAccount"));
+  assert.ok(appCode.includes("personalAccount"));
+  assert.ok(appCode.includes("seller-payment-method-row"));
+  assert.ok(appCode.includes("<PaymentInstructionCard order={order} session={session} />"));
 });
 
 test("styles.css includes all corresponding responsive tokens and classes", () => {
@@ -173,6 +183,13 @@ test("styles.css includes all corresponding responsive tokens and classes", () =
   assert.ok(stylesCode.includes(".track-shop-card-section"));
   assert.ok(stylesCode.includes(".shop-reviews-section"));
   assert.ok(stylesCode.includes(".shop-review-product-tag"));
+  assert.ok(stylesCode.includes(".payment-instruction-card"));
+  assert.ok(stylesCode.includes(".account-type-badge.merchant"));
+  assert.ok(stylesCode.includes(".account-type-badge.personal"));
+  assert.ok(stylesCode.includes(".payment-type-alert.merchant-alert"));
+  assert.ok(stylesCode.includes(".payment-type-alert.personal-alert"));
+  assert.ok(stylesCode.includes(".payment-steps-list"));
+  assert.ok(stylesCode.includes(".seller-payment-methods-list"));
 });
 
 test("Dark theme footer has clean 4-column layout, social pills, and information pages without unwanted cards or payment strip", () => {
@@ -228,4 +245,42 @@ test("Top bar and footer dynamically isolate shop contact and marketplace info w
   assert.ok(appCode.includes("shop?.social_links?.instagram"));
   assert.ok(appCode.includes("shop?.contact?.email"));
   assert.ok(appCode.includes("shop?.contact?.whatsapp || shop?.contact?.phone"));
+});
+
+test("detectPaymentAccountType correctly detects merchant vs personal accounts and guides buyer", () => {
+  function detectPaymentAccountType(payment, shop) {
+    if (!payment) return "personal";
+    const direct = (payment.account_type || payment.type || "").toString().toLowerCase();
+    if (direct.includes("merchant") || direct.includes("payment")) return "merchant";
+    if (direct.includes("personal") || direct.includes("send_money")) return "personal";
+
+    const text = (payment.instructions || payment.note || "").toString().toLowerCase();
+    if (text.includes("merchant") || text.includes("মার্চেন্ট") || text.includes("make payment") || text.includes("পেমেন্ট")) {
+      return "merchant";
+    }
+    if (text.includes("personal") || text.includes("পার্সোনাল") || text.includes("send money") || text.includes("সেন্ড মানি")) {
+      return "personal";
+    }
+
+    if (shop?.payment_account_types && payment.provider) {
+      const val = shop.payment_account_types[payment.provider.toLowerCase()];
+      if (val === "merchant" || val === "personal") return val;
+    }
+    return "personal";
+  }
+
+  // Merchant tests
+  assert.equal(detectPaymentAccountType({ account_type: "merchant" }), "merchant");
+  assert.equal(detectPaymentAccountType({ type: "merchant" }), "merchant");
+  assert.equal(detectPaymentAccountType({ instructions: "Please make payment to merchant account" }), "merchant");
+  assert.equal(detectPaymentAccountType({ instructions: "মার্চেন্ট একাউন্টে পেমেন্ট করুন" }), "merchant");
+  assert.equal(detectPaymentAccountType({ provider: "bkash" }, { payment_account_types: { bkash: "merchant" } }), "merchant");
+
+  // Personal tests
+  assert.equal(detectPaymentAccountType({ account_type: "personal" }), "personal");
+  assert.equal(detectPaymentAccountType({ type: "personal" }), "personal");
+  assert.equal(detectPaymentAccountType({ instructions: "Please send money to personal account" }), "personal");
+  assert.equal(detectPaymentAccountType({ instructions: "পার্সোনাল নম্বরে সেন্ড মানি করুন" }), "personal");
+  assert.equal(detectPaymentAccountType({ provider: "nagad" }, { payment_account_types: { nagad: "personal" } }), "personal");
+  assert.equal(detectPaymentAccountType(null), "personal");
 });
