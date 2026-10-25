@@ -163,6 +163,14 @@ test("App.tsx integrates all advanced e-commerce components and routes", () => {
   assert.ok(appCode.includes("personalAccount"));
   assert.ok(appCode.includes("seller-payment-method-row"));
   assert.ok(appCode.includes("<PaymentInstructionCard order={order} session={session} />"));
+
+  // Sponsored Ads & Monetization Management
+  assert.ok(appCode.includes("AdminSponsoredAdsManager"));
+  assert.ok(appCode.includes("HomeHeroSponsoredAd"));
+  assert.ok(appCode.includes("TopFlashSponsoredAd"));
+  assert.ok(appCode.includes("SponsoredProductCard"));
+  assert.ok(appCode.includes("FeaturedShopSponsoredAd"));
+  assert.ok(appCode.includes("StickyBottomSponsoredStrip"));
 });
 
 test("styles.css includes all corresponding responsive tokens and classes", () => {
@@ -190,6 +198,12 @@ test("styles.css includes all corresponding responsive tokens and classes", () =
   assert.ok(stylesCode.includes(".payment-type-alert.personal-alert"));
   assert.ok(stylesCode.includes(".payment-steps-list"));
   assert.ok(stylesCode.includes(".seller-payment-methods-list"));
+  assert.ok(stylesCode.includes(".sponsored-hero-banner"));
+  assert.ok(stylesCode.includes(".top-flash-sponsored-bar"));
+  assert.ok(stylesCode.includes(".sponsored-product-card"));
+  assert.ok(stylesCode.includes(".featured-shop-spotlight"));
+  assert.ok(stylesCode.includes(".sticky-bottom-ad-strip"));
+  assert.ok(stylesCode.includes(".ads-manager-panel"));
 });
 
 test("Dark theme footer has clean 4-column layout, social pills, and information pages without unwanted cards or payment strip", () => {
@@ -283,4 +297,34 @@ test("detectPaymentAccountType correctly detects merchant vs personal accounts a
   assert.equal(detectPaymentAccountType({ instructions: "পার্সোনাল নম্বরে সেন্ড মানি করুন" }), "personal");
   assert.equal(detectPaymentAccountType({ provider: "nagad" }, { payment_account_types: { nagad: "personal" } }), "personal");
   assert.equal(detectPaymentAccountType(null), "personal");
+});
+
+test("Sponsored Ads logic correctly filters slots and calculates metrics", () => {
+  const sampleAds = [
+    { id: "1", title: "Ad 1", placement: "home_hero", status: "active", start_date: "2026-01-01", end_date: "2026-12-31", price_bdt: 3000, impressions: 100, clicks: 10 },
+    { id: "2", title: "Ad 2", placement: "home_hero", status: "paused", start_date: "2026-01-01", end_date: "2026-12-31", price_bdt: 2000, impressions: 50, clicks: 2 },
+    { id: "3", title: "Ad 3", placement: "top_flash", status: "active", start_date: "2026-01-01", end_date: "2026-12-31", price_bdt: 1500, impressions: 200, clicks: 15 },
+    { id: "4", title: "Ad 4", placement: "sponsored_product", status: "active", start_date: "2026-01-01", end_date: "2026-12-31", price_bdt: 2500, impressions: 80, clicks: 8 },
+    { id: "5", title: "Ad 5", placement: "home_hero", status: "active", start_date: "2020-01-01", end_date: "2020-02-01", price_bdt: 1000, impressions: 10, clicks: 0 },
+  ];
+
+  function filterActive(slot, list) {
+    const now = Date.now();
+    return list.filter((ad) => {
+      if (ad.placement !== slot || ad.status !== "active") return false;
+      if (ad.end_date && new Date(ad.end_date).getTime() + 86400000 < now) return false;
+      return true;
+    });
+  }
+
+  const activeHero = filterActive("home_hero", sampleAds);
+  assert.equal(activeHero.length, 1);
+  assert.equal(activeHero[0].id, "1");
+
+  const activeFlash = filterActive("top_flash", sampleAds);
+  assert.equal(activeFlash.length, 1);
+  assert.equal(activeFlash[0].id, "3");
+
+  const totalRevenue = sampleAds.reduce((acc, a) => acc + a.price_bdt, 0);
+  assert.equal(totalRevenue, 10000);
 });

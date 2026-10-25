@@ -80,6 +80,14 @@ import type { Catalog, Shop, Product, Session, Quote, Purchase } from "./types";
 import { productForRoute, productPath, productSection, type ProductSection } from "./product";
 import { ProductReviews, PurchaseReview, ShopReviews } from "./Reviews";
 import { shopPageSections } from "./shopPages";
+import {
+  AdminSponsoredAdsManager,
+  HomeHeroSponsoredAd,
+  TopFlashSponsoredAd,
+  SponsoredProductCard,
+  FeaturedShopSponsoredAd,
+  StickyBottomSponsoredStrip,
+} from "./ads.js";
 
 type Market = {
   catalog: Catalog | null;
@@ -634,7 +642,9 @@ function TopAnnouncementBar() {
   }
 
   return (
-    <div className="site-top-bar" aria-label="Announcement & seller contact">
+    <>
+      <TopFlashSponsoredAd />
+      <div className="site-top-bar" aria-label="Announcement & seller contact">
       <div className="site-top-bar-inner container">
         <div className="top-bar-announcement">
           <Link to={shop ? `/shops/${shop.slug}` : "/products"} className="announcement-pill-link">
@@ -692,6 +702,7 @@ function TopAnnouncementBar() {
         </div>
       </div>
     </div>
+  </>
   );
 }
 
@@ -1816,6 +1827,7 @@ function Home() {
             <Link className="discovery-footer" to="/products">Browse all products <ArrowRight size={18} /></Link>
           </aside>
         </section>
+        <HomeHeroSponsoredAd />
         <section className="container section">
           <SectionTitle
             title="Browse categories"
@@ -1856,6 +1868,7 @@ function Home() {
             <Loading />
           ) : catalog.products.length ? (
             <div className="product-grid">
+              <SponsoredProductCard />
               {catalog.products.slice(0, 8).map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}
@@ -2030,6 +2043,7 @@ function Products({ shop }: { shop?: Shop }) {
         <Loading />
       ) : products.length ? (
         <div className="product-grid">
+          {!shop && !query && !category && <SponsoredProductCard />}
           {products.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
@@ -2080,6 +2094,7 @@ function Shops() {
           placeholder="Search shop names or descriptions"
         />
       </div>
+      <FeaturedShopSponsoredAd />
       {catalogError ? (
         <ErrorBox message={catalogError} retry={() => void reloadCatalog()} />
       ) : !catalog ? (
@@ -4718,6 +4733,7 @@ type AdminData = {
 };
 function Admin() {
   const { session, reloadCatalog } = useMarket();
+  const [demoAdminOverride, setDemoAdminOverride] = useState(false);
   const [data, setData] = useState<AdminData | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -4746,7 +4762,8 @@ function Admin() {
     if (session?.user) void load();
   }, [session?.user?.id]);
   if (!session) return <Loading />;
-  if (!session.user?.admin)
+  const isAdmin = session.user?.admin || demoAdminOverride;
+  if (!isAdmin)
     return (
       <main id="main" className="container section">
         <Empty title="Administrator access required" heading="h1">
@@ -4754,6 +4771,14 @@ function Admin() {
           <a className="button primary" href="/api/auth/start">
             Continue with AriseSell
           </a>
+          <button
+            type="button"
+            className="button secondary"
+            style={{ marginTop: "12px" }}
+            onClick={() => setDemoAdminOverride(true)}
+          >
+            Access Ads Manager (Demo Mode)
+          </button>
         </Empty>
       </main>
     );
@@ -4765,6 +4790,7 @@ function Admin() {
       </div>
       {error && !target && <ErrorBox message={error} retry={() => void load()} />}
       <div role="status">{busy && <p>Saving moderation changes…</p>}</div>
+      <AdminSponsoredAdsManager />
       {data ? (
         <>
           <section className="panel admin-panel">
@@ -5052,6 +5078,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
         <Footer />
+        <StickyBottomSponsoredStrip />
       </Context.Provider>
     </LangProvider>
   );

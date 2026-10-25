@@ -2833,3 +2833,487 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
   flex-wrap: wrap;
   gap: 10px;
 }
+
+/* ========================================================
+   SPONSORED ADS & MONETIZATION STYLES
+   ======================================================== */
+
+/* 1. Home Hero Sponsored Banner */
+.sponsored-hero-banner-wrap {
+  margin: 0 auto 36px;
+}
+.sponsored-hero-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 32px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #2e1065 0%, #4c1d95 45%, #6d28d9 100%);
+  color: #fff;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 10px 30px rgba(109, 40, 217, 0.22);
+}
+.sponsored-hero-content {
+  flex: 1;
+  max-width: 680px;
+  z-index: 2;
+}
+.sponsored-hero-badges {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.sponsored-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+.sponsored-pill.gold {
+  background: #fef08a;
+  color: #854d0e;
+}
+.sponsored-pill.purple {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+.sponsored-pill.sm {
+  font-size: 10px;
+  padding: 2px 8px;
+  background: #fef08a;
+  color: #854d0e;
+}
+.sponsored-advertiser-label {
+  font-size: 13px;
+  color: #e9d5ff;
+  font-weight: 600;
+}
+.sponsored-hero-title {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.3;
+  margin: 0 0 18px;
+  color: #ffffff;
+}
+.sponsored-hero-actions {
+  display: flex;
+  gap: 12px;
+}
+.sponsored-cta-btn {
+  background: #ffffff !important;
+  color: #4c1d95 !important;
+  border: none !important;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+.sponsored-cta-btn:hover {
+  background: #f3e8ff !important;
+  color: #3b0764 !important;
+}
+.sponsored-hero-media {
+  flex-shrink: 0;
+  width: 280px;
+  height: 180px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.sponsored-hero-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 2. Top Flash Sponsored Bar */
+.top-flash-sponsored-bar {
+  background: #1e1b4b;
+  color: #ede9fe;
+  font-size: 13px;
+  padding: 7px 16px;
+  border-bottom: 1px solid rgba(168, 85, 247, 0.3);
+}
+.top-flash-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  text-align: center;
+}
+.sponsored-ad-tag {
+  background: #fef08a;
+  color: #854d0e;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.top-flash-title {
+  font-weight: 500;
+}
+.top-flash-link {
+  color: #a78bfa;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 150ms ease;
+}
+.top-flash-link:hover {
+  color: #c4b5fd;
+}
+
+/* 3. Sponsored Product Card */
+.sponsored-product-card {
+  border: 2px solid #c084fc !important;
+  background: #faf5ff;
+  position: relative;
+}
+.sponsored-art-wrapper {
+  position: relative;
+}
+.sponsored-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sponsored-card-fallback-art {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ede9fe;
+  color: #7c3aed;
+}
+.sponsored-card-pill {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #7c3aed;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
+}
+.sponsored-seller-name {
+  color: #6b21a8;
+  font-weight: 700;
+}
+.sponsored-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+.sponsored-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #15803d;
+  font-weight: 600;
+}
+
+/* 4. Featured Shop Spotlight in /shops */
+.featured-shop-spotlight {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 28px;
+  border-radius: 16px;
+  border: 2px solid #ddd6fe;
+  background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+  margin-bottom: 28px;
+}
+.featured-shop-content {
+  flex: 1;
+}
+.featured-shop-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.featured-advertiser-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #581c87;
+}
+.featured-shop-content h3 {
+  font-size: 22px;
+  font-weight: 800;
+  color: #3b0764;
+  margin: 0 0 16px;
+}
+.featured-shop-art {
+  width: 220px;
+  height: 130px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+.featured-shop-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 5. Sticky Bottom Promo Strip */
+.sticky-bottom-ad-strip {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 990;
+  background: #0f172a;
+  color: #fff;
+  padding: 10px 16px;
+  border-top: 2px solid var(--primary);
+  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.15);
+  animation: slideUp 240ms ease-out;
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.sticky-bottom-ad-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.sticky-ad-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 260px;
+}
+.sticky-ad-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #f8fafc;
+}
+.sticky-ad-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sticky-ad-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 150ms ease;
+}
+.sticky-ad-close-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* 6. Admin Sponsored Ads Management Panel */
+.ads-manager-panel {
+  margin-bottom: 28px;
+  border: 1px solid #e2e8f0;
+  padding: 24px;
+}
+.ads-manager-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.ads-manager-header h2 {
+  margin: 4px 0 6px;
+}
+.ads-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.metric-box {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: var(--surface-alt, #f8fafc);
+  border: 1px solid var(--border-subtle);
+}
+.metric-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.metric-icon.gold { background: #fef9c3; color: #a16207; }
+.metric-icon.purple { background: #ede9fe; color: #6d28d9; }
+.metric-icon.blue { background: #e0f2fe; color: #0369a1; }
+.metric-icon.green { background: #dcfce7; color: #15803d; }
+.metric-label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.metric-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+/* Ad Form Card */
+.ad-form-card {
+  background: #fdf4ff;
+  border: 1.5px solid #d946ef;
+  border-radius: 14px;
+  padding: 22px;
+  margin-bottom: 24px;
+}
+.ad-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.ad-form-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #701a75;
+}
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.form-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+}
+
+/* Campaigns Table */
+.ad-campaigns-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+.ad-campaigns-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13.5px;
+}
+.ad-campaigns-table th {
+  background: #f1f5f9;
+  padding: 12px 14px;
+  font-weight: 700;
+  color: var(--ink);
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+.ad-campaigns-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+.ad-campaigns-table tr.inactive-row {
+  opacity: 0.65;
+  background: #fafafa;
+}
+.table-sub {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.target-url-text {
+  font-family: monospace;
+}
+.slot-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #e2e8f0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  white-space: nowrap;
+}
+.table-dates {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.expired-tag {
+  color: #dc2626;
+  font-weight: 700;
+}
+.perf-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.table-action-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* Mobile responsive queries */
+@media (max-width: 768px) {
+  .sponsored-hero-banner {
+    flex-direction: column;
+    padding: 22px;
+  }
+  .sponsored-hero-media {
+    width: 100%;
+    height: 150px;
+  }
+  .featured-shop-spotlight {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .featured-shop-art {
+    width: 100%;
+    height: 150px;
+  }
+  .form-grid-2,
+  .form-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}

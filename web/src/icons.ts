@@ -45,6 +45,10 @@ import Building2Raw from "lucide-react/dist/esm/icons/building-2.js";
 import UserCheckRaw from "lucide-react/dist/esm/icons/user-check.js";
 import WalletRaw from "lucide-react/dist/esm/icons/wallet.js";
 import InfoRaw from "lucide-react/dist/esm/icons/info.js";
+import Trash2Raw from "lucide-react/dist/esm/icons/trash-2.js";
+import MegaphoneRaw from "lucide-react/dist/esm/icons/megaphone.js";
+import EyeRaw from "lucide-react/dist/esm/icons/eye.js";
+import TrendingUpRaw from "lucide-react/dist/esm/icons/trending-up.js";
 
 export const ArrowUpRight = ArrowUpRightRaw as LucideIcon;
 export const ArrowRight = ArrowRightRaw as LucideIcon;
@@ -89,3 +93,7 @@ export const Building2 = Building2Raw as LucideIcon;
 export const UserCheck = UserCheckRaw as LucideIcon;
 export const Wallet = WalletRaw as LucideIcon;
 export const Info = InfoRaw as LucideIcon;
+export const Trash2 = Trash2Raw as LucideIcon;
+export const Megaphone = MegaphoneRaw as LucideIcon;
+export const Eye = EyeRaw as LucideIcon;
+export const TrendingUp = TrendingUpRaw as LucideIcon;

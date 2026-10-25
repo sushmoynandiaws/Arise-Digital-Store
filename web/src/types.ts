@@ -133,3 +133,28 @@ export type ProductReviewsPage = {
   has_more: boolean;
   reviews: ProductReview[];
 };
+
+export type AdPlacementSlot =
+  | "home_hero"
+  | "top_flash"
+  | "sponsored_product"
+  | "featured_shop"
+  | "sticky_bottom";
+
+export type SponsoredAd = {
+  id: string;
+  title: string;
+  advertiser_name: string;
+  target_url: string;
+  banner_url?: string;
+  badge_text?: string;
+  cta_text?: string;
+  placement: AdPlacementSlot;
+  start_date: string;
+  end_date: string;
+  price_bdt: number;
+  status: "active" | "paused" | "pending_payment";
+  impressions: number;
+  clicks: number;
+  created_at: number;
+};
