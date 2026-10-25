@@ -1428,3 +1428,431 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
   color: var(--primary);
   background: var(--surface-hover);
 }
+
+/* ==========================================================================
+   Dark Theme Footer (Matching SubscriptionsBD Layout in 2nd Image)
+   ========================================================================== */
+.dark-theme-footer {
+  background: #080c16 !important;
+  color: #cbd5e1 !important;
+  width: 100% !important;
+  padding: 0 !important;
+  margin-top: 60px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+.dark-theme-footer.store-footer {
+  padding-block: 0 !important;
+  gap: 0 !important;
+}
+.dark-footer-inner.store-footer-card {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 56px 24px 32px;
+  display: block !important;
+}
+
+/* 4-Column Grid */
+.dark-footer-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1.25fr 0.95fr;
+  gap: 36px;
+  margin-bottom: 36px;
+}
+.dark-footer-col {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Column 1: Brand & Contact Info */
+.dark-footer-brand-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.dark-shop-avatar-wrap .shop-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.dark-logo-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #10b981, #06b6d4);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+.dark-brand-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.dark-brand-name {
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+.dark-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  font-size: 11px;
+  font-weight: 700;
+  width: fit-content;
+}
+.dark-brand-tagline {
+  font-size: 13.5px;
+  color: #94a3b8;
+  line-height: 1.6;
+  margin-bottom: 22px;
+  max-width: 330px;
+}
+.dark-contact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dark-contact-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+.dark-contact-item strong {
+  color: #e2e8f0;
+}
+.dark-contact-icon {
+  color: #06b6d4;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.dark-contact-item a {
+  color: #94a3b8;
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+.dark-contact-item a:hover {
+  color: #38bdf8;
+  text-decoration: underline;
+}
+
+/* Headings in Dark Footer */
+.dark-footer-heading {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffffff;
+  margin-bottom: 18px;
+}
+
+/* Column 2: Products List */
+.dark-footer-links-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.dark-product-link {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #94a3b8;
+  font-size: 13.5px;
+  line-height: 1.45;
+  text-decoration: none;
+  transition: all 160ms ease;
+}
+.dark-product-link .bullet-dot {
+  color: #06b6d4;
+  font-weight: bold;
+}
+.dark-product-link:hover {
+  color: #ffffff;
+  transform: translateX(4px);
+}
+
+/* Column 3: Cert Cards & Fan Page */
+.dark-cert-cards-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.dark-cert-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.cert-emblem {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.cert-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cert-title {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+.cert-num {
+  font-size: 14px;
+  color: #38bdf8;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.dark-fanpage-section {
+  margin-bottom: 14px;
+}
+.dark-fanpage-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+.dark-fanpage-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+.fanpage-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fanpage-initial {
+  font-weight: 800;
+  color: #38bdf8;
+  font-size: 14px;
+}
+.fanpage-name {
+  font-size: 14px;
+  color: #ffffff;
+  font-weight: 700;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fanpage-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #1d9bf0;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.dark-social-pills-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dark-social-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 160ms ease;
+  min-height: 36px;
+}
+.dark-social-pill:hover {
+  background: #334155;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* Column 4: Links */
+.dark-footer-link-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: #94a3b8;
+  cursor: pointer;
+  text-align: left;
+  transition: all 150ms ease;
+  text-decoration: none;
+  display: inline-block;
+  line-height: 1.4;
+}
+.dark-footer-link-btn:hover {
+  color: #38bdf8;
+  transform: translateX(3px);
+}
+.dark-footer-link-btn.highlight-link {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+/* White Floating Payment Strip (Matching 2nd Image) */
+.dark-footer-payment-strip {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 12px 24px;
+  margin: 36px 0 24px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+.payment-strip-inner {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.pay-with-label {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0f172a;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.payment-logos-divider {
+  width: 1px;
+  height: 24px;
+  background: #cbd5e1;
+}
+.payment-logos-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  flex: 1;
+  justify-content: flex-end;
+}
+.pay-logo-img {
+  height: 24px;
+  max-width: 70px;
+  object-fit: contain;
+  transition: transform 160ms ease;
+}
+.pay-logo-img:hover {
+  transform: scale(1.08);
+}
+
+/* Sub-bottom Bar */
+.dark-footer-subbottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 12.5px;
+  color: #64748b;
+}
+.dark-copyright {
+  color: #64748b;
+}
+.dark-powered {
+  color: #64748b;
+}
+.dark-powered strong {
+  color: #94a3b8;
+}
+
+/* Policy Modal Styling */
+.policy-modal-card {
+  max-width: 580px;
+  width: 100%;
+}
+.policy-modal-body {
+  max-height: 65vh;
+  overflow-y: auto;
+  padding: 20px 24px;
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+/* Responsive queries */
+@media (max-width: 960px) {
+  .dark-footer-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+}
+@media (max-width: 640px) {
+  .dark-footer-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .dark-footer-inner.store-footer-card {
+    padding: 36px 16px 24px;
+  }
+  .payment-strip-inner {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 12px;
+  }
+  .payment-logos-divider {
+    display: none;
+  }
+  .payment-logos-row {
+    justify-content: center;
+    gap: 12px;
+  }
+  .pay-logo-img {
+    height: 20px;
+  }
+  .dark-footer-subbottom {
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+  }
+}

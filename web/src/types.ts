@@ -30,6 +30,8 @@ export type ShopSocialLinks = {
   whatsapp?: string;
   maps?: string;
   website?: string;
+  linkedin?: string;
+  youtube?: string;
 };
 
 export type ShopContact = {

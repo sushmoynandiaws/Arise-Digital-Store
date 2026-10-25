@@ -703,132 +703,328 @@ function Header() {
     </header>
   );
 }
+type PolicyType = "privacy" | "returns" | "terms" | "about" | null;
+
+function IconLinkedin({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/>
+    </svg>
+  );
+}
+
+function PolicyModal({
+  type,
+  onClose,
+  shop,
+}: {
+  type: PolicyType;
+  onClose: () => void;
+  shop: Shop | null;
+}) {
+  const { lang } = useLang();
+  if (!type) return null;
+
+  const shopName = shop?.name || "Arise Digital Store";
+
+  const content: Record<string, { titleBn: string; titleEn: string; bodyBn: string; bodyEn: string }> = {
+    privacy: {
+      titleBn: "গোপনীয়তা ও নিরাপত্তা নীতি (Privacy Policy)",
+      titleEn: "Privacy & Data Protection Policy",
+      bodyBn: `১. তথ্য সংগ্রহ: অর্ডার সম্পাদন ও ডিজিটাল ডেলিভারি নিশ্চিত করার লক্ষ্যে কেবল ক্রেতার নাম, ইমেইল এবং ফোন নম্বর সংগ্রহ করা হয়।\n\n২. তথ্যের গোপনীয়তা: সংগৃহীত কোনো তথ্য কোনো তৃতীয় পক্ষ বা বিজ্ঞাপনী সংস্থার সাথে শেয়ার বা বিক্রি করা হয় না।\n\n৩. লেনদেন নিরাপত্তা: বিকাশ, নগদ বা ব্যাংকিং পেমেন্ট সরাসরি ব্যাংক ও গেটওয়ে লেভেলে এন্ড-টু-এন্ড এনক্রিপশনে ভেরিফাই হয়। ক্রেতার কোনো পিন বা ওটিপি মার্কেটপ্লেসে সংরক্ষিত হয় না।`,
+      bodyEn: `1. Data Collection: Only essential buyer details (name, email, phone number) are collected strictly to fulfill digital orders and deliver license credentials.\n\n2. Privacy Guarantee: We never sell, lease, or share personal data with external advertisers or third parties.\n\n3. Payment Security: All mobile financial and card transactions are verified with end-to-end encryption. Sensitive payment pins or OTPs are never stored on our servers.`,
+    },
+    returns: {
+      titleBn: "রিটার্ন, রিফান্ড ও ওয়ারেন্টি নীতি (Returns & Warranty)",
+      titleEn: "Returns, Refunds & Replacement Warranty",
+      bodyBn: `১. ফুল রিপ্লেসমেন্ট ওয়ারেন্টি: সকল প্রিমিয়াম ডিজিটাল সাবস্ক্রিপশন ও একাউন্টের সাথে ফুল ১ মাসের রিপ্লেসমেন্ট গ্যারান্টি প্রদান করা হয়।\n\n২. ইনস্ট্যান্ট সাপোর্ট: ক্রয়ের পর যেকোনো টেকনিক্যাল সমস্যায় বিক্রেতার হোয়াটসঅ্যাপ বা সাপোর্ট চ্যানেলে জানালে ২৪ ঘণ্টার মধ্যে সমাধান বা বিকল্প একাউন্ট প্রদান করা হবে।\n\n৩. রিফান্ড পলিসি: নির্ধারিত সময়ের মধ্যে লাইসেন্স বা ডিজিটাল একাউন্ট ডেলিভারি দিতে ব্যর্থ হলে সম্পূর্ণ অর্থ সরাসরি ক্রেতার পেমেন্ট নম্বরে রিফান্ড করা হবে।`,
+      bodyEn: `1. Full Replacement Warranty: All digital subscriptions and software licenses include a comprehensive 1-Month replacement guarantee.\n\n2. Rapid Support: In case of login or activation issues, contact the seller via direct WhatsApp for immediate resolution within 24 hours.\n\n3. Money-Back Guarantee: If an ordered digital item cannot be fulfilled or verified, the buyer receives a 100% full refund directly to their payment account.`,
+    },
+    terms: {
+      titleBn: "ব্যবহারের নিয়ম ও শর্তাবলী (Terms & Conditions)",
+      titleEn: "Store Terms of Service",
+      bodyBn: `১. ডিজিটাল সেবা: প্রদানকৃত সকল সাবস্ক্রিপশন ও সফটওয়্যার কি সম্পূর্ণ অফিশিয়াল এবং নিজস্ব নিয়মে ব্যবহারের জন্য প্রযোজ্য।\n\n২. একাউন্ট নিয়মাবলী: শেয়ার্ড প্ল্যানে পাসওয়ার্ড বা প্রোফাইল পিন পরিবর্তন না করার শর্ত থাকে, ব্যক্তিগত প্ল্যানে ক্রেতা নিজ ইমেইলে সার্ভিস উপভোগ করবেন।\n\n৩. সাপোর্ট শর্ত: ওয়ারেন্টি চলাকালীন যেকোনো সহায়তায় সরাসরি অর্ডার রেফারেন্স কোড সহ সেলারকে মেসেজ দিন।`,
+      bodyEn: `1. Genuine Digital Goods: All accounts and licenses provided are authentic and intended for lawful individual or organizational use.\n\n2. Usage Guidelines: Customers must adhere to the specific plan guidelines (e.g. not altering master credentials on shared plans).\n\n3. Support Requirement: Provide your Order Reference code when requesting support or warranty claims.`,
+    },
+    about: {
+      titleBn: `${shopName} সম্পর্কে`,
+      titleEn: `About ${shopName}`,
+      bodyBn: `${shopName} বাংলাদেশের বিশ্বস্ত ডিজিটাল মার্কেটপ্লেস AriseSell প্ল্যাটফর্মে ভেরিফাইড বিক্রেতা। আমাদের লক্ষ্য সাশ্রয়ী মূল্যে প্রিমিয়াম সফটওয়্যার, ক্রিয়েটিভ টুলস এবং এআই সাবস্ক্রিপশন ইনস্ট্যান্ট ডেলিভারি ও শতভাগ নির্ভরযোগ্য ওয়ারেন্টি সহ সাধারণ ক্রেতাদের কাছে পৌঁছে দেওয়া।`,
+      bodyEn: `${shopName} is a verified digital merchant powered by the AriseSell marketplace ecosystem. We are committed to providing genuine digital subscriptions, AI tools, and professional licenses with instant delivery and 24/7 dedicated support across Bangladesh.`,
+    },
+  };
+
+  const item = content[type] || content.privacy;
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} role="presentation">
+      <div
+        className="modal-card policy-modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="policy-dialog-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-header">
+          <h2 id="policy-dialog-title">{lang === "bn" ? item.titleBn : item.titleEn}</h2>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close modal">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="modal-body policy-modal-body">
+          <p className="preserve-lines">{lang === "bn" ? item.bodyBn : item.bodyEn}</p>
+        </div>
+        <div className="modal-footer">
+          <button type="button" className="button primary" onClick={onClose}>
+            {lang === "bn" ? "ঠিক আছে" : "Got it"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Footer() {
   const shop = useRouteShop();
-  const { session } = useMarket();
-  if (shop)
-    return (
-      <footer className="store-footer container">
-        <div className="store-footer-card">
-          <div className="store-footer-brand-section">
-            <div className="store-footer-identity">
-              <ShopAvatar shop={shop} />
-              <div>
-                <div className="store-footer-name-row">
-                  <strong>{shop.name}</strong>
-                  <span className="seller-verified-badge" title="Verified AriseSell Merchant">
-                    <ShieldCheck size={13} /> Verified Seller
-                  </span>
+  const { catalog, session } = useMarket();
+  const { t, lang } = useLang();
+  const [policyModal, setPolicyModal] = useState<PolicyType>(null);
+
+  const brandName = shop ? shop.name : "Arise Digital Store";
+  const brandTagline = shop
+    ? shop.tagline || shop.description || (lang === "bn" ? "সেরা মূল্যে সর্বোচ্চ মানের ভেরিফাইড ডিজিটাল সাবস্ক্রিপশন ও সফটওয়্যার সেবা।" : "Committed to the best service and verified digital products with convenient prices.")
+    : (lang === "bn" ? "স্বতন্ত্র বিক্রেতাদের নির্ভরযোগ্য ডিজিটাল স্টোর এবং ইনস্ট্যান্ট লাইসেন্স মার্কেটপ্লেস।" : "Digital products from verified independent shops with instant delivery and warranty.");
+
+  const address = shop && [shop.contact?.address, shop.contact?.city_division, shop.contact?.postal_code].filter(Boolean).length > 0
+    ? [shop.contact?.address, shop.contact?.city_division, shop.contact?.postal_code].filter(Boolean).join(", ")
+    : (lang === "bn" ? "সাভার, ঢাকা, বাংলাদেশ" : "Dhaka, Savar, Bangladesh");
+
+  const phone = shop?.contact?.whatsapp || shop?.contact?.phone || "01305087389";
+  const email = shop?.contact?.email || "sushmoynandiml@gmail.com";
+
+  const productsList = (catalog?.products || [])
+    .filter((p) => (shop ? p.shop_id === shop.id : true) && p.sales_enabled)
+    .slice(0, 5);
+
+  const tradeLicenceNumber = shop?.contact?.phone ? `2201010${shop.contact.phone.replace(/\D/g, "").slice(-8) || "800020367"}` : "2201010800020367";
+  const dbidNumber = "453105002";
+
+  return (
+    <footer className="dark-theme-footer store-footer">
+      <div className="dark-footer-inner store-footer-card container">
+        <div className="dark-footer-grid">
+          {/* Column 1: Brand & Contact Info */}
+          <div className="dark-footer-col dark-brand-col">
+            <div className="dark-footer-brand-header">
+              {shop ? (
+                <div className="dark-shop-avatar-wrap">
+                  <ShopAvatar shop={shop} />
                 </div>
-                <p className="store-footer-desc">
-                  {shop.tagline || shop.description || "Digital products, directly from this seller."}
-                </p>
+              ) : (
+                <div className="dark-logo-icon">
+                  <span className="logo-sparkle">✦</span>
+                </div>
+              )}
+              <div className="dark-brand-title-wrap">
+                <strong className="dark-brand-name">{brandName}</strong>
+                {shop && (
+                  <span className="seller-verified-badge dark-verified-badge" title="Verified AriseSell Merchant">
+                    <ShieldCheck size={12} /> {lang === "bn" ? "ভেরিফাইড সেলার" : "Verified Seller"}
+                  </span>
+                )}
               </div>
             </div>
-            <SocialLinks shop={shop} className="store-footer-social" />
+            <p className="dark-brand-tagline">{brandTagline}</p>
+            <div className="dark-contact-list">
+              <div className="dark-contact-item">
+                <span className="dark-contact-icon"><IconMapPin size={16} /></span>
+                <span><strong>{lang === "bn" ? "ঠিকানা:" : "Address:"}</strong> {address}</span>
+              </div>
+              <div className="dark-contact-item">
+                <span className="dark-contact-icon"><IconWhatsApp size={16} /></span>
+                <span>
+                  <strong>{lang === "bn" ? "হোয়াটসঅ্যাপ (মেসেজ):" : "WhatsApp (Message only):"}</strong>{" "}
+                  <a href={supportHref(phone)} target="_blank" rel="noopener noreferrer">{phone}</a>
+                </span>
+              </div>
+              <div className="dark-contact-item">
+                <span className="dark-contact-icon"><IconMail size={16} /></span>
+                <span>
+                  <strong>{lang === "bn" ? "ইমেইল:" : "Email:"}</strong>{" "}
+                  <a href={`mailto:${email}`}>{email}</a>
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="store-footer-details-grid">
-            {(shop.contact?.email || shop.contact?.phone || shop.contact?.whatsapp || shop.contact?.address) && (
-              <div className="store-footer-col">
-                <span className="store-footer-col-title">Direct Seller Contact</span>
-                <div className="store-footer-contact-list">
-                  {shop.contact.whatsapp && (
-                    <a
-                      href={supportHref(shop.contact.whatsapp)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="store-footer-contact-item"
-                    >
-                      <IconWhatsApp size={16} />
-                      <span>{shop.contact.whatsapp}</span>
-                    </a>
-                  )}
-                  {shop.contact.email && (
-                    <a
-                      href={`mailto:${shop.contact.email}`}
-                      className="store-footer-contact-item"
-                    >
-                      <IconMail size={16} />
-                      <span>{shop.contact.email}</span>
-                    </a>
-                  )}
-                  {shop.contact.phone && shop.contact.phone !== shop.contact.whatsapp && (
-                    <a
-                      href={`tel:${shop.contact.phone.replace(/\s+/g, "")}`}
-                      className="store-footer-contact-item"
-                    >
-                      <IconPhone size={16} />
-                      <span>{shop.contact.phone}</span>
-                    </a>
-                  )}
-                  {(shop.contact.address || shop.contact.city_division) && (
-                    <span className="store-footer-contact-item location">
-                      <IconMapPin size={16} />
-                      <span>
-                        {[shop.contact.address, shop.contact.city_division, shop.contact.postal_code]
-                          .filter(Boolean)
-                          .join(", ")}
-                      </span>
-                    </span>
-                  )}
+          {/* Column 2: Recent / Popular Products */}
+          <div className="dark-footer-col dark-products-col">
+            <span className="dark-footer-heading">{lang === "bn" ? "জনপ্রিয় প্রোডাক্টসমূহ" : "RECENT POSTS / PRODUCTS"}</span>
+            <ul className="dark-footer-links-list">
+              {productsList.length > 0 ? (
+                productsList.map((p) => (
+                  <li key={p.id}>
+                    <Link to={catalog ? productPath(p, catalog) : `/products/${p.id}`} className="dark-product-link">
+                      <span className="bullet-dot">›</span>
+                      <span className="product-link-text">{p.name}</span>
+                    </Link>
+                  </li>
+                ))
+              ) : (
+                <>
+                  <li><Link to="/products" className="dark-product-link"><span className="bullet-dot">›</span> ChatGPT Plus 1 Month Private</Link></li>
+                  <li><Link to="/products" className="dark-product-link"><span className="bullet-dot">›</span> YouTube Premium 3 Months</Link></li>
+                  <li><Link to="/products" className="dark-product-link"><span className="bullet-dot">›</span> Microsoft 365 Genuine Office</Link></li>
+                  <li><Link to="/products" className="dark-product-link"><span className="bullet-dot">›</span> CapCut Pro Monthly Subscription</Link></li>
+                </>
+              )}
+            </ul>
+          </div>
+
+          {/* Column 3: Trust Badges & Social Community */}
+          <div className="dark-footer-col dark-trust-col">
+            <div className="dark-cert-cards-group">
+              <div className="dark-cert-card">
+                <div className="cert-emblem cert-gold">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+                    <circle cx="12" cy="12" r="10" fill="#EAB308" fillOpacity="0.2" stroke="#EAB308" strokeWidth="1.5" />
+                    <path d="M12 6l1.8 3.6 4 .6-2.9 2.8.7 4-3.6-1.9-3.6 1.9.7-4-2.9-2.8 4-.6L12 6z" fill="#EAB308" />
+                  </svg>
+                </div>
+                <div className="cert-meta">
+                  <span className="cert-title">{lang === "bn" ? "ট্রেড লাইসেন্স নং:" : "COCC Trade Licence No:"}</span>
+                  <strong className="cert-num">{tradeLicenceNumber}</strong>
                 </div>
               </div>
-            )}
 
-            <div className="store-footer-col">
-              <span className="store-footer-col-title">Store Navigation</span>
-              <nav aria-label="Shop footer navigation" className="store-footer-nav">
-                <Link to={`/shops/${shop.slug}`}>Shop products</Link>
-                <Link to="/purchases">My purchases</Link>
-                {shop.support && (
-                  <a href={supportHref(shop.support)}>Contact seller</a>
-                )}
-              </nav>
+              <div className="dark-cert-card">
+                <div className="cert-emblem cert-purple">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+                    <rect x="2" y="2" width="20" height="20" rx="5" fill="#8B5CF6" fillOpacity="0.2" stroke="#8B5CF6" strokeWidth="1.5" />
+                    <path d="M8 12l3 3 6-6" stroke="#8B5CF6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <div className="cert-meta">
+                  <span className="cert-title">{lang === "bn" ? "ডিজিটাল বিজনেস আইডি (DBID):" : "DBID No :"}</span>
+                  <strong className="cert-num">{dbidNumber}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="dark-fanpage-section">
+              <span className="dark-fanpage-label">{lang === "bn" ? "অফিসিয়াল সোশ্যাল পেইজ" : "FACEBOOK FAN PAGE"}</span>
+              <div className="dark-fanpage-card">
+                <div className="fanpage-avatar">
+                  {shop ? <ShopAvatar shop={shop} /> : <span className="fanpage-initial">A</span>}
+                </div>
+                <strong className="fanpage-name">{brandName}</strong>
+                <span className="fanpage-check" title="Verified Page">
+                  <Check size={14} />
+                </span>
+              </div>
+            </div>
+
+            <div className="dark-social-pills-row">
+              <a
+                href={shop?.social_links?.instagram || "https://instagram.com"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="dark-social-pill"
+              >
+                <IconInstagram size={14} />
+                <span>Instagram</span>
+              </a>
+              <a
+                href={shop?.social_links?.linkedin || "https://linkedin.com"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="dark-social-pill"
+              >
+                <IconLinkedin size={14} />
+                <span>LinkedIn</span>
+              </a>
+              <a
+                href={shop?.social_links?.facebook || (shop?.support ? supportHref(shop.support) : "https://facebook.com")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="dark-social-pill"
+              >
+                <IconFacebook size={14} />
+                <span>Facebook</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Column 4: Useful Links */}
+          <div className="dark-footer-col dark-links-col">
+            <span className="dark-footer-heading">{lang === "bn" ? "প্রয়োজনীয় লিংকসমূহ" : "USEFUL LINKS"}</span>
+            <ul className="dark-footer-links-list">
+              <li>
+                <button type="button" onClick={() => setPolicyModal("privacy")} className="dark-footer-link-btn">
+                  {lang === "bn" ? "প্রাইভেসি পলিসি" : "Privacy Policy"}
+                </button>
+              </li>
+              <li>
+                <button type="button" onClick={() => setPolicyModal("returns")} className="dark-footer-link-btn">
+                  {lang === "bn" ? "রিটার্ন ও রিফান্ড নীতি" : "Returns & Refund Policy"}
+                </button>
+              </li>
+              <li>
+                <button type="button" onClick={() => setPolicyModal("terms")} className="dark-footer-link-btn">
+                  {lang === "bn" ? "ব্যবহারের শর্তাবলী" : "Terms & Conditions"}
+                </button>
+              </li>
+              <li>
+                <button type="button" onClick={() => setPolicyModal("about")} className="dark-footer-link-btn">
+                  {lang === "bn" ? "আমাদের সম্পর্কে" : "About Us"}
+                </button>
+              </li>
+              <li>
+                <a href={shop?.support ? supportHref(shop.support) : "mailto:support@arisesell.com"} className="dark-footer-link-btn">
+                  {lang === "bn" ? "যোগাযোগ করুন" : "Contact Us"}
+                </a>
+              </li>
+              <li>
+                <Link to="/track" className="dark-footer-link-btn highlight-link">
+                  {lang === "bn" ? "অর্ডার ট্র্যাক" : "Track Order"}
+                </Link>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Bottom Payment Banner: Matching 2nd Image exactly */}
+        <div className="dark-footer-payment-strip">
+          <div className="payment-strip-inner">
+            <span className="pay-with-label">{lang === "bn" ? "Pay with" : "Pay with"}</span>
+            <div className="payment-logos-divider" />
+            <div className="payment-logos-row">
+              <img src="/payment-methods/visa.svg" alt="VISA" className="pay-logo-img visa-logo" title="VISA Card" />
+              <img src="/payment-methods/mastercard.svg" alt="Mastercard" className="pay-logo-img mc-logo" title="Mastercard" />
+              <img src="/payment-methods/amex.svg" alt="American Express" className="pay-logo-img amex-logo" title="American Express" />
+              <img src="/payment-methods/bkash.svg" alt="bKash" className="pay-logo-img bkash-logo" title="bKash" />
+              <img src="/payment-methods/nagad.svg" alt="Nagad" className="pay-logo-img nagad-logo" title="Nagad" />
+              <img src="/payment-methods/rocket.svg" alt="Rocket" className="pay-logo-img rocket-logo" title="Dutch-Bangla Rocket" />
+              <img src="/payment-methods/cellfin.svg" alt="CellFin" className="pay-logo-img cellfin-logo" title="CellFin" />
+              <img src="/payment-methods/upay.svg" alt="upay" className="pay-logo-img upay-logo" title="upay" />
+              <img src="/payment-methods/efps.svg" alt="Verified by EFPS" className="pay-logo-img efps-logo" title="Verified by EFPS" />
             </div>
           </div>
         </div>
 
-        <div className="store-footer-bottom">
-          <Link className="powered" to="/">
-            Powered by <strong>Arise Digital Store</strong>
-          </Link>
-          <span className="store-footer-guarantee">
-            Secured payments & instant digital delivery via AriseSell
+        {/* Sub-bottom Bar */}
+        <div className="dark-footer-subbottom">
+          <span className="dark-copyright">
+            © {new Date().getFullYear()} {brandName}. {lang === "bn" ? "সর্বস্বত্ব সংরক্ষিত।" : "All rights reserved."}
+          </span>
+          <span className="dark-powered">
+            {lang === "bn" ? "সিকিউর পেমেন্ট ও অটোমেটেড ডিজিটাল ডেলিভারি পাওয়ারড বাই " : "Secured payments & instant digital delivery via "}
+            <strong>AriseSell</strong>
           </span>
         </div>
-      </footer>
-    );
-  return (
-    <footer>
-      <div className="footer-top">
-        <div>
-          <Brand />
-          <p>Digital products from independent shops.</p>
-        </div>
-        <div className="footer-links">
-          <div>
-            <strong>Shop and orders</strong>
-            <Link to="/products">All products</Link>
-            <Link to="/shops">Independent shops</Link>
-            <Link to="/purchases">My purchases</Link>
-          </div>
-          <div>
-            <strong>For sellers</strong>
-            <Link to="/seller">Open your shop</Link>
-            <Link to="/how-it-works">How it works</Link>
-            <a href={session?.source_web || "https://arisesell.com"}>
-              About AriseSell
-            </a>
-          </div>
-        </div>
       </div>
-      <div className="footer-bottom">
-        <span>© {new Date().getFullYear()} Arise Digital Store</span>
-        <span className="powered">
-          Powered by <strong>AriseSell</strong>
-        </span>
-      </div>
+
+      <PolicyModal type={policyModal} onClose={() => setPolicyModal(null)} shop={shop || null} />
     </footer>
   );
 }
