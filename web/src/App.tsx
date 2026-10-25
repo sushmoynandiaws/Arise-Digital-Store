@@ -64,7 +64,7 @@ import {
   deliveryLabel,
 } from "./api";
 import type { Catalog, Shop, Product, Session, Quote, Purchase } from "./types";
-import { productForRoute, productPath } from "./product";
+import { productForRoute, productPath, productSection, productSections, type ProductSection } from "./product";
 
 type Market = {
   catalog: Catalog | null;
@@ -1005,6 +1005,11 @@ function ProductPage() {
   const route = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const section = productSection(location.hash);
+  const sectionTabs = useRef<HTMLDivElement>(null);
+  function selectSection(value: ProductSection) {
+    navigate({ pathname: location.pathname, search: location.search, hash: `#product-${value}` });
+  }
   const { catalog, catalogError } = useMarket();
   const [variant, setVariant] = useState("");
   const [report, setReport] = useState("");
@@ -1142,7 +1147,10 @@ function ProductPage() {
               <p>{product.delivery_mode === "automatic"
                 ? "Your items become available after your payment is verified."
                 : "The seller prepares your order after payment is verified."}</p>
-              <a className="text-link" href="#product-delivery">View delivery details <ArrowDown size={13} /></a>
+              <button type="button" className="text-link" onClick={() => {
+                selectSection("delivery");
+                sectionTabs.current?.scrollIntoView({ block: "start" });
+              }}>View delivery details <ArrowDown size={13} /></button>
             </div>
           </div>
           <Link className="visit-shop" to={`/shops/${shop.slug}`}>
@@ -1155,14 +1163,26 @@ function ProductPage() {
           </Link>
         </div>
       </div>
-      <nav className="product-section-nav" aria-label="Product information">
-        <a href="#product-overview">Overview</a>
-        <a href="#product-delivery">Delivery</a>
-        <a href="#product-terms">Purchase terms</a>
-      </nav>
+      <div ref={sectionTabs} className="product-section-nav" role="tablist" aria-label="Product information">
+        {productSections.map((tab, index) => (
+          <button type="button" key={tab.id} id={`product-tab-${tab.id}`} role="tab"
+            aria-selected={section === tab.id} aria-controls={`product-${tab.id}`}
+            tabIndex={section === tab.id ? 0 : -1} onClick={() => selectSection(tab.id)}
+            onKeyDown={(event) => {
+              const next = event.key === "Home" ? 0 : event.key === "End" ? productSections.length - 1
+                : event.key === "ArrowRight" ? (index + 1) % productSections.length
+                : event.key === "ArrowLeft" ? (index + productSections.length - 1) % productSections.length : -1;
+              if (next < 0) return;
+              event.preventDefault();
+              selectSection(productSections[next].id);
+              document.getElementById(`product-tab-${productSections[next].id}`)?.focus();
+            }}>{tab.label}</button>
+        ))}
+      </div>
       <div className="product-description">
         <div className="product-sections">
-          <section id="product-overview" className="product-section">
+          <section id="product-overview" className="product-section" role="tabpanel"
+            aria-labelledby="product-tab-overview" tabIndex={0} hidden={section !== "overview"}>
             <span className="eyebrow">THE DETAILS</span>
             <h2>About this product</h2>
             <p className="preserve-lines">
@@ -1170,7 +1190,8 @@ function ProductPage() {
                 "The seller has not provided an additional description."}
             </p>
           </section>
-          <section id="product-delivery" className="product-section">
+          <section id="product-delivery" className="product-section" role="tabpanel"
+            aria-labelledby="product-tab-delivery" tabIndex={0} hidden={section !== "delivery"}>
             <span className="eyebrow">AFTER YOUR PURCHASE</span>
             <h2>How delivery works</h2>
             <p>{product.delivery_mode === "automatic"
@@ -1179,11 +1200,12 @@ function ProductPage() {
             {product.delivery_note && product.delivery_note !== product.description &&
               <div className="product-delivery-instructions"><h3>Seller’s delivery instructions</h3><p className="preserve-lines">{product.delivery_note}</p></div>}
           </section>
-          <section id="product-terms" className="product-section">
+          <section id="product-terms" className="product-section" role="tabpanel"
+            aria-labelledby="product-tab-terms" tabIndex={0} hidden={section !== "terms"}>
             <span className="eyebrow">BEFORE YOU BUY</span>
             <h2>Purchase terms</h2>
             {product.purchase_terms && product.purchase_terms === product.description
-              ? <p>The seller’s purchase terms are included in the <a className="text-link" href="#product-overview">product description above</a>. Please read them before ordering.</p>
+              ? <p>The seller’s purchase terms are included in the <button type="button" className="text-link product-inline-link" onClick={() => selectSection("overview")}>product description</button>. Please read them before ordering.</p>
               : <p className="preserve-lines">{product.purchase_terms || "Contact the seller to confirm purchase terms before ordering."}</p>}
           </section>
         </div>

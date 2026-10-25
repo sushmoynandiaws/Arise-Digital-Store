@@ -5,10 +5,17 @@ import vm from 'node:vm';
 import ts from 'typescript';
 const exports={};
 vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../src/product.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,encodeURIComponent});
-const {productPath,productSlug,productForRoute}=exports;
+const {productPath,productSlug,productForRoute,productSection,productSections}=exports;
 const p={id:'34a419e0-8596-4910-ac03-7cb9ba04773f',shop_id:'a',name:'ChatGPT Plus No Warranty (UPI)'};
 const shop={id:'a',slug:'nandi-digital-products'};
 const catalog={shops:[shop,{id:'b',slug:'another-shop'}],products:[p]};
+
+test('product information defaults to overview and preserves existing section links',()=>{
+  assert.equal(productSection(''),'overview');
+  assert.equal(productSection('#unrecognized'),'overview');
+  assert.equal(productSection('#product-delivery-extra'),'overview');
+  for(const section of productSections)assert.equal(productSection(`#product-${section.id}`),section.id);
+});
 
 test('product URLs show shop and product names while legacy IDs still resolve',()=>{
   assert.equal(productPath(p,catalog),'/shops/nandi-digital-products/products/chatgpt-plus-no-warranty-upi');

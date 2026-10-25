@@ -1,5 +1,16 @@
 import type { Catalog, Product } from "./types";
 
+export const productSections = [
+  { id: "overview", label: "Overview" },
+  { id: "delivery", label: "Delivery" },
+  { id: "terms", label: "Purchase terms" },
+] as const;
+export type ProductSection = (typeof productSections)[number]["id"];
+
+export function productSection(hash: string): ProductSection {
+  return productSections.find((section) => hash === `#product-${section.id}`)?.id || "overview";
+}
+
 function nameSlug(name: string) {
   return name.normalize("NFKC").toLowerCase().replace(/['’]/g, "")
     .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "") || "digital-product";
