@@ -10,10 +10,10 @@ const p={id:'34a419e0-8596-4910-ac03-7cb9ba04773f',shop_id:'a',name:'ChatGPT Plu
 const shop={id:'a',slug:'nandi-digital-products'};
 const catalog={shops:[shop,{id:'b',slug:'another-shop'}],products:[p]};
 
-test('product information defaults to overview and preserves existing section links',()=>{
-  assert.equal(productSection(''),'overview');
-  assert.equal(productSection('#unrecognized'),'overview');
-  assert.equal(productSection('#product-delivery-extra'),'overview');
+test('product information stays closed by default and preserves existing section links',()=>{
+  assert.equal(productSection(''),null);
+  assert.equal(productSection('#unrecognized'),null);
+  assert.equal(productSection('#product-delivery-extra'),null);
   for(const section of productSections)assert.equal(productSection(`#product-${section.id}`),section.id);
 });
 

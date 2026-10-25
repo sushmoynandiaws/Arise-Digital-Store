@@ -42,11 +42,9 @@ import {
   Package,
   LockKeyhole,
   LoaderCircle,
-  Mail,
   Download,
   Flag,
   Plus,
-  ArrowDown,
   LogOut,
   Sparkles,
   Layers,
@@ -66,7 +64,7 @@ import {
   deliveryLabel,
 } from "./api";
 import type { Catalog, Shop, Product, Session, Quote, Purchase } from "./types";
-import { productForRoute, productPath, productSection, productSections, type ProductSection } from "./product";
+import { productForRoute, productPath, productSection, type ProductSection } from "./product";
 
 type Market = {
   catalog: Catalog | null;
@@ -1013,9 +1011,12 @@ function ProductPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const section = productSection(location.hash);
-  const sectionTabs = useRef<HTMLDivElement>(null);
+  const infoDialog = useRef<HTMLDialogElement>(null);
   function selectSection(value: ProductSection) {
     navigate({ pathname: location.pathname, search: location.search, hash: `#product-${value}` });
+  }
+  function closeSection() {
+    if (section) navigate({ pathname: location.pathname, search: location.search, hash: "" }, { replace: true });
   }
   const { catalog, catalogError } = useMarket();
   const [variant, setVariant] = useState("");
@@ -1025,6 +1026,15 @@ function ProductPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const product = catalog ? productForRoute(catalog, route) : undefined;
+  useEffect(() => {
+    const dialog = infoDialog.current;
+    if (!dialog) return;
+    if (section && !dialog.open) dialog.showModal();
+    if (!section && dialog.open) dialog.close();
+    const previousOverflow = document.body.style.overflow;
+    if (section) document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [section, product?.id]);
   useEffect(() => setQuantity(1), [product?.id, variant]);
   useEffect(() => {
     if (!product || !catalog) return;
@@ -1098,10 +1108,7 @@ function ProductPage() {
           {product.description && <div className="product-brief">
             <h2>Product description</h2>
             <p className="preserve-lines">{product.description}</p>
-            <button type="button" className="text-link" onClick={() => {
-              selectSection("overview");
-              sectionTabs.current?.scrollIntoView({ block: "start" });
-            }}>Read full description <ArrowDown size={14} /></button>
+            <button type="button" className="text-link" onClick={() => selectSection("overview")}>Read full description <ExternalLink size={14} /></button>
           </div>}
           {product.variants.length > 1 && (
             <label className="field">
@@ -1172,12 +1179,8 @@ function ProductPage() {
             </div>
             {available && !canBuy && <p role="alert" className="product-quantity-error">Choose a whole quantity between 1 and {maximum}.</p>}
             <div className="product-policy-links">
-              <button type="button" onClick={() => {
-                selectSection("terms"); sectionTabs.current?.scrollIntoView({ block: "start" });
-              }}>Purchase terms</button>
-              <button type="button" onClick={() => {
-                selectSection("delivery"); sectionTabs.current?.scrollIntoView({ block: "start" });
-              }}>Delivery details</button>
+              <button type="button" onClick={() => selectSection("terms")}>Purchase terms</button>
+              <button type="button" onClick={() => selectSection("delivery")}>Delivery details</button>
             </div>
           </div>
           <p className="checkout-note">
@@ -1195,10 +1198,7 @@ function ProductPage() {
               <p>{product.delivery_mode === "automatic"
                 ? "Your items become available after your payment is verified."
                 : "The seller prepares your order after payment is verified."}</p>
-              <button type="button" className="text-link" onClick={() => {
-                selectSection("delivery");
-                sectionTabs.current?.scrollIntoView({ block: "start" });
-              }}>View delivery details <ArrowDown size={13} /></button>
+              <button type="button" className="text-link" onClick={() => selectSection("delivery")}>View delivery details <ExternalLink size={13} /></button>
             </div>
           </div>
           {!!shop.payment_methods?.length && <div className="product-payment-methods">
@@ -1215,59 +1215,30 @@ function ProductPage() {
           </Link>
         </div>
       </div>
-      <div ref={sectionTabs} className="product-section-nav" role="tablist" aria-label="Product information">
-        {productSections.map((tab, index) => (
-          <button type="button" key={tab.id} id={`product-tab-${tab.id}`} role="tab"
-            aria-selected={section === tab.id} aria-controls={`product-${tab.id}`}
-            tabIndex={section === tab.id ? 0 : -1} onClick={() => selectSection(tab.id)}
-            onKeyDown={(event) => {
-              const next = event.key === "Home" ? 0 : event.key === "End" ? productSections.length - 1
-                : event.key === "ArrowRight" ? (index + 1) % productSections.length
-                : event.key === "ArrowLeft" ? (index + productSections.length - 1) % productSections.length : -1;
-              if (next < 0) return;
-              event.preventDefault();
-              selectSection(productSections[next].id);
-              document.getElementById(`product-tab-${productSections[next].id}`)?.focus();
-            }}>{tab.label}</button>
-        ))}
-      </div>
-      <div className="product-description">
-        <div className="product-sections">
-          <section id="product-overview" className="product-section" role="tabpanel"
-            aria-labelledby="product-tab-overview" tabIndex={0} hidden={section !== "overview"}>
-            <span className="eyebrow">OVERVIEW</span>
-            <h2>About this product</h2>
+      <dialog ref={infoDialog} className="product-info-dialog" aria-labelledby="product-info-title"
+        onClose={closeSection} onClick={(event) => { if (event.target === event.currentTarget) closeSection(); }}>
+        <div className="product-info-header">
+          <h2 id="product-info-title">{section === "overview" ? "Product description" : section === "delivery" ? "Delivery details" : "Purchase terms"}</h2>
+          <button type="button" className="icon-button" aria-label="Close product details" onClick={closeSection}><X size={20} /></button>
+        </div>
+        <div className="product-info-content">
+          <p className="product-info-name">{product.name}</p>
+          {section === "overview" &&
             <p className="preserve-lines">
               {product.description ||
                 "The seller has not provided an additional description."}
-            </p>
-          </section>
-          <section id="product-delivery" className="product-section" role="tabpanel"
-            aria-labelledby="product-tab-delivery" tabIndex={0} hidden={section !== "delivery"}>
-            <span className="eyebrow">FULFILMENT SPECIFICATION</span>
-            <h2>How delivery works</h2>
+            </p>}
+          {section === "delivery" && <>
             <p>{product.delivery_mode === "automatic"
               ? "Once your payment is verified, open My purchases to access your items privately."
               : product.delivery_estimate || "Once your payment is verified, the seller prepares your items. Follow your order in My purchases for updates."}</p>
-            {product.delivery_note && product.delivery_note !== product.description &&
+            {product.delivery_note &&
               <div className="product-delivery-instructions"><h3>Seller’s delivery instructions</h3><p className="preserve-lines">{product.delivery_note}</p></div>}
-          </section>
-          <section id="product-terms" className="product-section" role="tabpanel"
-            aria-labelledby="product-tab-terms" tabIndex={0} hidden={section !== "terms"}>
-            <span className="eyebrow">PURCHASE LICENSE & TERMS</span>
-            <h2>Purchase terms</h2>
-            {product.purchase_terms && product.purchase_terms === product.description
-              ? <p>The seller’s purchase terms are included in the <button type="button" className="text-link product-inline-link" onClick={() => selectSection("overview")}>product description</button>. Please read them before ordering.</p>
-              : <p className="preserve-lines">{product.purchase_terms || "Contact the seller to confirm purchase terms before ordering."}</p>}
-          </section>
+          </>}
+          {section === "terms" && <p className="preserve-lines">{product.purchase_terms || "Contact the seller to confirm purchase terms before ordering."}</p>}
         </div>
-        <aside className="help-card">
-          <Mail size={24} />
-          <h3>A question before you buy?</h3>
-          <p>
-            The seller knows their product best. Get in touch before placing an
-            order.
-          </p>
+      </dialog>
+        <aside className="product-support" aria-label="Seller support">
           {shop.support ? (
             <a className="text-link" href={supportHref(shop.support)}>
               Contact {shop.name}
@@ -1327,7 +1298,6 @@ function ProductPage() {
             )}
           </details>
         </aside>
-      </div>
     </main>
   );
 }

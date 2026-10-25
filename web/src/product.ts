@@ -7,8 +7,8 @@ export const productSections = [
 ] as const;
 export type ProductSection = (typeof productSections)[number]["id"];
 
-export function productSection(hash: string): ProductSection {
-  return productSections.find((section) => hash === `#product-${section.id}`)?.id || "overview";
+export function productSection(hash: string): ProductSection | null {
+  return productSections.find((section) => hash === `#product-${section.id}`)?.id ?? null;
 }
 
 function nameSlug(name: string) {
