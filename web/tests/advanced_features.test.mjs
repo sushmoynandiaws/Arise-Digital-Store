@@ -131,10 +131,10 @@ test("App.tsx integrates all advanced e-commerce components and routes", () => {
   assert.ok(appCode.includes("/orders/track/verify-otp"));
   assert.ok(appCode.includes("<Route path=\"/track\" element={<TrackOrderPage />} />"));
 
-  // Volume discount & Bundles
+  // Volume discount (opt-in from shop setup) and Bundle box (removed per user request)
   assert.ok(appCode.includes("volume-discount-widget"));
-  assert.ok(appCode.includes("bundle-cross-sell-box"));
-  assert.ok(appCode.includes("BUNDLE20"));
+  assert.ok(appCode.includes("isVolumeDiscountEnabled"));
+  assert.ok(!appCode.includes("bundle-cross-sell-box"));
   assert.ok(appCode.includes("RENEW10"));
 
   // Badges & WhatsApp

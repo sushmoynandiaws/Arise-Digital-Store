@@ -2262,7 +2262,16 @@ function ProductPage() {
     product.variants.find((v) => v.stock > 0) || product.variants[0];
   const available = Boolean(product.sales_enabled && selected && selected.stock > 0);
   const maximum = Math.min(selected?.stock ?? 0, 100);
-  const companion = useMemo(() => (catalog?.products || []).find((p) => p.id !== product?.id && p.sales_enabled) || null, [catalog?.products, product?.id]);
+  const isVolumeDiscountEnabled = useMemo(() => {
+    if (!product) return false;
+    if (shop?.volume_discount_enabled) return true;
+    try {
+      const shopId = shop?.id || product.shop_id;
+      return localStorage.getItem(`arise_volume_discount_${shopId}`) === "true";
+    } catch {
+      return false;
+    }
+  }, [shop, product]);
   const total = selected ? checkoutTotal(selected.price, quantity) : null;
   const canBuy = available && total !== null && quantity <= maximum;
   return (
@@ -2365,56 +2374,34 @@ function ProductPage() {
             </div>
           </div>
 
-          <div className="volume-discount-widget">
-            <span className="volume-title">
-              <Zap size={14} />
-              {t("volumeTierTitle")}
-            </span>
-            <div className="volume-chips-row">
-              <button
-                type="button"
-                className={`volume-chip ${quantity === 1 ? "active" : ""}`}
-                onClick={() => setQuantity(1)}
-              >
-                {t("volume1x")}
-              </button>
-              <button
-                type="button"
-                className={`volume-chip ${quantity >= 3 && quantity < 5 ? "active" : ""}`}
-                onClick={() => setQuantity(3)}
-              >
-                {t("volume3x")}
-              </button>
-              <button
-                type="button"
-                className={`volume-chip ${quantity >= 5 ? "active" : ""}`}
-                onClick={() => setQuantity(5)}
-              >
-                {t("volume5x")}
-              </button>
-            </div>
-          </div>
-
-          {companion && (
-            <div className="bundle-cross-sell-box">
-              <span className="bundle-badge">{t("bundleTitle")}</span>
-              <div className="bundle-content">
-                <div className="bundle-art">
-                  <Art product={companion} />
-                </div>
-                <div className="bundle-info">
-                  <strong>{companion.name}</strong>
-                  <p className="bundle-pricing">
-                    <span className="bundle-discount-pill">20% OFF</span>
-                    <span>{money(minimumPrice(companion))}</span>
-                  </p>
-                  <Link
-                    to={`/checkout/${companion.id}?coupon=BUNDLE20`}
-                    className="button secondary small"
-                  >
-                    {t("bundleAddPrompt")} {companion.name.slice(0, 18)}...
-                  </Link>
-                </div>
+          {isVolumeDiscountEnabled && (
+            <div className="volume-discount-widget">
+              <span className="volume-title">
+                <Zap size={14} />
+                {t("volumeTierTitle")}
+              </span>
+              <div className="volume-chips-row">
+                <button
+                  type="button"
+                  className={`volume-chip ${quantity === 1 ? "active" : ""}`}
+                  onClick={() => setQuantity(1)}
+                >
+                  {t("volume1x")}
+                </button>
+                <button
+                  type="button"
+                  className={`volume-chip ${quantity >= 3 && quantity < 5 ? "active" : ""}`}
+                  onClick={() => setQuantity(3)}
+                >
+                  {t("volume3x")}
+                </button>
+                <button
+                  type="button"
+                  className={`volume-chip ${quantity >= 5 ? "active" : ""}`}
+                  onClick={() => setQuantity(5)}
+                >
+                  {t("volume5x")}
+                </button>
               </div>
             </div>
           )}
@@ -3480,6 +3467,7 @@ function Seller() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
+  const [volumeDiscountEnabled, setVolumeDiscountEnabled] = useState(false);
   const [synced, setSynced] = useState("");
   useEffect(() => {
     if (!session?.user) return;
@@ -3521,6 +3509,12 @@ function Seller() {
     setSynced(
       new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     );
+    try {
+      const stored = localStorage.getItem(`arise_volume_discount_${selected}`);
+      setVolumeDiscountEnabled(stored === "true" || Boolean(result.shop.volume_discount_enabled));
+    } catch {
+      setVolumeDiscountEnabled(Boolean(result.shop.volume_discount_enabled));
+    }
   };
   useEffect(() => {
     let current = true;
@@ -3550,6 +3544,12 @@ function Seller() {
               minute: "2-digit",
             }),
           );
+          try {
+            const stored = localStorage.getItem(`arise_volume_discount_${selected}`);
+            setVolumeDiscountEnabled(stored === "true" || Boolean(result.shop.volume_discount_enabled));
+          } catch {
+            setVolumeDiscountEnabled(Boolean(result.shop.volume_discount_enabled));
+          }
         }
       })
       .catch((e) => {
@@ -3580,6 +3580,11 @@ function Seller() {
           ? "Your shop is published. Products, prices and stock are updated from AriseSell."
           : "Your shop is unpublished. Existing products and orders remain in AriseSell.",
       );
+      if (selected) {
+        try {
+          localStorage.setItem(`arise_volume_discount_${selected}`, volumeDiscountEnabled ? "true" : "false");
+        } catch {}
+      }
       await reloadCatalog();
     } catch (e) {
       setError((e as Error).message);
@@ -3880,6 +3885,34 @@ function Seller() {
                         ))}
                       </div>
                       <p className="muted">Use {data.shop.published ? "Save shop changes" : "Publish shop"} below to save this information with your shop.</p>
+                    </section>
+                    <section className="panel seller-panel" aria-labelledby="shop-promotions-title">
+                      <div className="seller-panel-heading">
+                        <div>
+                          <span className="eyebrow">Marketing & Discounts</span>
+                          <h2 id="shop-promotions-title">Volume Discounts</h2>
+                        </div>
+                        <Zap size={24} aria-hidden="true" />
+                      </div>
+                      <p className="muted">
+                        Allow customers to receive tiered bulk discounts (3+ items: 5% OFF, 5+ items: 10% OFF) on your product pages.
+                      </p>
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={volumeDiscountEnabled}
+                          onChange={(e) => {
+                            const val = e.target.checked;
+                            setVolumeDiscountEnabled(val);
+                            if (selected) {
+                              try {
+                                localStorage.setItem(`arise_volume_discount_${selected}`, val ? "true" : "false");
+                              } catch {}
+                            }
+                          }}
+                        />
+                        <span>Enable "Buy More, Save More" Volume Discounts for this shop</span>
+                      </label>
                     </section>
                     <section className="panel seller-panel">
                       <div className="seller-panel-heading">

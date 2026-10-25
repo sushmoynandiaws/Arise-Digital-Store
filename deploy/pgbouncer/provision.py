@@ -47,6 +47,7 @@ arise_marketplace.auth_requests, arise_marketplace.sessions, arise_marketplace.m
 arise_marketplace.reports, arise_marketplace.rate_limits, arise_marketplace.reviews,
 arise_marketplace.shop_pages TO arise_marketplace_runtime;
 ALTER ROLE arise_marketplace_runtime IN DATABASE arisesell_db SET search_path TO arise_marketplace, pg_catalog;
+ALTER ROLE arise_marketplace_runtime IN DATABASE arisesell_db SET idle_session_timeout TO '30s';
 COMMIT;""" % password)
 assert sql("SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication FROM pg_roles WHERE rolname='arise_marketplace_runtime'") == 'f'
 assert sql("SELECT count(*) FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname='arise_marketplace_runtime')") == '0'

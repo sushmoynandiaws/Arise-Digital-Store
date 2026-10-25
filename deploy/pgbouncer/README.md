@@ -2,6 +2,8 @@
 
 The production pooler listens on `187.53.134.195:6432`. Its only database mapping is `arisesell_db`; its authentication file contains only `arise_marketplace_runtime`. PostgreSQL remains unpublished on the existing `backend_default` Docker network. The pooler limits backend connections to 12 and uses session pooling so SQLx's search path remains bound to its session.
 
+The marketplace runtime role has PostgreSQL `idle_session_timeout = '30s'` for `arisesell_db`. This releases idle sessions held by frozen serverless instances; SQLx checks pooled connections before reuse and reconnects when an idle connection has closed. The timeout excludes open transactions and applies only to the marketplace role. PgBouncer's client idle timeout does not release server-linked clients in session pooling, so the limit belongs on the database role. See [PostgreSQL idle session timeout](https://www.postgresql.org/docs/16/runtime-config-client.html#GUC-IDLE-SESSION-TIMEOUT).
+
 Both client certificate verification and SCRAM-SHA-256 authentication are required. The server certificate has the VPS IP in its subject alternative names. SQLx verifies the server against the dedicated CA through `PGSSLROOTCERT`; never replace `sslmode=verify-full` with `require` or `disable`.
 
 ## Provision and start
