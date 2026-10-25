@@ -250,6 +250,8 @@ textarea { resize: vertical; }
 .product-image-caption { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); font-size: 13px; }
 .product-image-caption svg { color: var(--primary); }
 .product-image-caption small { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+.product-visual-reviews { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); }
+.product-reviews-heading { font-size: 20px; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.02em; }
 .product-category { display: inline-flex; padding: 4px 12px; border-radius: 6px; background: var(--primary-light); color: var(--primary); font-size: 12px; font-weight: 650; margin-bottom: 16px; }
 .product-summary h1 { font-size: clamp(28px, 3vw, 38px); overflow-wrap: anywhere; }
 .product-summary > .by-shop { margin-top: 8px; font-size: 13px; }

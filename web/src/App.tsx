@@ -1009,6 +1009,13 @@ function ProductPage() {
   const section = productSection(location.hash);
   const infoDialog = useRef<HTMLDialogElement>(null);
   function selectSection(value: ProductSection) {
+    if (value === "reviews") {
+      const el = document.getElementById("customer-reviews");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+        return;
+      }
+    }
     navigate({ pathname: location.pathname, search: location.search, hash: `#product-${value}` });
   }
   function closeSection() {
@@ -1086,6 +1093,10 @@ function ProductPage() {
             <span><ShoppingBag size={16} />No shipping needed</span>
           </div>
           <div className="product-image-caption"><ShieldCheck size={18} /><span>Delivered privately to your purchase history.<small>No shipping address needed.</small></span></div>
+          <section id="customer-reviews" className="product-visual-reviews" aria-label="Customer reviews">
+            <h2 className="product-reviews-heading">Customer reviews</h2>
+            <ProductReviews key={product.id} productId={product.id} />
+          </section>
         </div>
         <div className="product-summary">
           <div className="product-category-row">
@@ -1184,32 +1195,6 @@ function ProductPage() {
             <LockKeyhole size={14} />
             Your items stay private. Delivery follows verified payment.
           </p>
-          <div className="detail-delivery">
-            <Package size={19} />
-            <div>
-              <strong>
-                {product.delivery_mode === "automatic"
-                  ? "Ready after payment verification"
-                  : product.delivery_estimate || "Prepared by the seller"}
-              </strong>
-              <p>{product.delivery_mode === "automatic"
-                ? "Your items become available after your payment is verified."
-                : "The seller prepares your order after payment is verified."}</p>
-              <button type="button" className="text-link" onClick={() => selectSection("delivery")}>View delivery details <ExternalLink size={13} /></button>
-            </div>
-          </div>
-          {!!shop.payment_methods?.length && <div className="product-payment-methods">
-            <span>Pay with</span>
-            {shop.payment_methods.map(method => <strong key={method}>{method === "bkash" ? "bKash" : method === "nagad" ? "Nagad" : method === "rocket" ? "Rocket" : method}</strong>)}
-          </div>}
-          <Link className="visit-shop" to={`/shops/${shop.slug}`}>
-            <ShopAvatar shop={shop} />
-            <span>
-              <strong>{shop.name}</strong>
-              <small>Visit the shop</small>
-            </span>
-            <ArrowUpRight size={20} />
-          </Link>
         </div>
       </div>
       <dialog ref={infoDialog} className="product-info-dialog" aria-labelledby="product-info-title"
