@@ -76,6 +76,12 @@ Signed-in purchases require that same authenticated AriseSell account, including
 
 For a single-instance standalone deployment, set `PUBLIC_ORIGIN` to the HTTPS domain serving this container, then run `docker compose up --build -d` and place it behind an HTTPS reverse proxy. An Nginx example is in [`deploy/nginx/store-api.conf.example`](deploy/nginx/store-api.conf.example). Replace `store-api.yourdomain.com` with your real domain before enabling it, point DNS to the VPS, and run `sudo certbot --nginx -d your-real-domain` to enable HTTPS. Set AriseSell's `MARKETPLACE_REDIRECT_URI` to `https://your-real-domain/api/auth/callback` so it exactly matches `PUBLIC_ORIGIN`. Back up the marketplace data volume and protect its encryption key. For Vercel multi-service deployment, follow [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md); serverless instances require shared PostgreSQL metadata storage. The Dockerfile has not been built on this machine; the local WSL build is the verified standalone runtime.
 
+## Verified product reviews
+
+Product pages expose a Reviews popup with the real rating average, count and paginated customer comments. Buyers can publish or edit one review per order from My purchases after AriseSell confirms paid and sent/delivered status. Guest purchase capabilities and signed-in ownership checks stay in AriseSell; the public feed never includes order IDs, payment details or private deliverables.
+
+Apply `migrations/003_reviews.sql` with the migration role and grant SELECT, INSERT, UPDATE, DELETE on `arise_marketplace.reviews` to the existing marketplace runtime role before deploying this version. Fresh standalone SQLite databases apply the review table automatically. The AriseSell bridge must include the authoritative `product_id` in its owned purchase response. Its deployment workflow applies the same additive SQL on configured marketplace hosts.
+
 ## Tests
 
 ```powershell

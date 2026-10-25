@@ -69,6 +69,9 @@ export type Purchase = {
   delivery_estimate: string;
   created_at: string;
   ready: boolean;
+  product_id?: string;
+  can_review?: boolean;
+  review?: ProductReview | null;
   payment: {
     provider: string;
     account: string;
@@ -76,4 +79,17 @@ export type Purchase = {
     trx_id: string | null;
     expires_at: string;
   } | null;
+};
+export type ProductReview = {
+  id: string;
+  rating: number;
+  display_name: string;
+  comment: string;
+  created_at: number;
+};
+export type ProductReviewsPage = {
+  count: number;
+  average: number | null;
+  has_more: boolean;
+  reviews: ProductReview[];
 };

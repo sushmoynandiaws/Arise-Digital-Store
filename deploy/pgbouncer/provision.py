@@ -31,6 +31,7 @@ password = password_file.read_text().strip()
 assert len(password)==64 and all(c in '0123456789abcdef' for c in password)
 
 sql(Path('/opt/arise-digital-store/migrations/002_postgres.sql').read_text())
+sql(Path('/opt/arise-digital-store/migrations/003_reviews.sql').read_text())
 sql("""BEGIN;
 DO $$ BEGIN
 IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='arise_marketplace_runtime') THEN
@@ -42,13 +43,13 @@ GRANT USAGE ON SCHEMA arise_marketplace TO arise_marketplace_runtime;
 GRANT SELECT ON arise_marketplace.schema_version TO arise_marketplace_runtime;
 GRANT SELECT, INSERT, UPDATE, DELETE ON
 arise_marketplace.auth_requests, arise_marketplace.sessions, arise_marketplace.moderation,
-arise_marketplace.reports, arise_marketplace.rate_limits TO arise_marketplace_runtime;
+arise_marketplace.reports, arise_marketplace.rate_limits, arise_marketplace.reviews TO arise_marketplace_runtime;
 ALTER ROLE arise_marketplace_runtime IN DATABASE arisesell_db SET search_path TO arise_marketplace, pg_catalog;
 COMMIT;""" % password)
 assert sql("SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication FROM pg_roles WHERE rolname='arise_marketplace_runtime'") == 'f'
 assert sql("SELECT count(*) FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname='arise_marketplace_runtime')") == '0'
 assert sql("SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','v','m','p') AND has_table_privilege('arise_marketplace_runtime',c.oid,'SELECT,INSERT,UPDATE,DELETE')") == '0'
-assert sql('SELECT version FROM arise_marketplace.schema_version') == '1'
+assert sql('SELECT max(version) FROM arise_marketplace.schema_version') == '2'
 
 pool = ROOT/'pgbouncer'
 pool.mkdir(mode=0o755,exist_ok=True)
@@ -70,4 +71,4 @@ for label, cn, use, target in [('server','187.53.134.195','serverAuth',pool),('c
 verifier = sql("SELECT rolpassword FROM pg_authid WHERE rolname='arise_marketplace_runtime'")
 assert verifier.startswith('SCRAM-SHA-256$')
 save(pool/'userlist.txt','"arise_marketplace_runtime" "'+verifier+'"\n')
-print('PASS: schema v1, restricted login, zero commerce table privileges, server/client certificates, SCRAM verifier')
+print('PASS: schema v2, restricted login, zero commerce table privileges, server/client certificates, SCRAM verifier')

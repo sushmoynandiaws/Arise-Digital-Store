@@ -4565,6 +4565,27 @@ footer {
 .product-support { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 16px; border-top: 1px solid var(--line); padding-top: 16px; margin-top: 24px; font-size: 12px; }
 .product-support .report-product { width: min(360px, 100%); border: 0; margin: 0; padding: 0; }
 .product-support .report-product summary { min-height: 44px; justify-content: end; }
+.review-stars { display: inline-flex; gap: 3px; color: var(--primary); }
+.review-summary { display: flex; gap: 18px; align-items: center; padding: 18px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 18px; background: var(--primary-light); }
+.review-summary > strong { font-size: 32px; }
+.review-summary small { font-size: 12px; color: var(--muted); font-weight: 500; }
+.review-summary > span > small { display: block; margin-top: 5px; }
+.review-card { padding: 20px 0; border-top: 1px solid var(--line); }
+.review-card-top, .review-author { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.review-card-top time, .review-author span { color: var(--muted); font-size: 11px; }
+.review-card p { margin: 14px 0; overflow-wrap: anywhere; }
+.review-author { font-size: 13px; }
+.review-author span { color: var(--primary); background: var(--primary-light); border-radius: 5px; padding: 4px 8px; }
+.review-guidance { margin: 16px 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.review-guidance a { color: var(--primary); text-decoration: underline; }
+.purchase-review { margin-top: 24px; }
+.purchase-review h2 { font-size: 22px; margin-bottom: 20px; }
+.purchase-review .review-card p { font-size: 14px; line-height: 1.8; }
+.review-rating-input { border: 0; padding: 0; margin: 0 0 20px; }
+.review-rating-input legend { font-weight: 700; font-size: 13px; margin-bottom: 10px; }
+.review-rating-input label { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; color: var(--primary); border-radius: 8px; cursor: pointer; position: relative; }
+.review-rating-input input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.review-rating-input label:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }
 .product-image-caption { display: flex; align-items: center; justify-content: center; gap: 10px; border-top: 1px solid var(--line); padding: 18px 10px; font-size: 13px; color: var(--ink); }
 .product-image-caption svg { color: var(--primary); flex-shrink: 0; }
 .product-image-caption small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }

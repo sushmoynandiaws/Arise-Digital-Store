@@ -57,6 +57,7 @@ fn build_router(state: AppState, serve_web: bool) -> Router {
         .route("/api/auth/callback", get(auth_callback))
         .route("/api/auth/logout", post(logout))
         .route("/api/catalog", get(catalog))
+        .route("/api/products/{id}/reviews", get(product_reviews))
         .route("/api/seller", get(seller))
         .route("/api/seller/stores/{id}/catalog", get(seller_catalog))
         .route("/api/seller/stores/{id}/listing", put(save_listing))
@@ -64,6 +65,7 @@ fn build_router(state: AppState, serve_web: bool) -> Router {
         .route("/api/checkout/accept", post(accept))
         .route("/api/orders", get(orders))
         .route("/api/orders/{id}", get(order))
+        .route("/api/orders/{id}/review", post(save_review))
         .route("/api/orders/{id}/proof", post(proof))
         .route("/api/orders/{id}/reveal", post(reveal))
         .route("/api/reports", post(report))
@@ -558,14 +560,130 @@ async fn order(
     Path(id): Path<String>,
 ) -> Result<Json<Value>> {
     uuid(&id)?;
-    commerce(
+    let Json(mut data) = commerce(
         &state,
         &headers,
         reqwest::Method::GET,
         &format!("/marketplace/orders/{id}"),
         None,
     )
-    .await
+    .await?;
+    data["can_review"] = json!(reviewable_order(&data));
+    data["review"] = sqlx::query("SELECT id,CAST(rating AS BIGINT) AS rating,display_name,comment,created_at FROM reviews WHERE order_id=$1")
+        .bind(id).fetch_optional(&state.db).await.map_err(|_| AppError::internal())?
+        .map(public_review).transpose()?.unwrap_or(Value::Null);
+    Ok(Json(data))
+}
+fn reviewable_order(order: &Value) -> bool {
+    order["payment_status"] == "paid"
+        && matches!(
+            order["delivery_status"].as_str(),
+            Some("sent" | "delivered")
+        )
+        && order["product_id"]
+            .as_str()
+            .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok())
+}
+fn public_review(row: sqlx::any::AnyRow) -> Result<Value> {
+    Ok(json!({
+        "id": row.try_get::<String,_>("id").map_err(|_| AppError::internal())?,
+        "rating": row.try_get::<i64,_>("rating").map_err(|_| AppError::internal())?,
+        "display_name": row.try_get::<String,_>("display_name").map_err(|_| AppError::internal())?,
+        "comment": row.try_get::<String,_>("comment").map_err(|_| AppError::internal())?,
+        "created_at": row.try_get::<i64,_>("created_at").map_err(|_| AppError::internal())?,
+    }))
+}
+#[derive(Deserialize)]
+struct ReviewPage {
+    #[serde(default)]
+    offset: u32,
+}
+async fn product_reviews(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Query(page): Query<ReviewPage>,
+) -> Result<Json<Value>> {
+    uuid(&id)?;
+    if page.offset > 100_000 {
+        return Err(AppError::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Review page is out of range.",
+        ));
+    }
+    let catalog = feed(&state).await?;
+    if !catalog["products"]
+        .as_array()
+        .is_some_and(|rows| rows.iter().any(|row| row["id"] == id))
+    {
+        return Err(AppError::new(StatusCode::NOT_FOUND, "Product not found."));
+    }
+    let summary = sqlx::query("SELECT COUNT(*) AS count,CAST(COALESCE(SUM(rating),0) AS BIGINT) AS total FROM reviews WHERE product_id=$1")
+        .bind(&id).fetch_one(&state.db).await.map_err(|_| AppError::internal())?;
+    let count: i64 = summary.try_get("count").map_err(|_| AppError::internal())?;
+    let total: i64 = summary.try_get("total").map_err(|_| AppError::internal())?;
+    let reviews = sqlx::query("SELECT id,CAST(rating AS BIGINT) AS rating,display_name,comment,created_at FROM reviews WHERE product_id=$1 ORDER BY created_at DESC,id DESC LIMIT 20 OFFSET $2")
+        .bind(id).bind(i64::from(page.offset)).fetch_all(&state.db).await.map_err(|_| AppError::internal())?
+        .into_iter().map(public_review).collect::<Result<Vec<_>>>()?;
+    Ok(Json(
+        json!({"count":count,"average":if count > 0 { Some(total as f64 / count as f64) } else { None },
+        "has_more":i64::from(page.offset)+(reviews.len() as i64) < count,"reviews":reviews}),
+    ))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReviewInput {
+    rating: u8,
+    display_name: String,
+    comment: String,
+}
+async fn save_review(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(body): Json<ReviewInput>,
+) -> Result<Json<Value>> {
+    uuid(&id)?;
+    let display_name = body.display_name.trim();
+    let comment = body.comment.trim();
+    if !(1..=5).contains(&body.rating)
+        || !(2..=60).contains(&display_name.chars().count())
+        || !(10..=2000).contains(&comment.chars().count())
+        || display_name.chars().any(char::is_control)
+    {
+        return Err(AppError::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Choose 1–5 stars, a public name (2–60 characters), and a review (10–2,000 characters).",
+        ));
+    }
+    let Json(order) = commerce(
+        &state,
+        &headers,
+        reqwest::Method::GET,
+        &format!("/marketplace/orders/{id}"),
+        None,
+    )
+    .await?;
+    if !reviewable_order(&order) {
+        return Err(AppError::new(
+            StatusCode::CONFLICT,
+            "You can review this product after verified payment and delivery.",
+        ));
+    }
+    let product_id = order["product_id"]
+        .as_str()
+        .ok_or_else(AppError::internal)?;
+    let shop_id = order["shop"]["id"]
+        .as_str()
+        .ok_or_else(AppError::internal)?;
+    uuid(shop_id)?;
+    let buyer = buyer(&headers)?;
+    state
+        .rate_limit(&format!("reviews:{}", digest(&buyer)), 20)
+        .await?;
+    let row = sqlx::query("INSERT INTO reviews(id,order_id,product_id,shop_id,rating,display_name,comment,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(order_id) DO UPDATE SET rating=excluded.rating,display_name=excluded.display_name,comment=excluded.comment RETURNING id,CAST(rating AS BIGINT) AS rating,display_name,comment,created_at")
+        .bind(uuid::Uuid::new_v4().to_string()).bind(id).bind(product_id).bind(shop_id).bind(i64::from(body.rating))
+        .bind(display_name).bind(comment).bind(now()).fetch_one(&state.db).await.map_err(|_| AppError::internal())?;
+    Ok(Json(public_review(row)?))
 }
 async fn proof(
     State(state): State<AppState>,

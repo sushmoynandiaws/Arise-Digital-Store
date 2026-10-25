@@ -4,6 +4,7 @@ export const productSections = [
   { id: "overview", label: "Overview" },
   { id: "delivery", label: "Delivery" },
   { id: "terms", label: "Purchase terms" },
+  { id: "reviews", label: "Reviews" },
 ] as const;
 export type ProductSection = (typeof productSections)[number]["id"];
 

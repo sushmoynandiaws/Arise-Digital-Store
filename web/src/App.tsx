@@ -65,6 +65,7 @@ import {
 } from "./api";
 import type { Catalog, Shop, Product, Session, Quote, Purchase } from "./types";
 import { productForRoute, productPath, productSection, type ProductSection } from "./product";
+import { ProductReviews, PurchaseReview } from "./Reviews";
 
 type Market = {
   catalog: Catalog | null;
@@ -1181,6 +1182,7 @@ function ProductPage() {
             <div className="product-policy-links">
               <button type="button" onClick={() => selectSection("terms")}>Purchase terms</button>
               <button type="button" onClick={() => selectSection("delivery")}>Delivery details</button>
+              <button type="button" onClick={() => selectSection("reviews")}>Reviews</button>
             </div>
           </div>
           <p className="checkout-note">
@@ -1218,7 +1220,7 @@ function ProductPage() {
       <dialog ref={infoDialog} className="product-info-dialog" aria-labelledby="product-info-title"
         onClose={closeSection} onClick={(event) => { if (event.target === event.currentTarget) closeSection(); }}>
         <div className="product-info-header">
-          <h2 id="product-info-title">{section === "overview" ? "Product description" : section === "delivery" ? "Delivery details" : "Purchase terms"}</h2>
+          <h2 id="product-info-title">{section === "overview" ? "Product description" : section === "delivery" ? "Delivery details" : section === "reviews" ? "Customer reviews" : "Purchase terms"}</h2>
           <button type="button" className="icon-button" aria-label="Close product details" onClick={closeSection}><X size={20} /></button>
         </div>
         <div className="product-info-content">
@@ -1236,6 +1238,7 @@ function ProductPage() {
               <div className="product-delivery-instructions"><h3>Seller’s delivery instructions</h3><p className="preserve-lines">{product.delivery_note}</p></div>}
           </>}
           {section === "terms" && <p className="preserve-lines">{product.purchase_terms || "Contact the seller to confirm purchase terms before ordering."}</p>}
+          {section === "reviews" && <ProductReviews key={product.id} productId={product.id} />}
         </div>
       </dialog>
         <aside className="product-support" aria-label="Seller support">
@@ -2009,6 +2012,7 @@ function PurchasePage() {
           </div>
         )}
       </div>
+      {(order.can_review || order.review) && <PurchaseReview key={order.id} order={order} />}
       <div className="purchase-support">
         <span>Need a hand with this purchase?</span>
         {order.shop.support ? (

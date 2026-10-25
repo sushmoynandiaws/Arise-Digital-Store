@@ -33,3 +33,11 @@ CREATE TABLE IF NOT EXISTS rate_limits (
     attempts INTEGER NOT NULL
 );
 INSERT OR IGNORE INTO schema_version VALUES (1);
+CREATE TABLE IF NOT EXISTS reviews (
+    id TEXT PRIMARY KEY, order_id TEXT NOT NULL UNIQUE, product_id TEXT NOT NULL, shop_id TEXT NOT NULL,
+    rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+    display_name TEXT NOT NULL CHECK(length(display_name) BETWEEN 2 AND 60),
+    comment TEXT NOT NULL CHECK(length(comment) BETWEEN 10 AND 2000), created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS reviews_product_date ON reviews(product_id, created_at DESC, id DESC);
+INSERT OR IGNORE INTO schema_version VALUES (2);

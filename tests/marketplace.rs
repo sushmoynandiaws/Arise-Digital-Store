@@ -45,6 +45,15 @@ async fn setup_with_pool(pool: sqlx::AnyPool) -> (AppState, Requests, tokio::tas
             if headers.get("authorization").and_then(|v|v.to_str().ok())==Some("Bearer revoked") {return (StatusCode::UNAUTHORIZED,Json(json!({"detail":"Session revoked"}))).into_response();}
             Json(json!({"user":{"id":"user-1","admin":headers.get("authorization").and_then(|v|v.to_str().ok())==Some("Bearer admin")},"shops":[]})).into_response()
         }))
+        .route("/api/v1/marketplace/orders/{id}", get(|axum::extract::Path(id): axum::extract::Path<String>, headers: axum::http::HeaderMap| async move {
+            if headers.get("X-Marketplace-Buyer").and_then(|v|v.to_str().ok()) != Some(BUYER) {
+                return (StatusCode::NOT_FOUND, Json(json!({"detail":"Purchase not found"}))).into_response();
+            }
+            Json(json!({"id":id,"product_id":PRODUCT,"shop":{"id":SHOP},"name":"Owned product",
+                "payment_status":if id.starts_with('4') {"unpaid"} else {"paid"},
+                "delivery_status":if id.starts_with('5') {"queued"} else {"delivered"},
+                "private_secret":"must not appear in public reviews"})).into_response()
+        }))
         .route("/api/v1/marketplace/token",post(move |Json(body):Json<Value>| {let calls=captured.clone();async move {calls.lock().unwrap().push(("token".into(),body));Json(json!({"access_token":"seller-source-access","expires_in":3600}))}}));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -90,6 +99,121 @@ async fn sign_in(state: &AppState, access: &str) -> String {
         .await
         .unwrap();
     session
+}
+
+#[tokio::test]
+async fn reviews_require_an_owned_paid_delivered_purchase_and_never_leak_order_data() {
+    let (state, _, server) = setup().await;
+    let app = router(state.clone());
+    let get_reviews = || {
+        Request::builder()
+            .uri(format!("/api/products/{PRODUCT}/reviews"))
+            .body(Body::empty())
+            .unwrap()
+    };
+    let empty = body(app.clone().oneshot(get_reviews()).await.unwrap()).await;
+    assert_eq!(empty["count"], 0);
+    assert!(empty["average"].is_null());
+    let input =
+        json!({"rating":5,"display_name":"ক্রেতা","comment":"The product arrived as described."});
+    let review_request = |id: &str, data: Value| {
+        let mut request = write(&format!("/api/orders/{id}/review"), data);
+        *request.method_mut() = axum::http::Method::POST;
+        request
+    };
+    for id in [
+        "44444444-4444-4444-8444-444444444444",
+        "55555555-5555-4555-8555-555555555555",
+    ] {
+        assert_eq!(
+            app.clone()
+                .oneshot(review_request(id, input.clone()))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::CONFLICT
+        );
+    }
+    let id = "33333333-3333-4333-8333-333333333333";
+    let mut invalid = input.clone();
+    invalid["rating"] = json!(6);
+    assert_eq!(
+        app.clone()
+            .oneshot(review_request(id, invalid))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let mut wrong_product = input.clone();
+    wrong_product["product_id"] = json!(PRODUCT);
+    assert_eq!(
+        app.clone()
+            .oneshot(review_request(id, wrong_product))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let other_buyer = "c".repeat(64);
+    let mut foreign = review_request(id, input.clone());
+    foreign.headers_mut().insert(
+        "Cookie",
+        format!("arise_buyer={other_buyer}").parse().unwrap(),
+    );
+    foreign
+        .headers_mut()
+        .insert("X-CSRF-Token", digest(&other_buyer).parse().unwrap());
+    assert_eq!(
+        app.clone().oneshot(foreign).await.unwrap().status(),
+        StatusCode::NOT_FOUND
+    );
+    let response = app
+        .clone()
+        .oneshot(review_request(id, input.clone()))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let first = body(response).await;
+    assert_eq!(first["rating"], 5);
+    let mut update = input;
+    update["rating"] = json!(3);
+    let updated = body(
+        app.clone()
+            .oneshot(review_request(id, update))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(updated["id"], first["id"]);
+    let public = body(app.clone().oneshot(get_reviews()).await.unwrap()).await;
+    assert_eq!(public["count"], 1);
+    assert_eq!(public["average"], 3.0);
+    assert_eq!(public["reviews"].as_array().unwrap().len(), 1);
+    assert!(!public.to_string().contains(id));
+    assert!(!public.to_string().contains("private_secret"));
+    let owned = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/orders/{id}"))
+                .header("Cookie", format!("arise_buyer={BUYER}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let owned = body(owned).await;
+    assert_eq!(owned["can_review"], true);
+    assert_eq!(owned["review"]["rating"], 3);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM reviews")
+            .fetch_one(&state.db)
+            .await
+            .unwrap(),
+        1
+    );
+    server.abort();
 }
 
 #[tokio::test]
@@ -609,7 +733,7 @@ fn serverless_storage_rejects_ephemeral_files_and_unverified_remote_database_con
 async fn postgres_state_survives_separate_function_instances_without_commerce_table_access() {
     let url = postgres_test_url().expect("Set the disposable local PostgreSQL test URL");
     let pool = connect_pool(&url).await.unwrap();
-    sqlx::raw_sql("TRUNCATE arise_marketplace.auth_requests,arise_marketplace.sessions,arise_marketplace.moderation,arise_marketplace.reports,arise_marketplace.rate_limits;").execute(&pool).await.unwrap();
+    sqlx::raw_sql("TRUNCATE arise_marketplace.auth_requests,arise_marketplace.sessions,arise_marketplace.moderation,arise_marketplace.reports,arise_marketplace.rate_limits,arise_marketplace.reviews;").execute(&pool).await.unwrap();
     let (first, calls, server) = setup_with_pool(pool).await;
     let second = AppState::new((*first.config).clone(), connect_pool(&url).await.unwrap()).unwrap();
     let session = sign_in(&first, "admin").await;
@@ -624,6 +748,29 @@ async fn postgres_state_survives_separate_function_instances_without_commerce_ta
     );
     let one = router(first.clone());
     let two = router(second.clone());
+    let mut review = write(
+        "/api/orders/33333333-3333-4333-8333-333333333333/review",
+        json!({"rating":4,"display_name":"Postgres buyer","comment":"Review persists across function instances."}),
+    );
+    *review.method_mut() = axum::http::Method::POST;
+    assert_eq!(
+        one.clone().oneshot(review).await.unwrap().status(),
+        StatusCode::OK
+    );
+    let reviews = body(
+        two.clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/api/products/{PRODUCT}/reviews"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(reviews["count"], 1);
+    assert_eq!(reviews["average"], 4.0);
     let start = one
         .clone()
         .oneshot(

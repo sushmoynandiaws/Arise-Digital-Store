@@ -1,0 +1,47 @@
+name: Marketplace checks
+on:
+  push:
+    branches: [main, sushmoy]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: local-test-only
+          POSTGRES_DB: arise_marketplace_test
+        ports: ['55438:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d arise_marketplace_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      MARKETPLACE_TEST_DATABASE_URL: postgresql://marketplace_test:local-test-only@127.0.0.1:55438/arise_marketplace_test
+      PG_ADMIN_URL: postgresql://postgres:local-test-only@127.0.0.1:55438/arise_marketplace_test
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update stable && rustup default stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Prepare isolated PostgreSQL metadata
+        run: |
+          psql "$PG_ADMIN_URL" -v ON_ERROR_STOP=1 -f migrations/002_postgres.sql -f migrations/003_reviews.sql
+          psql "$PG_ADMIN_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE marketplace_test LOGIN PASSWORD 'local-test-only'; GRANT USAGE ON SCHEMA arise_marketplace TO marketplace_test; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA arise_marketplace TO marketplace_test; CREATE TABLE public.commerce_sentinel(id integer);"
+      - run: cargo fmt --check && cargo test --locked && cargo test --locked -- --ignored --test-threads=1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci && npm test && npm run build
+        working-directory: web
