@@ -62,6 +62,8 @@ import {
   minimumPrice,
   paymentLabel,
   deliveryLabel,
+  purchaseMessage,
+  paymentMethodLabel,
 } from "./api";
 import type { Catalog, Shop, Product, Session, Quote, Purchase } from "./types";
 import { productForRoute, productPath, productSection, type ProductSection } from "./product";
@@ -114,7 +116,7 @@ function ErrorBox({ message, retry }: { message: string; retry?: () => void }) {
 function Loading() {
   return (
     <div className="loading" role="status" aria-busy="true">
-      <span className="sr-only">Getting things ready…</span>
+      <span className="sr-only">Loading…</span>
       <div className="loading-preview" aria-hidden="true"><span /><span /><span /></div>
     </div>
   );
@@ -190,8 +192,8 @@ function Header() {
             </>
           ) : (
             <>
-              <NavLink to="/products">Explore products</NavLink>
-              <NavLink to="/shops">Discover shops</NavLink>
+              <NavLink to="/products">Browse products</NavLink>
+              <NavLink to="/shops">Browse shops</NavLink>
               <NavLink to="/how-it-works">How it works</NavLink>
             </>
           )}
@@ -234,8 +236,8 @@ function Header() {
             </>
           ) : (
             <>
-              <Link to="/products">Explore products</Link>
-              <Link to="/shops">Discover shops</Link>
+              <Link to="/products">Browse products</Link>
+              <Link to="/shops">Browse shops</Link>
             </>
           )}
           <Link to="/purchases">My purchases</Link>
@@ -306,14 +308,14 @@ function Footer() {
       <div className="footer-top">
         <div>
           <Brand />
-          <p>Useful finds for your digital everyday.<br />From independent shops, directly to you.</p>
+          <p>Digital products from independent shops.</p>
         </div>
         <div className="footer-links">
           <div>
-            <strong>Find your next thing</strong>
+            <strong>Shop and orders</strong>
             <Link to="/products">All products</Link>
             <Link to="/shops">Independent shops</Link>
-            <Link to="/purchases">Your purchases</Link>
+            <Link to="/purchases">My purchases</Link>
           </div>
           <div>
             <strong>For sellers</strong>
@@ -328,7 +330,7 @@ function Footer() {
       </div>
       <div className="footer-bottom">
         <span>© {new Date().getFullYear()} Arise Digital Store</span>
-        <span>Made for a more digital everyday.</span>
+        <span>Products, payments and delivery connected through AriseSell.</span>
         <span className="powered">
           Powered by <strong>AriseSell</strong>
         </span>
@@ -431,7 +433,7 @@ function Art({
       <span className="art-tag">
         {product.delivery_mode === "automatic"
           ? "Automatic delivery"
-          : "Seller delivery"}
+          : "Seller-prepared delivery"}
       </span>
     </div>
   );
@@ -469,10 +471,10 @@ function ProductCard({ product }: { product: Product }) {
               product.delivery_mode === "automatic" ? (
                 <>
                   <Zap size={12} />
-                  Instant access
+                  Automatic delivery
                 </>
               ) : (
-                "Seller delivery"
+                "Seller-prepared delivery"
               )
             ) : (
               "Sold out"
@@ -562,14 +564,13 @@ function Home() {
       <main id="main">
         <section className="hero container">
           <div className="hero-copy">
-            <p className="hero-kicker"><Store size={16} /> A marketplace for your digital everyday</p>
             <h1>
-              Good things.
+              Digital products
               <br />
-              For your digital life.
+              from independent shops
             </h1>
             <p className="hero-description">
-              Tools for your next project. A course for your next chapter. Discover digital products from independent shops, all in one place.
+              Browse software, templates, design assets and courses. Check each seller’s product details and terms before ordering.
             </p>
             <form
               className="hero-search"
@@ -584,7 +585,7 @@ function Home() {
               </label>
               <input
                 id="home-search"
-                placeholder="What are you looking for?"
+                placeholder="Search digital products"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -608,7 +609,7 @@ function Home() {
               </span>
               <span>
                 <Zap size={15} />
-                Automatic & seller delivery
+                Automatic or seller-prepared delivery
               </span>
               <span>
                 <Store size={15} />
@@ -617,22 +618,22 @@ function Home() {
             </div>
           </div>
           <aside className="discovery-shelf" aria-labelledby="discovery-title">
-            <div className="discovery-heading"><span className="discovery-symbol"><ShoppingBag size={22} /></span><div><p>Inside the marketplace</p><h2 id="discovery-title">A little inspiration.</h2></div></div>
+            <div className="discovery-heading"><span className="discovery-symbol"><ShoppingBag size={22} /></span><div><p>Product preview</p><h2 id="discovery-title">Explore the catalog</h2></div></div>
             {catalog?.products.length ? <div className="discovery-picks">
               {catalog.products.slice(0, 3).map(product => <Link className="discovery-pick" key={product.id} to={productPath(product, catalog)}>
                 <span className="discovery-art"><CategoryIcon category={product.category} size={24} /></span>
                 <span><small>{product.category}</small><strong>{product.name}</strong><span>{product.variants.length > 1 ? "From " : ""}{money(minimumPrice(product))}</span></span>
                 <ArrowUpRight size={18} />
               </Link>)}
-            </div> : catalog ? <p className="discovery-empty">New finds will appear as shops publish their products.</p> : catalogError ? <p className="discovery-empty">Explore the catalog below to retry loading products.</p> : <Loading />}
-            <Link className="discovery-footer" to="/products">Find something for you <ArrowRight size={18} /></Link>
+            </div> : catalog ? <p className="discovery-empty">No products are published yet.</p> : catalogError ? <p className="discovery-empty">Products could not be loaded. Use Try again in the product section below.</p> : <Loading />}
+            <Link className="discovery-footer" to="/products">Browse all products <ArrowRight size={18} /></Link>
           </aside>
         </section>
         <section className="benefit-strip">
           <div className="container">
             <span>
               <Layers />
-              One marketplace, many possibilities
+              Browse digital products
             </span>
             <span>
               <Store />
@@ -640,7 +641,7 @@ function Home() {
             </span>
             <span>
               <LockKeyhole />
-              Private, protected delivery
+              Private access to your items
             </span>
             <span>
               <RefreshCw />
@@ -650,9 +651,8 @@ function Home() {
         </section>
         <section className="container section">
           <SectionTitle
-            eyebrow="Browse by interest"
-            title="Find your kind of digital."
-            link="Explore everything"
+            title="Browse categories"
+            link="Browse all products"
             to="/products"
           />
           {categories.length > 0 ? (
@@ -677,8 +677,7 @@ function Home() {
         </section>
         <section className="container section products-section">
           <SectionTitle
-            eyebrow="The product shelf"
-            title="Small upgrades. Big possibilities."
+            title="Explore products"
             link="View all products"
             to="/products"
           />
@@ -696,13 +695,12 @@ function Home() {
               ))}
             </div>
           ) : (
-            <Empty title="Good things are on their way.">
+            <Empty title="No products yet">
               <p>
-                Our sellers are getting their shops ready. Check back soon, or
-                be the first to open one.
+                Products appear here when shops publish them. Browse the shops or return later.
               </p>
-              <Link className="button primary" to="/seller">
-                Open your shop
+              <Link className="button primary" to="/shops">
+                Browse shops
                 <ArrowUpRight size={17} />
               </Link>
             </Empty>
@@ -710,9 +708,8 @@ function Home() {
         </section>
         <section className="container section">
           <SectionTitle
-            eyebrow="People behind the products"
-            title="Meet your new favorite shops."
-            link="Discover all shops"
+            title="Independent shops"
+            link="Browse all shops"
             to="/shops"
           />
           <div className="shop-grid">
@@ -732,9 +729,9 @@ function Home() {
               <p className="eyebrow">
                 For independent sellers
               </p>
-              <h2>Have something good to share?</h2>
+              <h2>Sell your digital products</h2>
               <p>
-                Bring your AriseSell shop to a whole new audience.
+                Publish your AriseSell products on this marketplace.
                 <br />
                 Your products, payments, and stock stay in sync.
               </p>
@@ -787,9 +784,9 @@ function Products({ shop }: { shop?: Shop }) {
       {!shop && (
         <div className="page-intro">
           <p className="eyebrow">Explore the marketplace</p>
-          <h1>A good find starts here.</h1>
+          <h1>All products</h1>
           <p>
-            Explore digital products that help you learn, create, and do more.
+            Search products, filter by category, and compare prices from independent shops.
           </p>
         </div>
       )}
@@ -823,7 +820,7 @@ function Products({ shop }: { shop?: Shop }) {
           <SlidersHorizontal size={17} />
           <span className="sr-only">Sort products</span>
           <select value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="recommended">Recommended</option>
+            <option value="recommended">Default order</option>
             <option value="low">Price: low to high</option>
             <option value="high">Price: high to low</option>
           </select>
@@ -859,7 +856,7 @@ function Products({ shop }: { shop?: Shop }) {
         </label>
       </div>
       <p className="results-count" role="status">
-        {products.length} {products.length === 1 ? "find" : "finds"}
+        {products.length} {products.length === 1 ? "product" : "products"}
         {query && <> for “{query}”</>}
       </p>
       {catalogError ? (
@@ -873,8 +870,8 @@ function Products({ shop }: { shop?: Shop }) {
           ))}
         </div>
       ) : (
-        <Empty title="No matches just yet.">
-          <p>Try a different search or explore another category.</p>
+        <Empty title="No products found">
+          <p>Try another search, choose a different category, or clear your filters.</p>
           <button
             className="button secondary"
             onClick={() => {
@@ -898,14 +895,12 @@ function Shops() {
   return (
     <main id="main" className="container listing-page">
       <div className="page-intro">
-        <p className="eyebrow">Meet the makers</p>
+        <p className="eyebrow">Shop directory</p>
         <h1>
-          Independent shops.
-          <br />
-          Individual possibilities.
+          Independent shops
         </h1>
         <p>
-          Find a shop that gets you. Discover something made for your everyday.
+          Browse independent shops and their digital products.
         </p>
       </div>
       <div className="catalog-search standalone-search">
@@ -917,7 +912,7 @@ function Shops() {
           id="shop-search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Find your next favorite shop…"
+          placeholder="Search shop names or descriptions"
         />
       </div>
       {catalogError ? (
@@ -943,8 +938,9 @@ function Shops() {
           ))}
         </div>
       ) : (
-        <Empty title="No shops found.">
-          <p>Try another name, or explore our products.</p>
+        <Empty title="No shops found">
+          <p>Try another shop name or browse all products.</p>
+          <Link className="button secondary" to="/products">Browse products</Link>
         </Empty>
       )}
     </main>
@@ -992,15 +988,93 @@ function ShopPage() {
         </div>
       </section>
       <Products shop={shop} />
+      <WhatsAppFloatingButton shop={shop} />
     </main>
   );
 }
 function supportHref(value: string) {
-  return /^https:\/\//.test(value)
-    ? value
-    : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
-      ? `mailto:${value}`
-      : "#seller-support";
+  if (/^https:\/\//.test(value)) return value;
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return `mailto:${value}`;
+  const digits = value.replace(/\D/g, "");
+  if (digits.length >= 10) {
+    const clean = digits.length === 11 && digits.startsWith("01") ? `88${digits}` : digits;
+    return `https://wa.me/${clean}`;
+  }
+  return "#seller-support";
+}
+
+export function extractDownloadLinks(content: string): { url: string; label: string; isFile: boolean }[] {
+  const urlRegex = /(https?:\/\/[^\s"'<>]+)/gi;
+  const matches = content.match(urlRegex) || [];
+  return Array.from(new Set(matches)).map((url) => {
+    const cleanUrl = url.replace(/[.,;!?)]+$/, "");
+    const isFile = /\.(zip|rar|7z|tar|gz|pdf|epub|apk|exe|dmg|iso|mp4|docx?|xlsx?|pptx?)(?:\?.*)?$/i.test(cleanUrl);
+    const isDrive = /drive\.google\.com|dropbox\.com|mega\.nz|onedrive\.live\.com/i.test(cleanUrl);
+    let label = "Access Download Link";
+    if (isFile) {
+      const filename = cleanUrl.split("/").pop()?.split("?")[0] || "File";
+      label = `Download ${filename}`;
+    } else if (isDrive) {
+      label = "Open Cloud Download";
+    }
+    return { url: cleanUrl, label, isFile };
+  });
+}
+
+function WhatsAppFloatingButton({
+  shop,
+  product,
+  order,
+}: {
+  shop?: Shop;
+  product?: Product;
+  order?: Purchase;
+}) {
+  const contact = shop?.support || order?.shop?.support || "";
+  if (!contact) return null;
+
+  let targetUrl = "";
+  if (contact.includes("wa.me") || contact.includes("api.whatsapp.com")) {
+    targetUrl = contact;
+  } else {
+    const digits = contact.replace(/\D/g, "");
+    if (digits.length >= 10) {
+      const cleanPhone = digits.length === 11 && digits.startsWith("01") ? `88${digits}` : digits;
+      let text = "Hello! I am contacting you from Arise Digital Store.";
+      if (order) {
+        text = `Hello! I need help with my order *${order.ref}* (${order.name}) on Arise Digital Store.`;
+      } else if (product) {
+        text = `Hello! I have a question about *${product.name}* on Arise Digital Store.`;
+      } else if (shop) {
+        text = `Hello! I have a question regarding *${shop.name}* on Arise Digital Store.`;
+      }
+      targetUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+    } else if (/^https?:\/\//i.test(contact)) {
+      targetUrl = contact;
+    }
+  }
+
+  if (!targetUrl) return null;
+
+  return (
+    <aside className="whatsapp-floating-container" aria-label="WhatsApp live chat support">
+      <a
+        href={targetUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="whatsapp-floating-btn"
+        title="Chat on WhatsApp"
+        aria-label="Chat directly with seller on WhatsApp"
+      >
+        <span className="whatsapp-icon-wrapper" aria-hidden="true">
+          <svg className="whatsapp-svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+            <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm.01 1.67c2.2 0 4.26.86 5.82 2.41a8.16 8.16 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24zm4.52 11.53c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.06-.39-2.02-1.25-.75-.67-1.26-1.5-1.4-1.75-.14-.25-.02-.39.11-.51.11-.11.25-.29.38-.44.13-.14.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.61.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.44.53.6.19 1.15.16 1.58.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.15-1.18-.06-.11-.22-.18-.47-.3z"/>
+          </svg>
+        </span>
+        <span className="whatsapp-label">WhatsApp Support</span>
+      </a>
+    </aside>
+  );
 }
 function ProductPage() {
   const route = useParams();
@@ -1012,7 +1086,8 @@ function ProductPage() {
     if (value === "reviews") {
       const el = document.getElementById("customer-reviews");
       if (el) {
-        el.scrollIntoView({ behavior: "smooth" });
+        el.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+        el.focus({ preventScroll: true });
         return;
       }
     }
@@ -1093,7 +1168,7 @@ function ProductPage() {
             <span><ShoppingBag size={16} />No shipping needed</span>
           </div>
           <div className="product-image-caption"><ShieldCheck size={18} /><span>Delivered privately to your purchase history.<small>No shipping address needed.</small></span></div>
-          <section id="customer-reviews" className="product-visual-reviews" aria-label="Customer reviews">
+          <section id="customer-reviews" tabIndex={-1} className="product-visual-reviews" aria-label="Customer reviews">
             <h2 className="product-reviews-heading">Customer reviews</h2>
             <ProductReviews key={product.id} productId={product.id} />
           </section>
@@ -1110,7 +1185,46 @@ function ProductPage() {
           </Link>
           <div className="detail-price">
             {selected ? money(selected.price) : money(minimumPrice(product))}
-            <span>Per item · One-time payment</span>
+            <span>Price per item</span>
+          </div>
+          <div className="product-trust-badges" aria-label="Purchase guarantees and warranties">
+            <div className="trust-badge">
+              <ShieldCheck size={18} className="trust-badge-icon" />
+              <div className="trust-badge-info">
+                <strong>
+                  {product.warranty_type === "warranty"
+                    ? `${product.warranty_days || 30}-Day Replacement Warranty`
+                    : "Replacement Guarantee"}
+                </strong>
+                <span>{product.warranty_type === "warranty" ? "Direct replacement for any valid issue" : "Authentic item verified by seller"}</span>
+              </div>
+            </div>
+            <div className="trust-badge">
+              {product.delivery_mode === "automatic" ? (
+                <>
+                  <Zap size={18} className="trust-badge-icon zap-icon" />
+                  <div className="trust-badge-info">
+                    <strong>Instant Auto-Delivery (10s)</strong>
+                    <span>Access immediately after payment verification</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Package size={18} className="trust-badge-icon" />
+                  <div className="trust-badge-info">
+                    <strong>Fast Seller Delivery</strong>
+                    <span>{product.delivery_estimate || "Delivered within 1-2 hours"}</span>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="trust-badge">
+              <LockKeyhole size={18} className="trust-badge-icon" />
+              <div className="trust-badge-info">
+                <strong>100% Verified & Private</strong>
+                <span>Credentials delivered only to your private account</span>
+              </div>
+            </div>
           </div>
           {product.description && <div className="product-brief">
             <h2>Product description</h2>
@@ -1151,7 +1265,7 @@ function ProductPage() {
               ) : (
                 <>
                   <Package size={14} />
-                  Seller delivery
+                  Seller-prepared delivery
                 </>
               )}
             </span>
@@ -1208,7 +1322,7 @@ function ProductPage() {
           {section === "overview" &&
             <p className="preserve-lines">
               {product.description ||
-                "The seller has not provided an additional description."}
+                "No additional description is available. Contact the seller if you need more information."}
             </p>}
           {section === "delivery" && <>
             <p>{product.delivery_mode === "automatic"
@@ -1239,7 +1353,7 @@ function ProductPage() {
             </summary>
             {sent ? (
               <p role="status">
-                Thank you. Your report has been sent for review.
+                Report submitted. The marketplace team will review it.
               </p>
             ) : (
               <form
@@ -1264,7 +1378,7 @@ function ProductPage() {
                 }}
               >
                 <label className="field">
-                  What seems wrong?
+                  Describe the issue
                   <textarea
                     minLength={10}
                     maxLength={1000}
@@ -1281,6 +1395,7 @@ function ProductPage() {
             )}
           </details>
         </aside>
+        <WhatsAppFloatingButton shop={shop} product={product} />
     </main>
   );
 }
@@ -1302,6 +1417,7 @@ function Checkout() {
   });
   const [quantity, setQuantity] = useState(() => checkoutQuantity(params.get("quantity"))),
     [provider, setProvider] = useState("");
+  const [couponCode, setCouponCode] = useState("");
   const [quote, setQuote] = useState<Quote | null>(null),
     [agreed, setAgreed] = useState(false),
     [busy, setBusy] = useState(false),
@@ -1331,6 +1447,7 @@ function Checkout() {
             variant_id: variant.id,
             quantity,
             provider,
+            coupon_code: couponCode.trim().toUpperCase() || undefined,
             buyer: fields,
           }),
         });
@@ -1365,11 +1482,11 @@ function Checkout() {
       </Link>
       <div className="checkout-heading">
         <p className="eyebrow">Checkout · {shop.name}</p>
-        <h1>{quote ? "One last look." : "Complete your order."}</h1>
+        <h1>{quote ? "Review your order" : "Checkout"}</h1>
         <p>
           {quote
             ? "Review the current price and seller terms before creating your payment request."
-            : "Your product, your total, and a simple way to pay."}
+            : "Enter your details and choose a payment method."}
         </p>
         <ol className="checkout-progress" aria-label="Checkout progress">
           <li aria-current={!quote ? "step" : undefined}><span>{quote ? <Check size={14} /> : "1"}</span>Details & payment</li>
@@ -1380,7 +1497,7 @@ function Checkout() {
         <form onSubmit={submit} className="panel checkout-form">
           <div className="step-heading">
             <span>{quote ? "02" : "01"}</span>
-            <h2>{quote ? "Review & confirm" : "Your details"}</h2>
+            <h2>{quote ? "Order details" : "Contact details"}</h2>
           </div>
           {!quote ? (
             <>
@@ -1427,7 +1544,7 @@ function Checkout() {
                 ))}
               <label className="field">
                 {product.delivery_mode === "manual"
-                  ? "Delivery / Account details"
+                  ? "Delivery details (optional)"
                   : "Order note (optional)"}
                 <textarea
                   name="note"
@@ -1435,14 +1552,47 @@ function Checkout() {
                   maxLength={500}
                   placeholder={
                     product.delivery_mode === "manual"
-                      ? "e.g. Email address or username for activation, or delivery instructions"
-                      : "Optional note or instructions for the seller"
+                      ? "Enter the email address or username needed for delivery. Do not include passwords."
+                      : "Add any instructions for the seller"
                   }
                   value={fields.note}
                   onChange={(e) =>
                     setFields({ ...fields, note: e.target.value })
                   }
                 />
+              </label>
+              <label className="field">
+                Promo code / Coupon (optional)
+                <div className="coupon-input-row">
+                  <input
+                    type="text"
+                    name="coupon_code"
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                    spellCheck={false}
+                    maxLength={32}
+                    placeholder="e.g. SAVE10 or EID2026"
+                    value={couponCode}
+                    onChange={(e) => {
+                      setCouponCode(e.target.value.toUpperCase());
+                      setError("");
+                    }}
+                  />
+                  {couponCode.trim() && (
+                    <button
+                      type="button"
+                      className="coupon-clear-button"
+                      aria-label="Clear coupon code"
+                      onClick={() => {
+                        setCouponCode("");
+                        setError("");
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <small className="form-hint">Discounts are calculated and verified when you click Review order.</small>
               </label>
               <label className="field">
                 Quantity
@@ -1483,13 +1633,7 @@ function Checkout() {
                     <span className={`wallet-icon ${method}`}>
                       {method.slice(0, 1).toUpperCase()}
                     </span>
-                    <strong>
-                      {method === "bkash"
-                        ? "bKash"
-                        : method === "nagad"
-                          ? "Nagad"
-                          : "Rocket"}
-                    </strong>
+                    <strong>{paymentMethodLabel(method)}</strong>
                     <CheckCircle2 size={18} />
                   </label>
                 ))}
@@ -1526,8 +1670,14 @@ function Checkout() {
               )}
               <div className="review-row">
                 <span>Payment method</span>
-                <strong>{provider === "bkash" ? "bKash" : provider}</strong>
+                <strong>{paymentMethodLabel(provider)}</strong>
               </div>
+              {quote.snapshot.coupon_code && Number(quote.snapshot.discount || "0") > 0 && (
+                <div className="review-row discount-row">
+                  <span>Coupon discount ({quote.snapshot.coupon_code})</span>
+                  <strong className="discount-value">- {money(quote.snapshot.discount!)}</strong>
+                </div>
+              )}
               <div className="terms-box">
                 <h3>Seller’s purchase terms</h3>
                 <p className="preserve-lines">
@@ -1561,16 +1711,16 @@ function Checkout() {
             {busy ? (
               <>
                 <LoaderCircle size={17} className="spin" />
-                Please wait…
+                {quote ? "Creating your order…" : "Checking price and availability…"}
               </>
             ) : quote ? (
               <>
-                Confirm & get payment instructions
+                Confirm order
                 <ArrowRight size={17} />
               </>
             ) : (
               <>
-                Review my order
+                Review order
                 <ArrowRight size={17} />
               </>
             )}
@@ -1611,6 +1761,20 @@ function Checkout() {
               <span>Delivery</span>
               <strong>Digital · no shipping</strong>
             </div>
+            {quote?.snapshot.discount && Number(quote.snapshot.discount) > 0 ? (
+              <>
+                <div className="summary-line">
+                  <span>Subtotal</span>
+                  <strong>{money(quote.snapshot.subtotal || (Number(variant.price) * (quote.snapshot.quantity || quantity)).toFixed(2))}</strong>
+                </div>
+                <div className="summary-line discount-line">
+                  <span>
+                    Discount <span className="coupon-code-badge">{quote.snapshot.coupon_code}</span>
+                  </span>
+                  <strong className="discount-amount">- {money(quote.snapshot.discount)}</strong>
+                </div>
+              </>
+            ) : null}
             <div className="summary-total" aria-live="polite" aria-atomic="true">
               <span>{quote ? "Total to pay" : "Estimated total"}</span>
               <strong>{total !== null ? money(total) : "—"}</strong>
@@ -1638,10 +1802,9 @@ function Purchases() {
   return (
     <main id="main" className="container listing-page narrow-page">
       <div className="page-intro">
-        <p className="eyebrow">My purchases</p>
-        <h1>Your digital shelf.</h1>
+        <h1>My purchases</h1>
         <p>
-          Payment updates, delivery details, and the things you’ve made yours.
+          Track payments, check delivery status, and access your digital items.
         </p>
       </div>
       {!session?.user && (
@@ -1709,12 +1872,12 @@ function Purchases() {
           ))}
         </div>
       ) : (
-        <Empty title="Your shelf is waiting.">
+        <Empty title="No purchases yet">
           <p>
-            When you find something you love, your purchase will appear here.
+            Orders placed in this browser or with your signed-in account appear here.
           </p>
           <Link to="/products" className="button primary">
-            Discover products
+            Browse products
             <ArrowRight size={17} />
           </Link>
         </Empty>
@@ -1748,7 +1911,7 @@ function CopyButton({
     >
       {copied ? <Check size={14} /> : <Copy size={14} />}
       <span aria-live="polite">
-        {copied ? "Copied" : error ? "Select and copy the text" : label}
+        {copied ? "Copied" : error ? "Copy manually" : label}
       </span>
     </button>
   );
@@ -1812,6 +1975,7 @@ function PurchasePage() {
   ].includes(order.payment_status);
   const expired =
     order.payment && new Date(order.payment.expires_at).getTime() < Date.now();
+  const message = purchaseMessage(order);
   return (
     <main id="main" className="container purchase-page narrow-page">
       <Link to="/purchases" className="back-link">
@@ -1819,33 +1983,13 @@ function PurchasePage() {
         My purchases
       </Link>
       <div className="purchase-page-heading">
-        <span className={`purchase-hero-icon ${paid ? "positive" : ""}`}>
-          {paid ? <CheckCircle2 size={32} /> : <LockKeyhole size={30} />}
+        <span className={`purchase-hero-icon ${paid && !cancelled ? "positive" : ""}`}>
+          {paid && !cancelled ? <CheckCircle2 size={32} /> : <LockKeyhole size={30} />}
         </span>
         <p className="eyebrow">{order.ref}</p>
-        <h1>
-          {!paid && !paymentOpen
-            ? "A payment update for your order."
-            : cancelled
-              ? "This order has ended."
-              : paid
-                ? order.ready
-                  ? "Your good find is ready."
-                  : "Your payment is verified."
-                : "One more step to make it yours."}
-        </h1>
-        <p>
-          {!paid && !paymentOpen
-            ? "Check your payment status below. Your seller can help with any questions."
-            : cancelled
-              ? "Start a new checkout if you’d still like this product."
-              : paid
-                ? order.ready
-                  ? "Your private items are waiting right here."
-                  : order.delivery_estimate ||
-                    "The seller is preparing your digital delivery."
-                : "Follow the payment instructions below. We’ll update your order when payment is verified."}
-        </p>
+        <h1>{message.title}</h1>
+        <p>{message.description}</p>
+        {paid && !order.ready && !cancelled && order.delivery_estimate && <p className="preserve-lines">{order.delivery_estimate}</p>}
       </div>
       {error && <ErrorBox message={error} />}
       <div className="panel purchase-panel">
@@ -1855,9 +1999,15 @@ function PurchasePage() {
             <h2>{order.name}</h2>
             <p>
               {order.quantity} {order.quantity === 1 ? "item" : "items"}
+              {order.coupon_code && <span className="order-coupon-pill"> · Coupon {order.coupon_code}</span>}
             </p>
           </div>
-          <strong className="price">{money(order.total)}</strong>
+          <div className="purchase-pricing-col">
+            <strong className="price">{money(order.total)}</strong>
+            {order.discount && Number(order.discount) > 0 && (
+              <span className="purchase-discount-tag">Discount: -{money(order.discount)}</span>
+            )}
+          </div>
         </div>
         <div className="order-status-grid">
           <div>
@@ -1907,9 +2057,7 @@ function PurchasePage() {
             <div className="payment-instructions">
               <h3>
                 Pay with{" "}
-                {order.payment.provider === "bkash"
-                  ? "bKash"
-                  : order.payment.provider}
+                {paymentMethodLabel(order.payment.provider)}
               </h3>
               <p>
                 Send the exact amount to the seller’s receiving account. Then
@@ -1975,11 +2123,11 @@ function PurchasePage() {
                   spellCheck={false}
                   value={trx}
                   onChange={(e) => setTrx(e.target.value)}
-                  placeholder="Enter the TrxID from your payment"
+                  placeholder="Enter the TrxID from your payment receipt"
                 />
               </label>
               <button className="button primary" disabled={busy}>
-                {busy ? "Checking…" : "Check my payment"}
+                {busy ? "Checking…" : "Check payment"}
                 <ArrowRight size={17} />
               </button>
             </form>
@@ -1993,38 +2141,59 @@ function PurchasePage() {
         )}
         {paymentOpen && (expired || cancelled) && (
           <div className="notice">
-            <p>This payment request is no longer active.</p>
+            <p>This payment request is no longer active. Do not send payment using these details.</p>
             <button
               className="button secondary"
               onClick={() => navigate("/products")}
             >
-              Explore products
+              Browse products
               <ArrowRight size={16} />
             </button>
           </div>
         )}
-        {paid && order.ready && (
+        {paid && order.ready && !cancelled && (
           <div className="private-delivery">
             <div>
               <LockKeyhole size={24} />
-              <h3>Your private delivery</h3>
+              <h3>Your digital items</h3>
               <p>
-                Keep these details safe. Only you should have access to them.
+                Keep your passwords, license keys and access details private.
               </p>
             </div>
             {items ? (
               <div className="private-items">
-                {items.map((item) => (
-                  <div key={item.item} className="private-item">
-                    <div>
-                      <strong>Item {item.item}</strong>
-                      <CopyButton value={item.content} />
+                {items.map((item) => {
+                  const downloadLinks = extractDownloadLinks(item.content);
+                  return (
+                    <div key={item.item} className="private-item">
+                      <div className="private-item-header">
+                        <strong>Item {item.item}</strong>
+                        <CopyButton value={item.content} />
+                      </div>
+                      {downloadLinks.length > 0 && (
+                        <div className="private-item-downloads">
+                          {downloadLinks.map((dl, idx) => (
+                            <a
+                              key={idx}
+                              href={dl.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download={dl.isFile ? true : undefined}
+                              className="button primary download-action-btn"
+                            >
+                              <Download size={16} />
+                              <span>{dl.label}</span>
+                              <ExternalLink size={14} />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                      <pre data-private="true">{item.content}</pre>
                     </div>
-                    <pre data-private="true">{item.content}</pre>
-                  </div>
-                ))}
+                  );
+                })}
                 <button className="button ghost" onClick={() => setItems(null)}>
-                  Hide private items
+                  Hide my items
                 </button>
               </div>
             ) : (
@@ -2053,19 +2222,18 @@ function PurchasePage() {
             )}
           </div>
         )}
-        {paid && !order.ready && (
+        {paid && !order.ready && !cancelled && (
           <div className="notice">
             <Package size={22} />
             <p>
-              Your seller is preparing the delivery. This page updates
-              automatically.
+              {order.delivery_status === "needs_attention" ? "Contact the seller using the support details below." : "Check the delivery status above for updates. This page refreshes automatically."}
             </p>
           </div>
         )}
       </div>
       {(order.can_review || order.review) && <PurchaseReview key={order.id} order={order} />}
       <div className="purchase-support">
-        <span>Need a hand with this purchase?</span>
+        <span>Need help with this order?</span>
         {order.shop.support ? (
           <a className="text-link" href={supportHref(order.shop.support)}>
             Contact {order.shop.name}
@@ -2078,6 +2246,7 @@ function PurchasePage() {
           </Link>
         )}
       </div>
+      <WhatsAppFloatingButton shop={order.shop} order={order} />
     </main>
   );
 }
@@ -2198,8 +2367,8 @@ function Seller() {
       );
       setMessage(
         published
-          ? "Your shop is live. Your products, prices, and availability come directly from AriseSell."
-          : "Your shop is now unpublished. Your products and orders remain in AriseSell.",
+          ? "Your shop is published. Products, prices and stock are updated from AriseSell."
+          : "Your shop is unpublished. Existing products and orders remain in AriseSell.",
       );
       await reloadCatalog();
     } catch (e) {
@@ -2212,8 +2381,8 @@ function Seller() {
     <main id="main" className="container seller-page">
       <div className="page-intro">
         <p className="eyebrow">Seller workspace</p>
-        <h1>{session?.user ? "Make your shop your own." : <>Your products.<br />A whole new audience.</>}</h1>
-        <p>{session?.user ? "Your profile, your product selection, and a storefront ready to share." : "Connect your AriseSell shop. Give your digital products a new place to be found."}</p>
+        <h1>{session?.user ? "Manage your shop" : <>Sell digital products</>}</h1>
+        <p>{session?.user ? "Update your profile, choose products, and share your shop link." : "Connect your AriseSell account to publish your digital products here."}</p>
       </div>
       <ol className="onboarding-steps">
         <li className={session?.user ? "complete" : "active"}>
@@ -2221,11 +2390,10 @@ function Seller() {
           AriseSell
         </li>
         <li className={session?.user ? "active" : ""}>
-          <span>2</span>Make it yours
+          <span>2</span>Set up your shop
         </li>
         <li className={data?.shop.published ? "complete" : ""}>
-          <span>{data?.shop.published ? <Check size={16} /> : "3"}</span>Choose
-          & publish
+          <span>{data?.shop.published ? <Check size={16} /> : "3"}</span>Publish products
         </li>
       </ol>
       {sessionError && (
@@ -2253,8 +2421,7 @@ function Seller() {
                 <Store size={34} />
               </div>
               <h2>
-                A familiar account.
-                <br />A fresh storefront.
+                Connect your AriseSell account
               </h2>
               <p>
                 Connect your AriseSell account to bring your shop here. Your
@@ -2289,7 +2456,7 @@ function Seller() {
           ) : !shops.length ? (
             <section className="panel connect-panel">
               <Store size={36} />
-              <h2>Let’s start with a digital shop.</h2>
+              <h2>Create a shop in AriseSell</h2>
               <p>
                 Your account is connected. Create a digital store in AriseSell,
                 then return here to publish it.
@@ -2305,7 +2472,7 @@ function Seller() {
                 className="button secondary"
                 onClick={() => window.location.reload()}
               >
-                I’ve created my shop
+                Refresh shop list
                 <RefreshCw size={16} />
               </button>
             </section>
@@ -2313,7 +2480,7 @@ function Seller() {
             <>
               {shops.length > 1 && (
                 <label className="field shop-picker">
-                  Choose your AriseSell store
+                  Choose your AriseSell shop
                   <select
                     value={selected}
                     onChange={(e) => setSelected(e.target.value)}
@@ -2358,7 +2525,7 @@ function Seller() {
                     <div className="seller-panel-heading">
                       <div>
                         <span className="eyebrow">Your storefront</span>
-                        <h2 id="store-link-title">Share your store</h2>
+                        <h2 id="store-link-title">Share your shop</h2>
                       </div>
                       <Store size={24} />
                     </div>
@@ -2368,7 +2535,7 @@ function Seller() {
                       shop and can buy as guests.
                     </p>
                     <label className="field">
-                      Your store link
+                      Shop link
                       <input
                         type="url"
                         readOnly
@@ -2381,7 +2548,7 @@ function Seller() {
                         <CopyButton
                           key={data.shop.id}
                           value={`${window.location.origin}/shops/${data.shop.slug}`}
-                          label="Copy store link"
+                          label="Copy shop link"
                         />
                         <Link
                           className="text-link"
@@ -2408,7 +2575,7 @@ function Seller() {
                       <div className="seller-panel-heading">
                         <div>
                           <span className="eyebrow">Shop settings</span>
-                          <h2>Your shop profile</h2>
+                          <h2>Shop profile</h2>
                         </div>
                         <span
                           className={`pill ${data.shop.published ? "positive" : ""}`}
@@ -2439,7 +2606,7 @@ function Seller() {
                           onChange={(e) =>
                             setForm({ ...form, description: e.target.value })
                           }
-                          placeholder="What do you make, curate, or help people do?"
+                          placeholder="Describe the digital products you sell and who they are for."
                         />
                         <small>{form.description.length}/1,500</small>
                       </label>
@@ -2506,6 +2673,7 @@ function Seller() {
                         Choose which products appear here. Edit products, stock,
                         prices, and delivery settings in AriseSell.
                       </p>
+                      <p className="publication-hint">To publish, select at least one product and connect a payment account in an active AriseSell shop.</p>
                       <div className="sync-bar">
                         <span>
                           <RefreshCw size={14} />
@@ -2567,7 +2735,7 @@ function Seller() {
                           ))}
                         </div>
                       ) : (
-                        <Empty title="Your catalog is waiting.">
+                        <Empty title="No products in your catalog">
                           <p>
                             Add a digital product in AriseSell, then refresh
                             here.
@@ -2592,7 +2760,7 @@ function Seller() {
                             ? "Saving…"
                             : data.shop.published
                               ? "Save shop changes"
-                              : "Publish my shop"}
+                              : "Publish shop"}
                           <ArrowUpRight size={17} />
                         </button>
                       </div>
@@ -2620,7 +2788,7 @@ function Seller() {
             <span className="aside-icon">
               <Layers size={26} />
             </span>
-            <h3>One place to manage it all.</h3>
+            <h3>Manage products in AriseSell</h3>
             <p>
               Your marketplace shop is connected to AriseSell. There’s no second
               inventory to keep updated.
@@ -2646,7 +2814,7 @@ function Seller() {
           </section>
           {session?.user && data && (
             <section className="panel setup-checklist">
-              <h3>Your launch checklist</h3>
+              <h3>Publication checklist</h3>
               {[
                 [true, "AriseSell connected"],
                 [
@@ -2686,8 +2854,7 @@ function HowItWorks() {
       <div className="page-intro">
         <p className="eyebrow">How it works</p>
         <h1>
-          A good find.
-          <br />A few easy steps.
+          How to buy digital products
         </h1>
         <p>
           Independent shops, digital products, and a straightforward way to make
@@ -2698,17 +2865,17 @@ function HowItWorks() {
         {[
           [
             Search,
-            "Find your thing",
-            "Explore products and independent shops. Check the description, options, delivery details, and seller’s terms.",
+            "Choose a product",
+            "Browse products and independent shops. Check the description, options, delivery details, and seller’s terms.",
           ],
           [
             LockKeyhole,
-            "Make it yours",
+            "Review and pay",
             "Choose a product, confirm its current price and terms, and follow the seller’s payment instructions.",
           ],
           [
             Download,
-            "Enjoy your good find",
+            "Access your digital items",
             "After payment verification, automatic items become available in My purchases. Manual items are prepared by the seller.",
           ],
         ].map(([Icon, title, text]) => {
@@ -2725,7 +2892,7 @@ function HowItWorks() {
         })}
       </div>
       <div className="faq-section">
-        <h2>A few things worth knowing.</h2>
+        <h2>Frequently asked questions</h2>
         {[
           [
             "Who am I buying from?",
@@ -2749,7 +2916,7 @@ function HowItWorks() {
           ],
           [
             "Can I share a link to just my shop?",
-            "Yes. Connect and publish your shop, then use Copy store link in your seller dashboard. Share it on your Facebook or Instagram page, or send it to customers. It opens your shop directly, with your products, search and checkout. Customers can buy as guests.",
+            "Yes. Connect and publish your shop, then use Copy shop link in your seller dashboard. Share it on your Facebook or Instagram page, or send it to customers. It opens your shop directly, with your products, search and checkout. Customers can buy as guests.",
           ],
         ].map(([question, answer]) => (
           <details key={question}>
@@ -2763,7 +2930,7 @@ function HowItWorks() {
       </div>
       <div className="centered-cta">
         <Link to="/products" className="button primary">
-          Discover your next good find
+          Browse products
           <ArrowRight size={18} />
         </Link>
       </div>
@@ -2819,7 +2986,7 @@ function Admin() {
   if (!session.user?.admin)
     return (
       <main id="main" className="container section">
-        <Empty title="Administrator access required." heading="h1">
+        <Empty title="Administrator access required" heading="h1">
           <p>Continue with an authorized AriseSell administrator account.</p>
           <a className="button primary" href="/api/auth/start">
             Continue with AriseSell
@@ -2830,8 +2997,7 @@ function Admin() {
   return (
     <main id="main" className="container listing-page">
       <div className="page-intro">
-        <p className="eyebrow">Marketplace administration</p>
-        <h1>A clear view of your marketplace.</h1>
+        <h1>Marketplace administration</h1>
         <p>Review published shops, product listings, and customer reports.</p>
       </div>
       {error && !target && <ErrorBox message={error} retry={() => void load()} />}
@@ -2932,7 +3098,7 @@ function Admin() {
                       }
                     }}
                   >
-                    {report.resolved ? "Resolved" : "Mark reviewed"}
+                    {report.resolved ? "Resolved" : "Resolve report"}
                   </button>
                 </div>
               ))
@@ -2971,6 +3137,7 @@ function Admin() {
               }
             }}
           >
+            <p className="moderation-description">{target.hidden ? `This hides the ${target.kind === "shop" ? "shop and its listings" : "listing"} from the marketplace. Existing orders and inventory are not deleted.` : "This removes the marketplace restriction. The seller’s publication and availability settings still apply."}</p>
             <label className="field">
               Reason for this action
               <textarea
@@ -2984,7 +3151,7 @@ function Admin() {
             {error && <ErrorBox message={error} />}
             <div className="button-row">
               <button className="button primary" disabled={busy}>
-                Confirm change
+                {busy ? "Saving…" : target.hidden ? (target.kind === "shop" ? "Hide shop" : "Hide listing") : "Restore"}
               </button>
               <button
                 className="button secondary"
@@ -3004,13 +3171,12 @@ function Admin() {
 function NotFound() {
   return (
     <main id="main" className="container section">
-      <Empty title="This find isn’t here anymore." heading="h1">
+      <Empty title="Page not found" heading="h1">
         <p>
-          The link may have changed, or the seller may have unpublished the
-          product.
+          This page may have moved, or the product or shop is no longer available. Browse products to continue.
         </p>
         <Link className="button primary" to="/products">
-          Explore products
+          Browse products
           <ArrowRight size={17} />
         </Link>
       </Empty>

@@ -43,9 +43,11 @@ export function ProductReviews({ productId }: { productId: string }) {
       <div className="review-summary">
         {data.count > 0 && data.average !== null ? <><strong>{data.average.toFixed(1)}<small> / 5</small></strong><span>{data.count} {data.count === 1 ? "review" : "reviews"}<small>From verified purchases</small></span></> : <p>No reviews yet.</p>}
       </div>
-      {data.reviews.map(review => <ReviewCard key={review.id} review={review} />)}
+      {data.reviews.length > 0 && <div className="review-list" role="region" aria-label="Customer review list" tabIndex={0}>
+        {data.reviews.map(review => <ReviewCard key={review.id} review={review} />)}
+      </div>}
       {data.has_more && !error && <button type="button" className="button secondary full-width" disabled={busy} onClick={() => void load()}>{busy ? "Loading…" : "Load more reviews"}</button>}
-      <p className="review-guidance">Purchased this product? Leave or edit your review from <Link to="/purchases">My purchases</Link> after delivery.</p>
+      <p className="review-guidance">After payment verification and delivery, you can leave or edit a review in <Link to="/purchases">My purchases</Link>.</p>
     </>}
   </div>;
 }
@@ -73,9 +75,9 @@ export function PurchaseReview({ order }: { order: Purchase }) {
       </fieldset>
       <label className="field">Your public name<input required minLength={2} maxLength={60} value={name} onChange={event => setName(event.target.value)} /></label>
       <label className="field">Your review<textarea required minLength={10} maxLength={2000} rows={4} value={comment} onChange={event => setComment(event.target.value)} placeholder="Tell others about the product and your experience." /></label>
-      <p className="review-guidance">Your name, rating and review will be public. Keep passwords, license keys and payment details private.</p>
+      <p className="review-guidance">Your public name, rating, review and review date appear on the product page. Keep passwords, license keys and payment details private.</p>
       {error && <p role="alert" className="notice error">{error}</p>}
-      <button className="button primary" disabled={busy || !order.can_review}>{busy ? "Saving…" : review ? "Update review" : "Publish review"}</button>
+      <button className="button primary" disabled={busy || !order.can_review}>{busy ? "Saving review…" : review ? "Update review" : "Publish review"}</button>
       {review && <button type="button" className="button ghost" onClick={() => setEditing(false)}>Cancel</button>}
     </form>}
   </section>;

@@ -27,7 +27,7 @@ test("checkout updates totals, rejects invalid quantities and uses the seller qu
   });
   await page.goto("/checkout/checkout-test?variant=variant-test");
   const quantity = page.getByRole("spinbutton", { name: "Quantity", exact: true });
-  const review = page.getByRole("button", { name: "Review my order", exact: true });
+  const review = page.getByRole("button", { name: "Review order", exact: true });
   await page.getByLabel("Full name", { exact: true }).fill("Test buyer");
   await quantity.fill("6");
   await expect(page.locator(".summary-total strong")).toHaveText(/60\.00/);
@@ -48,7 +48,7 @@ test("checkout updates totals, rejects invalid quantities and uses the seller qu
   await expect(page.locator(".summary-total")).toContainText("Total to pay");
   await expect(page.locator(".summary-total strong")).toHaveText(/66\.00/);
   await expect(page.locator(".checkout-payable strong")).toHaveText(/66\.00/);
-  const confirm = page.getByRole("button", { name: "Confirm & get payment instructions", exact: true });
+  const confirm = page.getByRole("button", { name: "Confirm order", exact: true });
   await expect(confirm).toBeDisabled();
   await page.getByRole("button", { name: "Edit order details", exact: true }).click();
   await quantity.fill("2");

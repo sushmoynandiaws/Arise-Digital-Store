@@ -11,6 +11,7 @@ test("product options, quantity and total stay consistent through checkout", asy
   await page.route("**/api/**", route => {
     const endpoint = new URL(route.request().url()).pathname;
     if (endpoint === "/api/session") return route.fulfill({ json: { user: null, csrf: "test-csrf", demo: false, source_web: "" } });
+    if (endpoint.endsWith("/reviews")) return route.fulfill({ json: { count: 0, average: null, has_more: false, reviews: [] } });
     if (endpoint === "/api/catalog") return route.fulfill({ json: {
       products: [product], shops: [{ id: "shop-test", slug: "test-shop", name: "Test shop", support: "", payment_methods: ["bkash"] }],
       synced_at: new Date().toISOString(),

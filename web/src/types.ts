@@ -18,6 +18,8 @@ export type Product = {
   delivery_note: string;
   purchase_terms: string;
   required_buyer_fields: string[];
+  warranty_type?: "warranty" | "no_warranty";
+  warranty_days?: number | null;
   sales_enabled: boolean;
   selected?: boolean;
 };
@@ -44,6 +46,10 @@ export type Quote = {
   draft_id: string;
   quote_hash: string;
   snapshot: {
+    unit_price?: string;
+    subtotal?: string;
+    discount?: string;
+    coupon_code?: string | null;
     total: string;
     name: string;
     variant: string;
@@ -62,6 +68,8 @@ export type Purchase = {
   name: string;
   quantity: number;
   total: string;
+  discount?: string;
+  coupon_code?: string | null;
   currency: string;
   payment_status: string;
   delivery_status: string;

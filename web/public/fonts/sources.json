@@ -1,0 +1,146 @@
+[
+  {
+    "family": "Urbanist",
+    "subset": "latin-ext",
+    "weight": "400-900",
+    "file": "urbanist-latin-ext-400-900.woff2",
+    "source": "https://fonts.gstatic.com/s/urbanist/v18/L0x-DF02iFML4hGCyMqrbS10ig.woff2",
+    "bytes": 16604,
+    "sha256": "f71047c01398a570cabbd2810cb0893992b3dd2e34c966afa0e54b3f12b6f329"
+  },
+  {
+    "family": "Urbanist",
+    "subset": "latin",
+    "weight": "400-900",
+    "file": "urbanist-latin-400-900.woff2",
+    "source": "https://fonts.gstatic.com/s/urbanist/v18/L0x-DF02iFML4hGCyMqlbS0.woff2",
+    "bytes": 27752,
+    "sha256": "7981ef90c246352c7c217081b8d9337b9c95e9d17ae126bf56b0d3753d1e5ffb"
+  },
+  {
+    "family": "Hind Siliguri",
+    "subset": "bengali",
+    "weight": "400",
+    "file": "hindsiliguri-bengali-400.woff2",
+    "source": "https://fonts.gstatic.com/s/hindsiliguri/v14/ijwTs5juQtsyLLR5jN4cxBEoTI7ax9k0.woff2",
+    "bytes": 71076,
+    "sha256": "8ae56aab7628191d874faef495d5229138187e8ed6061ede100fe362104faa91"
+  },
+  {
+    "family": "Hind Siliguri",
+    "subset": "latin-ext",
+    "weight": "400",
+    "file": "hindsiliguri-latin-ext-400.woff2",
+    "source": "https://fonts.gstatic.com/s/hindsiliguri/v14/ijwTs5juQtsyLLR5jN4cxBEoTJLax9k0.woff2",
+    "bytes": 8272,
+    "sha256": "fc45397ed829e3f30f1637a08d21b3bad1405ba51a292eb7ec3db090437a09ec"
+  },
+  {
+    "family": "Hind Siliguri",
+    "subset": "latin",
+    "weight": "400",
+    "file": "hindsiliguri-latin-400.woff2",
+    "source": "https://fonts.gstatic.com/s/hindsiliguri/v14/ijwTs5juQtsyLLR5jN4cxBEoTJzaxw.woff2",
+    "bytes": 14472,
+    "sha256": "cdc41415f366ef2966fc77e90d51391dec03657a6ed397fe59efd5ce34cf9549"
+  },
+  {
+    "family": "Hind Siliguri",
+    "subset": "bengali",
+    "weight": "500",
+    "file": "hindsiliguri-bengali-500.woff2",
+    "source": "https://fonts.gstatic.com/s/hindsiliguri/v14/ijwOs5juQtsyLLR5jN4cxBEoRG_50vQVKxGv.woff2",
+    "bytes": 73688,
+    "sha256": "7f39fcb7fe45615aacae18c5f34e6da557bf8ad1222b1568402e1e2d80979038"
+  },
+  {
+    "family": "Hind Siliguri",
+    "subset": "latin-ext",
+    "weight": "500",
+    "file": "hindsiliguri-latin-ext-500.woff2",
+    "source": "https://fonts.gstatic.com/s/hindsiliguri/v14/ijwOs5juQtsyLLR5jN4cxBEoRG_50ugVKxGv.woff2",
+    "bytes": 8672,
+    "sha256": "ec42abf143517f67937db7717190cb58ba0466d56885a839147aec26fa008435"
+  },
+  {
+    "family": "Hind Siliguri",
+    "subset": "latin",
+    "weight": "500",
+    "file": "hindsiliguri-latin-500.woff2",
+    "source": "https://fonts.gstatic.com/s/hindsiliguri/v14/ijwOs5juQtsyLLR5jN4cxBEoRG_50uYVKw.woff2",
+    "bytes": 14896,
+    "sha256": "50c07c577a7c527c2d471089cf3473bb90c7f010f8dfa343a45cf9e81fb4c5e8"
+  },
+  {
+    "family": "Hind Siliguri",
+    "subset": "bengali",
+    "weight": "600",
+    "file": "hindsiliguri-bengali-600.woff2",
+    "source": "https://fonts.gstatic.com/s/hindsiliguri/v14/ijwOs5juQtsyLLR5jN4cxBEoREP-0vQVKxGv.woff2",
+    "bytes": 74784,
+    "sha256": "b92b5da6d4f4f6de315f093f26a4e20d7ce7876a7db3ae7dda6a92fc5c3cc7c4"
+  },
+  {
+    "family": "Hind Siliguri",
+    "subset": "latin-ext",
+    "weight": "600",
+    "file": "hindsiliguri-latin-ext-600.woff2",
+    "source": "https://fonts.gstatic.com/s/hindsiliguri/v14/ijwOs5juQtsyLLR5jN4cxBEoREP-0ugVKxGv.woff2",
+    "bytes": 8544,
+    "sha256": "d35fe137c42fb9051ef9c0c2cc7fc4dfd9bf2be32b791456b5cca2e6d8bd1414"
+  },
+  {
+    "family": "Hind Siliguri",
+    "subset": "latin",
+    "weight": "600",
+    "file": "hindsiliguri-latin-600.woff2",
+    "source": "https://fonts.gstatic.com/s/hindsiliguri/v14/ijwOs5juQtsyLLR5jN4cxBEoREP-0uYVKw.woff2",
+    "bytes": 14724,
+    "sha256": "c39d0db6f570276765a06728ce87d83be5808ae403475ed6b49a64c02915805c"
+  },
+  {
+    "family": "Hind Siliguri",
+    "subset": "bengali",
+    "weight": "700",
+    "file": "hindsiliguri-bengali-700.woff2",
+    "source": "https://fonts.gstatic.com/s/hindsiliguri/v14/ijwOs5juQtsyLLR5jN4cxBEoRCf_0vQVKxGv.woff2",
+    "bytes": 72956,
+    "sha256": "b6033f70da8e37d5b8a3065b0eaefaafa6003f72309864b0eeddaa926eb472c3"
+  },
+  {
+    "family": "Hind Siliguri",
+    "subset": "latin-ext",
+    "weight": "700",
+    "file": "hindsiliguri-latin-ext-700.woff2",
+    "source": "https://fonts.gstatic.com/s/hindsiliguri/v14/ijwOs5juQtsyLLR5jN4cxBEoRCf_0ugVKxGv.woff2",
+    "bytes": 8452,
+    "sha256": "2854fe9d8b669ebe4c24ab11f1d4863d5b39b4a46b876aeb4ff6e6954dcf1b3e"
+  },
+  {
+    "family": "Hind Siliguri",
+    "subset": "latin",
+    "weight": "700",
+    "file": "hindsiliguri-latin-700.woff2",
+    "source": "https://fonts.gstatic.com/s/hindsiliguri/v14/ijwOs5juQtsyLLR5jN4cxBEoRCf_0uYVKw.woff2",
+    "bytes": 14480,
+    "sha256": "e8f0fc0cabf50652d414fcb76a02c6a21d6bcfc19adcfd14453088a9dae1d970"
+  },
+  {
+    "family": "JetBrains Mono",
+    "subset": "latin-ext",
+    "weight": "400-600",
+    "file": "jetbrainsmono-latin-ext-400-600.woff2",
+    "source": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPx7cwhsk.woff2",
+    "bytes": 11624,
+    "sha256": "db5ff4db83e580426280e9337a58dc57d3a83784a1b03ad80914651594441d52"
+  },
+  {
+    "family": "JetBrains Mono",
+    "subset": "latin",
+    "weight": "400-600",
+    "file": "jetbrainsmono-latin-400-600.woff2",
+    "source": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPxDcwg.woff2",
+    "bytes": 31432,
+    "sha256": "83c005d49d8a6a50474c73a5a36ac0468076e9c4a29da7bdb14995d80560a5be"
+  }
+]

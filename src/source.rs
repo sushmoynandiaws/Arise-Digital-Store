@@ -30,14 +30,14 @@ impl AppState {
         let response = request.send().await.map_err(|_| {
             AppError::new(
                 StatusCode::SERVICE_UNAVAILABLE,
-                "AriseSell is temporarily unavailable. Please retry.",
+                "AriseSell is temporarily unavailable. Try again shortly.",
             )
         })?;
         let status = response.status();
         let value: Value = response.json().await.map_err(|_| {
             AppError::new(
                 StatusCode::BAD_GATEWAY,
-                "AriseSell returned an unreadable response.",
+                "We could not read the shop service response. Refresh this page to check the result before trying again.",
             )
         })?;
         if !status.is_success() {

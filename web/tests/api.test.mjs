@@ -16,9 +16,18 @@ test("prices retain currency and decimals; availability comes from all actual va
 });
 test("customer status copy does not expose internal enum names or claim unverified payment is paid",()=>{
   const helpers=client();assert.equal(helpers.paymentLabel("pending_verification"),"Checking payment");
-  assert.equal(helpers.paymentLabel("future_unknown_state"),"Checking payment");
+  assert.equal(helpers.paymentLabel("future_unknown_state"),"Status unavailable");
+  assert.equal(helpers.deliveryLabel("future_unknown_state"),"Status unavailable");
   assert.equal(helpers.deliveryLabel("awaiting_manual"),"Seller is preparing your order");
   assert.equal(helpers.paymentLabel("refunded"),"Refunded");
+});
+
+test("payment method names are consistent and unknown source names are preserved",()=>{
+  const {paymentMethodLabel}=client();
+  assert.equal(paymentMethodLabel("bkash"),"bKash");
+  assert.equal(paymentMethodLabel("nagad"),"Nagad");
+  assert.equal(paymentMethodLabel("rocket"),"Rocket");
+  assert.equal(paymentMethodLabel("New source wallet"),"New source wallet");
 });
 test("checkout totals multiply exact minor units and reject incomplete or unsafe values",()=>{
   const {checkoutTotal}=client();
@@ -45,4 +54,34 @@ test("API writes include same-origin credentials and the current CSRF token",asy
 test("API errors preserve actionable messages and do not masquerade as successful results",async()=>{
   const helpers=client(async()=>({ok:false,json:async()=>({error:"Not enough stock; no payment invoice was created"})}));
   await assert.rejects(helpers.api("/checkout/accept",{method:"POST"}),/Not enough stock/);
+});
+
+test("purchase headings distinguish verified access, preparation, review, expiry and refunds",()=>{
+  const {purchaseMessage}=client();
+  const base={payment_status:"unpaid",delivery_status:"awaiting_payment",delivery_mode:"automatic",ready:false,payment:null};
+  const expired={expires_at:"2000-01-01T00:00:00Z"};
+  const future={expires_at:"2999-01-01T00:00:00Z"};
+  for(const [changes,title] of [
+    [{},"Complete your payment"],
+    [{payment_status:"pending_verification"},"Checking your payment"],
+    [{payment_status:"review_required"},"Your payment needs review"],
+    [{payment:expired},"Payment request expired"],
+    [{payment_status:"pending_verification",payment:expired},"Payment request expired"],
+    [{payment:future},"Complete your payment"],
+    [{payment_status:"paid",payment:expired,ready:true,delivery_status:"delivered"},"Your order is ready"],
+    [{payment_status:"paid",delivery_mode:"manual"},"Your order is being prepared"],
+    [{payment_status:"paid",delivery_status:"queued"},"Preparing your digital items"],
+    [{payment_status:"paid",delivery_status:"needs_attention"},"Your delivery needs attention"],
+    [{payment_status:"refunded",delivery_status:"cancelled",ready:true},"Payment refunded"],
+    [{payment_status:"partially_refunded",ready:true},"Payment partially refunded"],
+    [{payment_status:"paid",delivery_status:"cancelled",ready:true},"Order cancelled"],
+    [{payment_status:"unknown",ready:true},"Payment status unavailable"],
+  ]) assert.equal(purchaseMessage({...base,...changes}).title,title);
+  assert.match(purchaseMessage({...base,payment_status:"pending_verification"}).description,/not been verified/);
+  assert.doesNotMatch(purchaseMessage({...base,payment_status:"paid",delivery_mode:"manual"}).description,/ready/);
+});
+
+test("connection failures and unreadable responses explain how to check the result safely",async()=>{
+  await assert.rejects(client(async()=>{throw new TypeError("Failed to fetch");}).api("/checkout/accept"),/refresh this page to check the result/);
+  await assert.rejects(client(async()=>({ok:false,json:async()=>{throw new Error("invalid JSON");}})).api("/checkout/accept"),/check the result before trying again/);
 });

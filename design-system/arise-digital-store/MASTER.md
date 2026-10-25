@@ -37,12 +37,34 @@ Inspired by top-tier Bangladeshi digital product platforms like **Subscriptions 
 | Ink Muted | `#64748B` | `--muted` | Slate 500 secondary guidance, timestamps, and terms |
 | Border Line | `#EDE9FE` | `--line` | Clean violet-slate structural card boundaries |
 | Border Strong | `#CCC6DF` | `--line-strong` | Input boundaries and hover card borders; focus uses the primary violet |
-| Accent Orange | `#FF6B00` | `--accent-orange` | Urgency badges, live alerts, and sale tags |
-| Verification Emerald | `#10B981` | `--mint` | Instant delivery confirmed, active stock, secure badges |
+| Status Amber | `#8A5A0A` | `--amber` | Payment guidance, expiry and attention notices |
+| Stock Emerald | `#10B981` | `--mint` | Source-confirmed availability indicators |
+| Success Ink | `#08765B` | `--success` | Verified payment and source-confirmed delivery status |
 
 ---
 
 ### Typography
+
+Use the role tokens in `web/src/styles.css`. Their rem values respect the browser's text size; the pixel equivalents below assume a 16px root. The mobile role changes apply at 600px and below. Do not add per-page overrides for values already represented by these tokens.
+
+| Role | Token | Desktop | Mobile |
+| --- | --- | --- | --- |
+| General page title | `--title-page` | 28–36px fluid | 28px |
+| Checkout / order status | `--title-status` | 32px | 26px |
+| Product title | `--title-product` | 32px | 28px |
+| Section title | `--title-section` | 24px | 22px |
+| Subsection title | `--title-subsection` | 20px | 20px |
+| Product / shop card title | `--title-card` | 18px | 18px |
+| Body / essential instructions / form values | `--text-body` | 16px | 16px |
+| Labels and buttons | `--text-label` | 14px | 14px |
+| Supporting metadata | `--text-meta` / `--text-small` | 13px / 12px | 13px / 12px |
+| Order totals | `--text-price` | 28px | 26px |
+
+The homepage hero is the sole display-size exception (40–66px depending on viewport). Use `--line-body: 1.65` and `--line-heading: 1.2`; keep explanatory copy around 60–75 characters per line. Hierarchy also comes from weight and spacing, rather than enlarging every heading. Brand lettering, avatar initials, quantity symbols and the numeric review average have their own visual roles.
+
+Serve the existing font families from `web/public/fonts` using `fonts.css` and `font-display: swap`. Their original WOFF2 subsets, source manifest and OFL licenses are bundled there. Keep font loading local so a third-party stylesheet outage cannot block the interface.
+
+Use [content-style-guide.md](content-style-guide.md) for wording and state-specific messages.
 
 - **Interface & Headings:** `Urbanist`, `Hind Siliguri`, system-ui, sans-serif
   - Weights: `400`, `500`, `600`, `700`, `800`, `900`

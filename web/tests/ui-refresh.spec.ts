@@ -45,6 +45,18 @@ const routes = [
   ["seller-workspace", "/seller"], ["admin", "/admin"], ["help", "/how-it-works"], ["not-found", "/missing-page"],
 ];
 
+test("English and Bangla typography load while external font services are blocked", async ({ page }) => {
+  const external: string[] = [];
+  await page.route(/https:\/\/fonts\.(googleapis|gstatic)\.com\//, route => { external.push(route.request().url()); return route.abort(); });
+  await preview(page);
+  await page.goto("/products");
+  await expect(page.getByRole("heading", { name: "All products", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "বাংলা ডিজাইন কোর্স", exact: true })).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  for (const family of ["Urbanist", "Hind Siliguri"]) expect(await page.evaluate(name => [...document.fonts].some(face => face.family.includes(name) && face.status === "loaded"), family)).toBeTruthy();
+  expect(external).toEqual([]);
+});
+
 for (const width of [320, 768, 1024, 1440]) {
   for (const [name, path] of routes) test(`${name} reflows and keeps usable controls at ${width}px`, async ({ page }) => {
     const errors: string[] = [];
@@ -55,7 +67,7 @@ for (const width of [320, 768, 1024, 1440]) {
       await page.goto(path);
       await expect(page.locator("h1")).toHaveCount(1);
       await expect(page.locator("#main")).toBeVisible();
-      if (name === "seller-workspace") await expect(page.getByRole("heading", { name: "Your shop profile" })).toBeVisible();
+      if (name === "seller-workspace") await expect(page.getByRole("heading", { name: "Shop profile" })).toBeVisible();
       if (name === "admin") await expect(page.getByRole("heading", { name: "Published shops" })).toBeVisible();
       await page.evaluate(() => document.fonts.ready);
       const issues = await page.evaluate(() => {
@@ -72,7 +84,9 @@ for (const width of [320, 768, 1024, 1440]) {
         return problems;
       });
       expect(issues, `${name} at ${width}px`).toEqual([]);
-      await page.screenshot({ path: `../artifacts/ui-refresh/${name}-${width}.png`, fullPage: true });
+      const titleSize = await page.locator("h1").evaluate(element => parseFloat(getComputedStyle(element).fontSize));
+      if (name !== "home") expect(titleSize).toBeLessThanOrEqual(width <= 600 ? 30 : 36);
+      await page.screenshot({ path: `../artifacts/copy-typography/${name}-${width}.png`, fullPage: true });
     expect(errors).toEqual([]);
   });
 }
@@ -108,6 +122,46 @@ test("keyboard menu, FAQ and moderation dialogs preserve focus", async ({ page }
   await expect(dialog).toHaveCount(0); await expect(hide).toBeFocused();
 });
 
+const payment = { provider: "bkash", account: "SAMPLE-DO-NOT-PAY", amount: "490.00", trx_id: null, expires_at: "2999-01-01T00:00:00Z" };
+const orderStates: [string, Partial<Purchase>, string, boolean, boolean][] = [
+  ["unpaid", { payment_status: "unpaid", delivery_status: "awaiting_payment", ready: false, payment }, "Complete your payment", true, false],
+  ["checking", { payment_status: "pending_verification", ready: false, payment: { ...payment, trx_id: "SAMPLE123" } }, "Checking your payment", true, false],
+  ["review", { payment_status: "review_required", ready: false, payment }, "Your payment needs review", true, false],
+  ["expired", { payment_status: "unpaid", ready: false, payment: { ...payment, expires_at: "2000-01-01T00:00:00Z" } }, "Payment request expired", false, false],
+  ["manual", { ready: false, delivery_mode: "manual", delivery_status: "awaiting_manual", delivery_estimate: "Seller-provided delivery schedule remains unchanged." }, "Your order is being prepared", false, false],
+  ["queued", { ready: false, delivery_status: "queued" }, "Preparing your digital items", false, false],
+  ["attention", { ready: false, delivery_status: "needs_attention" }, "Your delivery needs attention", false, false],
+  ["ready", {}, "Your order is ready", false, true],
+  ["cancelled", { delivery_status: "cancelled", ready: true }, "Order cancelled", false, false],
+  ["refunded", { payment_status: "refunded", delivery_status: "cancelled", ready: true, payment }, "Payment refunded", false, false],
+  ["partial-refund", { payment_status: "partially_refunded", ready: true, payment }, "Payment partially refunded", false, false],
+  ["unknown", { payment_status: "future-state", ready: false }, "Payment status unavailable", false, false],
+];
+
+for (const [name, changes, title, canPay, canAccess] of orderStates) test(`order copy matches ${name} without promising the wrong next step`, async ({ page }) => {
+  await preview(page);
+  const order = { ...readyOrder, can_review: false, ...changes };
+  await page.route("**/api/orders/sample-order", route => route.fulfill({ json: order }));
+  await page.goto("/purchases/sample-order");
+  await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Check payment", exact: true })).toHaveCount(canPay ? 1 : 0);
+  await expect(page.getByRole("button", { name: "View my items", exact: true })).toHaveCount(canAccess ? 1 : 0);
+  if (name === "manual") await expect(page.getByText(order.delivery_estimate, { exact: true })).toBeVisible();
+  for (const width of [320, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(await page.locator("h1").evaluate(element => parseFloat(getComputedStyle(element).fontSize))).toBe(width === 320 ? 26 : 32);
+    expect(await page.locator(".purchase-page-heading > p").last().evaluate(element => parseFloat(getComputedStyle(element).fontSize))).toBe(16);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    await page.screenshot({ path: `../artifacts/copy-typography/status-${name}-${width}.png`, fullPage: true });
+  }
+  if (canAccess) {
+    await page.getByRole("button", { name: "View my items" }).click();
+    await expect(page.locator("pre[data-private]")).toContainText("SAMPLE PRIVATE ITEM");
+    await page.getByRole("button", { name: "Hide my items" }).click();
+    await expect(page.locator("pre[data-private]")).toHaveCount(0);
+  }
+});
+
 test("seller artwork stays visible and failed images fall back to category artwork", async ({ page }) => {
   await preview(page);
   const withImage = structuredClone(catalog);
@@ -141,9 +195,9 @@ test("moderation errors stay inside the dialog and a successful retry updates th
   await row.getByRole("button", { name: "Hide listing" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Reason for this action").fill("Review sample listing");
-  await dialog.getByRole("button", { name: "Confirm change" }).click();
+  await dialog.getByRole("button", { name: "Hide listing", exact: true }).click();
   await expect(dialog.getByRole("alert")).toContainText("Could not save this change");
-  await dialog.getByRole("button", { name: "Confirm change" }).click();
+  await dialog.getByRole("button", { name: "Hide listing", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(row.getByText("Hidden", { exact: true })).toBeVisible();
   expect(attempts).toBe(2);
@@ -151,9 +205,11 @@ test("moderation errors stay inside the dialog and a successful retry updates th
 
 test("empty, failure, loading and permission states retain a useful next action", async ({ page }) => {
   await preview(page, { empty: true });
-  await page.goto("/products"); await expect(page.getByRole("heading", { name: "No matches just yet." })).toBeVisible();
-  await page.goto("/purchases"); await expect(page.getByRole("link", { name: "Discover products", exact: true })).toBeVisible();
-  await page.goto("/admin"); await expect(page.getByRole("heading", { name: "Administrator access required." })).toBeVisible();
+  await page.goto("/");
+  await expect(page.locator(".empty").getByRole("link", { name: "Browse shops", exact: true })).toHaveAttribute("href", "/shops");
+  await page.goto("/products"); await expect(page.getByRole("heading", { name: "No products found" })).toBeVisible();
+  await page.goto("/purchases"); await expect(page.locator(".empty").getByRole("link", { name: "Browse products", exact: true })).toBeVisible();
+  await page.goto("/admin"); await expect(page.getByRole("heading", { name: "Administrator access required", exact: true })).toBeVisible();
   await page.unroute("**/api/**"); await preview(page, { failure: true });
   await page.goto("/products"); await expect(page.getByRole("alert")).toContainText("temporarily unavailable");
   await expect(page.getByRole("button", { name: "Try again", exact: true })).toBeVisible();
