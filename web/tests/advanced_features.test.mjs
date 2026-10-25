@@ -160,9 +160,9 @@ test("styles.css includes all corresponding responsive tokens and classes", () =
   assert.ok(stylesCode.includes(".track-order-page"));
 });
 
-test("Dark theme footer has clean 4-column layout, social pills, and policy modal without unwanted cards or payment strip", () => {
+test("Dark theme footer has clean 4-column layout, social pills, and information pages without unwanted cards or payment strip", () => {
   // App.tsx contains footer components
-  assert.ok(appCode.includes("function PolicyModal("));
+  assert.ok(appCode.includes("function ShopInformationPage("));
   assert.ok(appCode.includes("dark-theme-footer"));
   assert.ok(appCode.includes("dark-social-pills-row"));
   assert.ok(appCode.includes("dark-footer-links-list"));
@@ -176,5 +176,24 @@ test("Dark theme footer has clean 4-column layout, social pills, and policy moda
   assert.ok(stylesCode.includes(".dark-theme-footer"));
   assert.ok(stylesCode.includes(".dark-footer-grid"));
   assert.ok(stylesCode.includes(".dark-social-pill"));
-  assert.ok(stylesCode.includes(".policy-modal-card"));
+  assert.ok(stylesCode.includes(".shop-policy-page"));
+});
+
+test("Top bar, central search, sub-nav, and shop hero match modern header design", () => {
+  // App.tsx contains top bar and sub-nav components
+  assert.ok(appCode.includes("function TopAnnouncementBar()"));
+  assert.ok(appCode.includes("function SubNavBar()"));
+  assert.ok(appCode.includes("header-center-search"));
+  assert.ok(appCode.includes("site-top-bar"));
+  assert.ok(appCode.includes("category-pill-btn"));
+  assert.ok(appCode.includes("shop-online-indicator"));
+  assert.ok(appCode.includes("shop-hero-features-row"));
+
+  // styles.css contains corresponding rules
+  assert.ok(stylesCode.includes(".site-top-bar"));
+  assert.ok(stylesCode.includes(".header-center-search"));
+  assert.ok(stylesCode.includes(".site-sub-nav"));
+  assert.ok(stylesCode.includes(".category-pill-btn"));
+  assert.ok(stylesCode.includes(".shop-online-indicator"));
+  assert.ok(stylesCode.includes(".shop-hero-features-row"));
 });

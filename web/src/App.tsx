@@ -37,6 +37,8 @@ import {
   Zap,
   ChevronDown,
   LayoutGrid,
+  Clock,
+  Mail,
   BookOpen,
   Palette,
   Code2,
@@ -72,6 +74,7 @@ import {
 import type { Catalog, Shop, Product, Session, Quote, Purchase } from "./types";
 import { productForRoute, productPath, productSection, type ProductSection } from "./product";
 import { ProductReviews, PurchaseReview } from "./Reviews";
+import { shopPageSections } from "./shopPages";
 
 type Market = {
   catalog: Catalog | null;
@@ -92,7 +95,8 @@ function useRouteShop() {
   const { catalog } = useMarket();
   const { pathname } = useLocation();
   const shopSlug = matchPath("/shops/:slug", pathname)?.params.slug ||
-    matchPath("/shops/:slug/products/:productSlug", pathname)?.params.slug;
+    matchPath("/shops/:slug/products/:productSlug", pathname)?.params.slug ||
+    matchPath("/shops/:slug/info/:section", pathname)?.params.slug;
   if (shopSlug)
     return catalog?.shops.find(
       (shop) => shop.slug === shopSlug || shop.id === shopSlug,
@@ -528,11 +532,148 @@ export function TrackOrderPage() {
   );
 }
 
+
+
+function TopAnnouncementBar() {
+  const shop = useRouteShop();
+  const { lang } = useLang();
+  const phone = shop?.contact?.whatsapp || shop?.contact?.phone || "01305087389";
+  const email = shop?.contact?.email || "sushmoynandiml@gmail.com";
+
+  return (
+    <div className="site-top-bar" aria-label="Announcement & seller contact">
+      <div className="site-top-bar-inner container">
+        <div className="top-bar-announcement">
+          <Link to={shop ? `/shops/${shop.slug}` : "/products"} className="announcement-pill-link">
+            <span className="announcement-flash">⚡</span>
+            <span>
+              {lang === "bn"
+                ? "ইউটিউব প্রিমিয়াম, চ্যাটজিপিটি ও অফিস এখন স্টকে! এখনই কিনুন"
+                : "YouTube Premium, ChatGPT, Office In Stock Now!! Buy Now"}
+            </span>
+            <span className="announcement-arrow">→</span>
+          </Link>
+        </div>
+
+        <div className="top-bar-meta">
+          <div className="top-meta-item">
+            <Clock size={13} className="top-meta-icon" />
+            <span>{lang === "bn" ? "কাজের সময় : সকাল ১০.০০ - রাত ১২.০০ (BD TIME)" : "Working Hours : 10.00 AM - 12.00 AM (BD TIME)"}</span>
+          </div>
+
+          <div className="top-meta-item email-meta">
+            <Mail size={13} className="top-meta-icon" />
+            <a href={`mailto:${email}`}>{email}</a>
+          </div>
+
+          <div className="top-bar-socials">
+            <a
+              href={shop?.social_links?.instagram || "https://instagram.com"}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram"
+              title="Instagram"
+            >
+              <IconInstagram size={14} />
+            </a>
+            <a
+              href={shop?.social_links?.linkedin || "https://linkedin.com"}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="LinkedIn"
+              title="LinkedIn"
+            >
+              <IconLinkedin size={14} />
+            </a>
+            <a
+              href={shop?.social_links?.facebook || (shop?.support ? supportHref(shop.support) : "https://facebook.com")}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Facebook"
+              title="Facebook"
+            >
+              <IconFacebook size={14} />
+            </a>
+            <a
+              href={supportHref(phone)}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="WhatsApp"
+              title="WhatsApp"
+            >
+              <IconWhatsApp size={14} />
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SubNavBar() {
+  const shop = useRouteShop();
+  const { t, lang } = useLang();
+
+  return (
+    <div className="site-sub-nav">
+      <div className="sub-nav-inner container">
+        <div className="sub-nav-category-col">
+          <Link
+            to={shop ? `/shops/${shop.slug}` : "/products"}
+            className="category-pill-btn"
+            title="All Categories"
+          >
+            <LayoutGrid size={15} />
+            <span>{lang === "bn" ? "সকল ক্যাটাগরি" : "All Categories"}</span>
+            <ChevronDown size={14} />
+          </Link>
+        </div>
+
+        <nav className="desktop-sub-nav" aria-label="Store navigation">
+          {shop ? (
+            <>
+              <NavLink to={`/shops/${shop.slug}`} end>
+                {lang === "bn" ? "শপ প্রোডাক্টস" : "Shop"}
+              </NavLink>
+                <NavLink to={`/shops/${shop.slug}/info/about`} className="sub-nav-text-btn">
+                  {lang === "bn" ? "আমাদের সম্পর্কে" : "About Us"}
+                </NavLink>
+              <a href="#customer-reviews" className="sub-nav-link">
+                {lang === "bn" ? "রিভিউসমূহ" : "Reviews"}
+              </a>
+              <NavLink to="/track">
+                {t("trackOrder")}
+              </NavLink>
+              {shop.support && (
+                <a href={supportHref(shop.support)} target="_blank" rel="noopener noreferrer">
+                  {lang === "bn" ? "যোগাযোগ" : "Contact Us"}
+                </a>
+              )}
+            </>
+          ) : (
+            <>
+              <NavLink to="/products">{t("allProducts")}</NavLink>
+              <NavLink to="/shops">{t("shops")}</NavLink>
+              <NavLink to="/track">{t("trackOrder")}</NavLink>
+              <NavLink to="/how-it-works">{t("howItWorks")}</NavLink>
+                <NavLink to="/info/about" className="sub-nav-text-btn">
+                  {lang === "bn" ? "আমাদের সম্পর্কে" : "About Us"}
+                </NavLink>
+            </>
+          )}
+        </nav>
+      </div>
+    </div>
+  );
+}
+
 function Header() {
   const { session, refreshSession } = useMarket();
   const { t, lang, toggleLang } = useLang();
   const { wishlist } = useWishlist();
   const [showWishlist, setShowWishlist] = useState(false);
+  const [headerSearch, setHeaderSearch] = useState("");
+  const navigate = useNavigate();
   const shop = useRouteShop();
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -548,6 +689,7 @@ function Header() {
   }, [open]);
   return (
     <header className="site-header">
+      <TopAnnouncementBar />
       <div className="header-inner">
         {shop ? (
           <Link
@@ -564,23 +706,28 @@ function Header() {
         ) : (
           <Brand />
         )}
-        <nav className="desktop-nav" aria-label="Main navigation">
-          {shop ? (
-            <>
-              <NavLink to={`/shops/${shop.slug}`}>{t("allProducts")}</NavLink>
-              {shop.support && (
-                <a href={supportHref(shop.support)}>Contact seller</a>
-              )}
-            </>
-          ) : (
-            <>
-              <NavLink to="/products">{t("allProducts")}</NavLink>
-              <NavLink to="/shops">{t("shops")}</NavLink>
-              <NavLink to="/track">{t("trackOrder")}</NavLink>
-              <NavLink to="/how-it-works">{t("howItWorks")}</NavLink>
-            </>
-          )}
-        </nav>
+
+        <form
+          className="header-center-search"
+          role="search"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const q = headerSearch.trim();
+            if (q) {
+              navigate(shop ? `/shops/${shop.slug}?search=${encodeURIComponent(q)}` : `/products?search=${encodeURIComponent(q)}`);
+            }
+          }}
+        >
+          <Search size={16} className="header-search-icon" />
+          <input
+            type="search"
+            placeholder={lang === "bn" ? "প্রোডাক্ট বা টুলস সার্চ করুন..." : "Search Tools, Subscriptions..."}
+            value={headerSearch}
+            onChange={(e) => setHeaderSearch(e.target.value)}
+            aria-label="Search tools"
+          />
+        </form>
+
         <div className="header-actions">
           <button
             type="button"
@@ -671,6 +818,7 @@ function Header() {
           )}
         </nav>
       )}
+      <SubNavBar />
       <WishlistModal open={showWishlist} onClose={() => setShowWishlist(false)} />
       {session?.demo && (
         <div className="demo-bar">
@@ -703,8 +851,6 @@ function Header() {
     </header>
   );
 }
-type PolicyType = "privacy" | "returns" | "terms" | "about" | null;
-
 function IconLinkedin({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -713,74 +859,48 @@ function IconLinkedin({ size = 18 }: { size?: number }) {
   );
 }
 
-function PolicyModal({
-  type,
-  onClose,
-  shop,
-}: {
-  type: PolicyType;
-  onClose: () => void;
-  shop: Shop | null;
-}) {
+function ShopInformationPage() {
+  const { slug, section: sectionKey } = useParams();
+  const { catalog, catalogError, reloadCatalog } = useMarket();
+  const shop = useRouteShop();
   const { lang } = useLang();
-  if (!type) return null;
-
+  const section = shopPageSections.find(section => section.key === sectionKey);
+  const title = section ? (lang === "bn" ? section.titleBn : section.title) : "";
   const shopName = shop?.name || "Arise Digital Store";
-
-  const content: Record<string, { titleBn: string; titleEn: string; bodyBn: string; bodyEn: string }> = {
-    privacy: {
-      titleBn: "গোপনীয়তা ও নিরাপত্তা নীতি (Privacy Policy)",
-      titleEn: "Privacy & Data Protection Policy",
-      bodyBn: `১. তথ্য সংগ্রহ: অর্ডার সম্পাদন ও ডিজিটাল ডেলিভারি নিশ্চিত করার লক্ষ্যে কেবল ক্রেতার নাম, ইমেইল এবং ফোন নম্বর সংগ্রহ করা হয়।\n\n২. তথ্যের গোপনীয়তা: সংগৃহীত কোনো তথ্য কোনো তৃতীয় পক্ষ বা বিজ্ঞাপনী সংস্থার সাথে শেয়ার বা বিক্রি করা হয় না।\n\n৩. লেনদেন নিরাপত্তা: বিকাশ, নগদ বা ব্যাংকিং পেমেন্ট সরাসরি ব্যাংক ও গেটওয়ে লেভেলে এন্ড-টু-এন্ড এনক্রিপশনে ভেরিফাই হয়। ক্রেতার কোনো পিন বা ওটিপি মার্কেটপ্লেসে সংরক্ষিত হয় না।`,
-      bodyEn: `1. Data Collection: Only essential buyer details (name, email, phone number) are collected strictly to fulfill digital orders and deliver license credentials.\n\n2. Privacy Guarantee: We never sell, lease, or share personal data with external advertisers or third parties.\n\n3. Payment Security: All mobile financial and card transactions are verified with end-to-end encryption. Sensitive payment pins or OTPs are never stored on our servers.`,
-    },
-    returns: {
-      titleBn: "রিটার্ন, রিফান্ড ও ওয়ারেন্টি নীতি (Returns & Warranty)",
-      titleEn: "Returns, Refunds & Replacement Warranty",
-      bodyBn: `১. ফুল রিপ্লেসমেন্ট ওয়ারেন্টি: সকল প্রিমিয়াম ডিজিটাল সাবস্ক্রিপশন ও একাউন্টের সাথে ফুল ১ মাসের রিপ্লেসমেন্ট গ্যারান্টি প্রদান করা হয়।\n\n২. ইনস্ট্যান্ট সাপোর্ট: ক্রয়ের পর যেকোনো টেকনিক্যাল সমস্যায় বিক্রেতার হোয়াটসঅ্যাপ বা সাপোর্ট চ্যানেলে জানালে ২৪ ঘণ্টার মধ্যে সমাধান বা বিকল্প একাউন্ট প্রদান করা হবে।\n\n৩. রিফান্ড পলিসি: নির্ধারিত সময়ের মধ্যে লাইসেন্স বা ডিজিটাল একাউন্ট ডেলিভারি দিতে ব্যর্থ হলে সম্পূর্ণ অর্থ সরাসরি ক্রেতার পেমেন্ট নম্বরে রিফান্ড করা হবে।`,
-      bodyEn: `1. Full Replacement Warranty: All digital subscriptions and software licenses include a comprehensive 1-Month replacement guarantee.\n\n2. Rapid Support: In case of login or activation issues, contact the seller via direct WhatsApp for immediate resolution within 24 hours.\n\n3. Money-Back Guarantee: If an ordered digital item cannot be fulfilled or verified, the buyer receives a 100% full refund directly to their payment account.`,
-    },
-    terms: {
-      titleBn: "ব্যবহারের নিয়ম ও শর্তাবলী (Terms & Conditions)",
-      titleEn: "Store Terms of Service",
-      bodyBn: `১. ডিজিটাল সেবা: প্রদানকৃত সকল সাবস্ক্রিপশন ও সফটওয়্যার কি সম্পূর্ণ অফিশিয়াল এবং নিজস্ব নিয়মে ব্যবহারের জন্য প্রযোজ্য।\n\n২. একাউন্ট নিয়মাবলী: শেয়ার্ড প্ল্যানে পাসওয়ার্ড বা প্রোফাইল পিন পরিবর্তন না করার শর্ত থাকে, ব্যক্তিগত প্ল্যানে ক্রেতা নিজ ইমেইলে সার্ভিস উপভোগ করবেন।\n\n৩. সাপোর্ট শর্ত: ওয়ারেন্টি চলাকালীন যেকোনো সহায়তায় সরাসরি অর্ডার রেফারেন্স কোড সহ সেলারকে মেসেজ দিন।`,
-      bodyEn: `1. Genuine Digital Goods: All accounts and licenses provided are authentic and intended for lawful individual or organizational use.\n\n2. Usage Guidelines: Customers must adhere to the specific plan guidelines (e.g. not altering master credentials on shared plans).\n\n3. Support Requirement: Provide your Order Reference code when requesting support or warranty claims.`,
-    },
-    about: {
-      titleBn: `${shopName} সম্পর্কে`,
-      titleEn: `About ${shopName}`,
-      bodyBn: `${shopName} বাংলাদেশের বিশ্বস্ত ডিজিটাল মার্কেটপ্লেস AriseSell প্ল্যাটফর্মে ভেরিফাইড বিক্রেতা। আমাদের লক্ষ্য সাশ্রয়ী মূল্যে প্রিমিয়াম সফটওয়্যার, ক্রিয়েটিভ টুলস এবং এআই সাবস্ক্রিপশন ইনস্ট্যান্ট ডেলিভারি ও শতভাগ নির্ভরযোগ্য ওয়ারেন্টি সহ সাধারণ ক্রেতাদের কাছে পৌঁছে দেওয়া।`,
-      bodyEn: `${shopName} is a verified digital merchant powered by the AriseSell marketplace ecosystem. We are committed to providing genuine digital subscriptions, AI tools, and professional licenses with instant delivery and 24/7 dedicated support across Bangladesh.`,
-    },
-  };
-
-  const item = content[type] || content.privacy;
-
+  useEffect(() => {
+    if (!title) return;
+    const previous = document.title;
+    document.title = `${title} | ${shopName}`;
+    return () => { document.title = previous; };
+  }, [title, shopName]);
+  if (slug && catalogError) return <main id="main" className="container section"><ErrorBox message={catalogError} retry={() => void reloadCatalog()} /></main>;
+  if (slug && !catalog) return <Loading />;
+  if (!section || (slug && !shop)) return <NotFound />;
+  const text = shop?.pages?.[section.key]?.trim() || (section.key === "about" ? shop?.description : "");
+  const support = shop?.support || (!shop ? "support@arisesell.com" : "");
   return (
-    <div className="modal-backdrop" onClick={onClose} role="presentation">
-      <div
-        className="modal-card policy-modal-card"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="policy-dialog-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="modal-header">
-          <h2 id="policy-dialog-title">{lang === "bn" ? item.titleBn : item.titleEn}</h2>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Close modal">
-            <X size={20} />
-          </button>
-        </div>
-        <div className="modal-body policy-modal-body">
-          <p className="preserve-lines">{lang === "bn" ? item.bodyBn : item.bodyEn}</p>
-        </div>
-        <div className="modal-footer">
-          <button type="button" className="button primary" onClick={onClose}>
-            {lang === "bn" ? "ঠিক আছে" : "Got it"}
-          </button>
-        </div>
+    <main id="main" className="container narrow-page shop-policy-page">
+      <Link className="text-link" to={shop ? `/shops/${shop.slug}` : "/"}>
+        <ArrowLeft size={16} aria-hidden="true" />
+        {shop ? (lang === "bn" ? "শপে ফিরে যান" : "Back to shop") : (lang === "bn" ? "হোমে ফিরে যান" : "Back to home")}
+      </Link>
+      <div className="page-intro">
+        <p className="eyebrow">{shopName}</p>
+        <h1>{title}</h1>
       </div>
-    </div>
+      <article className="panel shop-policy-content">
+        {text ? <p className="preserve-lines">{text}</p> :
+          <p className="muted">{lang === "bn"
+            ? "এই তথ্য এখনও যোগ করা হয়নি। বিস্তারিত জানতে যোগাযোগ করুন।"
+            : "This information has not been added yet. Contact support for details."}</p>}
+        {section.key === "contact" && shop && <ShopContactChips shop={shop} />}
+        {support && <div className="shop-policy-support">
+          <a className="button secondary" href={supportHref(support)}>
+            <Phone size={16} aria-hidden="true" />{lang === "bn" ? "সাপোর্টে যোগাযোগ করুন" : "Contact support"}<ArrowRight size={16} aria-hidden="true" />
+          </a>
+        </div>}
+      </article>
+    </main>
   );
 }
 
@@ -788,7 +908,6 @@ function Footer() {
   const shop = useRouteShop();
   const { catalog, session } = useMarket();
   const { t, lang } = useLang();
-  const [policyModal, setPolicyModal] = useState<PolicyType>(null);
 
   const brandName = shop ? shop.name : "Arise Digital Store";
   const brandTagline = shop
@@ -929,31 +1048,13 @@ function Footer() {
           <div className="dark-footer-col dark-links-col">
             <span className="dark-footer-heading">{lang === "bn" ? "প্রয়োজনীয় লিংকসমূহ" : "USEFUL LINKS"}</span>
             <ul className="dark-footer-links-list">
-              <li>
-                <button type="button" onClick={() => setPolicyModal("privacy")} className="dark-footer-link-btn">
-                  {lang === "bn" ? "প্রাইভেসি পলিসি" : "Privacy Policy"}
-                </button>
-              </li>
-              <li>
-                <button type="button" onClick={() => setPolicyModal("returns")} className="dark-footer-link-btn">
-                  {lang === "bn" ? "রিটার্ন ও রিফান্ড নীতি" : "Returns & Refund Policy"}
-                </button>
-              </li>
-              <li>
-                <button type="button" onClick={() => setPolicyModal("terms")} className="dark-footer-link-btn">
-                  {lang === "bn" ? "ব্যবহারের শর্তাবলী" : "Terms & Conditions"}
-                </button>
-              </li>
-              <li>
-                <button type="button" onClick={() => setPolicyModal("about")} className="dark-footer-link-btn">
-                  {lang === "bn" ? "আমাদের সম্পর্কে" : "About Us"}
-                </button>
-              </li>
-              <li>
-                <a href={shop?.support ? supportHref(shop.support) : "mailto:support@arisesell.com"} className="dark-footer-link-btn">
-                  {lang === "bn" ? "যোগাযোগ করুন" : "Contact Us"}
-                </a>
-              </li>
+              {shopPageSections.map(section => (
+                <li key={section.key}>
+                  <Link to={`${shop ? `/shops/${shop.slug}` : ""}/info/${section.key}`} className="dark-footer-link-btn">
+                    {lang === "bn" ? section.titleBn : section.title}
+                  </Link>
+                </li>
+              ))}
               <li>
                 <Link to="/track" className="dark-footer-link-btn highlight-link">
                   {lang === "bn" ? "অর্ডার ট্র্যাক" : "Track Order"}
@@ -977,7 +1078,6 @@ function Footer() {
         </div>
       </div>
 
-      <PolicyModal type={policyModal} onClose={() => setPolicyModal(null)} shop={shop || null} />
     </footer>
   );
 }
@@ -1745,6 +1845,7 @@ function Shops() {
 function ShopPage() {
   const { slug } = useParams();
   const { catalog, catalogError, session } = useMarket();
+  const { lang } = useLang();
   if (catalogError)
     return (
       <main id="main" className="container section">
@@ -1763,6 +1864,13 @@ function ShopPage() {
   return (
     <main id="main">
       <section className="shop-hero container">
+        <nav className="breadcrumbs shop-page-breadcrumbs" aria-label="Breadcrumb">
+          <Link to="/">{lang === "bn" ? "হোম" : "Home"}</Link>
+          <span>/</span>
+          <Link to="/shops">{lang === "bn" ? "স্বাধীন শপসমূহ" : "Shops"}</Link>
+          <span>/</span>
+          <span aria-current="page">{shop.name}</span>
+        </nav>
         <div
           className="shop-banner"
           style={
@@ -1777,14 +1885,33 @@ function ShopPage() {
             <ShopAvatar shop={shop} />
             <div className="shop-identity-body">
               <div className="shop-badge-row">
-                <span className="eyebrow">Verified digital shop</span>
+                <span className="eyebrow">{lang === "bn" ? "ভেরিফাইড ডিজিটাল শপ" : "Verified digital shop"}</span>
                 <span className="seller-verified-badge" title="Verified seller on AriseSell">
-                  <ShieldCheck size={13} /> Verified
+                  <ShieldCheck size={13} /> {lang === "bn" ? "ভেরিফাইড" : "Verified"}
+                </span>
+                <span className="shop-online-indicator">
+                  <span className="online-dot" /> {lang === "bn" ? "অনলাইন সাপোর্ট সক্রিয়" : "Online Support Active"}
                 </span>
               </div>
               <h1>{shop.name}</h1>
               {shop.tagline && <p className="shop-tagline">{shop.tagline}</p>}
               <p className="shop-identity-desc">{shop.description}</p>
+
+              <div className="shop-hero-features-row">
+                <span className="shop-feature-badge">
+                  <span className="badge-icon">🕒</span>
+                  <span>{lang === "bn" ? "১০:০০ AM - ১২:০০ AM (BD TIME)" : "10:00 AM - 12:00 AM (BD TIME)"}</span>
+                </span>
+                <span className="shop-feature-badge">
+                  <span className="badge-icon">⚡</span>
+                  <span>{lang === "bn" ? "ইনস্ট্যান্ট অটো-ডেলিভারি (< ৪৫ সে.)" : "Instant Auto-Delivery (< 45s)"}</span>
+                </span>
+                <span className="shop-feature-badge">
+                  <span className="badge-icon">🛡️</span>
+                  <span>{lang === "bn" ? "১ মাসের রিপ্লেসমেন্ট ওয়ারেন্টি" : "1-Month Replacement Warranty"}</span>
+                </span>
+              </div>
+
               <ShopContactChips shop={shop} className="shop-hero-contact-chips" />
               <SocialLinks shop={shop} className="shop-hero-social" />
             </div>
@@ -3197,6 +3324,7 @@ function Seller() {
       support: "",
       logo_url: "",
       cover_url: "",
+      pages: {} as NonNullable<Shop["pages"]>,
     }),
     [ids, setIds] = useState<string[]>([]),
     [busy, setBusy] = useState(false),
@@ -3233,6 +3361,7 @@ function Seller() {
       support: result.shop.support,
       logo_url: result.shop.logo_url,
       cover_url: result.shop.cover_url,
+      pages: result.shop.pages || {},
     });
     setIds(
       result.products
@@ -3258,6 +3387,7 @@ function Seller() {
             support: result.shop.support,
             logo_url: result.shop.logo_url,
             cover_url: result.shop.cover_url,
+            pages: result.shop.pages || {},
           });
           setIds(
             result.products
@@ -3577,6 +3707,29 @@ function Seller() {
                           />
                         </label>
                       </details>
+                    </section>
+                    <section className="panel seller-panel" aria-labelledby="shop-information-title">
+                      <div className="seller-panel-heading">
+                        <div><span className="eyebrow">Useful links</span><h2 id="shop-information-title">Shop information & policies</h2></div>
+                        <BookOpen size={24} aria-hidden="true" />
+                      </div>
+                      <p className="muted">Customers can read these sections from your shop footer. Write in English or Bangla. Only add policies and promises your shop follows.</p>
+                      <div className="shop-page-editors">
+                        {shopPageSections.map(section => (
+                          <details key={section.key} className="branding-details shop-page-editor">
+                            <summary>{section.title}<span>{form.pages[section.key]?.trim() ? "Added" : "Optional"}</span><ChevronDown size={15} aria-hidden="true" /></summary>
+                            <div className="field">
+                              <label htmlFor={`shop-page-${section.key}`}>{section.title}</label>
+                              <textarea id={`shop-page-${section.key}`} rows={6} maxLength={3000} disabled={busy}
+                                value={form.pages[section.key] || ""}
+                                aria-describedby={`shop-page-${section.key}-hint`}
+                                onChange={event => setForm({ ...form, pages: { ...form.pages, [section.key]: event.target.value } })} />
+                              <span className="form-hint" id={`shop-page-${section.key}-hint`}>{section.hint} Up to 3,000 characters. Your text appears as written.</span>
+                            </div>
+                          </details>
+                        ))}
+                      </div>
+                      <p className="muted">Use {data.shop.published ? "Save shop changes" : "Publish shop"} below to save this information with your shop.</p>
                     </section>
                     <section className="panel seller-panel">
                       <div className="seller-panel-heading">
@@ -4202,6 +4355,8 @@ export default function App() {
           <Route path="/shops/:slug/products/:productSlug" element={<ProductPage />} />
           <Route path="/shops" element={<Shops />} />
           <Route path="/shops/:slug" element={<ShopPage />} />
+          <Route path="/shops/:slug/info/:section" element={<ShopInformationPage />} />
+          <Route path="/info/:section" element={<ShopInformationPage />} />
           <Route path="/track" element={<TrackOrderPage />} />
           <Route path="/checkout/:id" element={<Checkout />} />
           <Route path="/purchases" element={<Purchases />} />

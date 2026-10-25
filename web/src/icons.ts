@@ -38,6 +38,8 @@ import BotRaw from "lucide-react/dist/esm/icons/bot.js";
 import StarRaw from "lucide-react/dist/esm/icons/star.js";
 import HeartRaw from "lucide-react/dist/esm/icons/heart.js";
 import PhoneRaw from "lucide-react/dist/esm/icons/phone.js";
+import ClockRaw from "lucide-react/dist/esm/icons/clock.js";
+import MailRaw from "lucide-react/dist/esm/icons/mail.js";
 
 export const ArrowUpRight = ArrowUpRightRaw as LucideIcon;
 export const ArrowRight = ArrowRightRaw as LucideIcon;
@@ -52,6 +54,8 @@ export const CheckCircle2 = CheckCircle2Raw as LucideIcon;
 export const ShieldCheck = ShieldCheckRaw as LucideIcon;
 export const Heart = HeartRaw as LucideIcon;
 export const Phone = PhoneRaw as LucideIcon;
+export const Clock = ClockRaw as LucideIcon;
+export const Mail = MailRaw as LucideIcon;
 export const Zap = ZapRaw as LucideIcon;
 export const ChevronDown = ChevronDownRaw as LucideIcon;
 export const LayoutGrid = LayoutGridRaw as LucideIcon;

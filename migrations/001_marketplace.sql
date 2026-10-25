@@ -41,3 +41,8 @@ CREATE TABLE IF NOT EXISTS reviews (
 );
 CREATE INDEX IF NOT EXISTS reviews_product_date ON reviews(product_id, created_at DESC, id DESC);
 INSERT OR IGNORE INTO schema_version VALUES (2);
+CREATE TABLE IF NOT EXISTS shop_pages (
+    shop_id TEXT PRIMARY KEY,
+    content TEXT NOT NULL
+);
+INSERT OR IGNORE INTO schema_version VALUES (3);

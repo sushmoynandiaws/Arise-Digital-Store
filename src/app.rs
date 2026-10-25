@@ -404,12 +404,21 @@ async fn feed(state: &AppState) -> Result<Value> {
             .fetch_all(&state.db)
             .await
             .map_err(|_| AppError::internal())?;
+    let pages: Vec<(String, String)> = sqlx::query_as("SELECT shop_id,content FROM shop_pages")
+        .fetch_all(&state.db)
+        .await
+        .map_err(|_| AppError::internal())?;
     if let Some(shops) = feed["shops"].as_array_mut() {
         shops.retain(|shop| {
             !hidden
                 .iter()
                 .any(|(kind, id)| kind == "shop" && shop["id"].as_str() == Some(id))
         });
+        for shop in shops {
+            if let Some((_, content)) = pages.iter().find(|(id, _)| shop["id"] == *id) {
+                shop["pages"] = serde_json::from_str(content).map_err(|_| AppError::internal())?;
+            }
+        }
     }
     let shop_ids: Vec<String> = feed["shops"]
         .as_array()
@@ -453,37 +462,73 @@ async fn seller_catalog(
 ) -> Result<Json<Value>> {
     uuid(&id)?;
     let access = required_access(&state, &headers).await?;
-    Ok(Json(
-        state
-            .source(
-                reqwest::Method::GET,
-                &format!("/marketplace/stores/{id}/catalog"),
-                Some(&access),
-                None,
-                None,
-            )
-            .await?,
-    ))
+    let mut result = state
+        .source(
+            reqwest::Method::GET,
+            &format!("/marketplace/stores/{id}/catalog"),
+            Some(&access),
+            None,
+            None,
+        )
+        .await?;
+    let content: Option<String> =
+        sqlx::query_scalar("SELECT content FROM shop_pages WHERE shop_id=$1")
+            .bind(&id)
+            .fetch_optional(&state.db)
+            .await
+            .map_err(|_| AppError::internal())?;
+    if let Some(content) = content {
+        result["shop"]["pages"] =
+            serde_json::from_str(&content).map_err(|_| AppError::internal())?;
+    }
+    Ok(Json(result))
 }
 async fn save_listing(
     State(state): State<AppState>,
     headers: HeaderMap,
     Path(id): Path<String>,
-    Json(body): Json<Value>,
+    Json(mut body): Json<Value>,
 ) -> Result<Json<Value>> {
     uuid(&id)?;
     let access = required_access(&state, &headers).await?;
-    Ok(Json(
-        state
-            .source(
-                reqwest::Method::PUT,
-                &format!("/marketplace/stores/{id}/listing"),
-                Some(&access),
-                None,
-                Some(body),
-            )
-            .await?,
-    ))
+    let pages = body.as_object_mut().and_then(|body| body.remove("pages"));
+    if let Some(pages) = &pages {
+        let valid = pages.as_object().is_some_and(|fields| {
+            fields.iter().all(|(key, value)| {
+                matches!(
+                    key.as_str(),
+                    "privacy" | "returns" | "terms" | "about" | "contact"
+                ) && value
+                    .as_str()
+                    .is_some_and(|text| text.chars().count() <= 3000)
+            })
+        });
+        if !valid {
+            return Err(AppError::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "Shop information must contain only the five supported text sections, up to 3,000 characters each.",
+            ));
+        }
+    }
+    // AriseSell validates ownership and publication before any local metadata write.
+    let mut result = state
+        .source(
+            reqwest::Method::PUT,
+            &format!("/marketplace/stores/{id}/listing"),
+            Some(&access),
+            None,
+            Some(body),
+        )
+        .await?;
+    if let Some(pages) = pages {
+        sqlx::query("INSERT INTO shop_pages(shop_id,content) VALUES($1,$2) ON CONFLICT(shop_id) DO UPDATE SET content=excluded.content")
+            .bind(&id).bind(pages.to_string()).execute(&state.db).await.map_err(|_| {
+                AppError::new(StatusCode::INTERNAL_SERVER_ERROR,
+                    "Your shop listing was saved, but its information could not be saved. Reload your shop settings and check them before retrying.")
+            })?;
+        result["shop"]["pages"] = pages;
+    }
+    Ok(Json(result))
 }
 async fn ensure_visible(state: &AppState, body: &Value) -> Result<()> {
     let catalog = feed(state).await?;

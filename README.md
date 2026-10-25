@@ -82,6 +82,12 @@ Product pages expose a Reviews popup with the real rating average, count and pag
 
 Apply `migrations/003_reviews.sql` with the migration role and grant SELECT, INSERT, UPDATE, DELETE on `arise_marketplace.reviews` to the existing marketplace runtime role before deploying this version. Fresh standalone SQLite databases apply the review table automatically. The AriseSell bridge must include the authoritative `product_id` in its owned purchase response. Its deployment workflow applies the same additive SQL on configured marketplace hosts.
 
+## Shop information and policies
+
+Sellers can edit Privacy policy, Returns & refund policy, Terms & conditions, About us and Contact us during setup or from Manage your shop. Each optional section accepts up to 3,000 characters in English or Bangla. Save shop changes / Publish shop saves them with the listing. Each footer link opens a separate page at `/shops/:slug/info/:section`, preserving shop branding and supporting direct links, refresh and browser Back. Marketplace footer links use `/info/:section`. Blank policies show an unavailable message; About us can reuse the existing shop description, and Contact us also shows source-owned contact details.
+
+Shop pages are public marketplace metadata, stored separately from AriseSell inventory and payment settings. Writes require a successful source-authorized listing save. Before deploying this version, apply `migrations/004_shop_pages.sql` with the migration role and grant SELECT, INSERT, UPDATE, DELETE on `arise_marketplace.shop_pages` to the runtime role. Standalone SQLite creates the table automatically. No production migration is performed by editing these files.
+
 ## Tests
 
 ```powershell

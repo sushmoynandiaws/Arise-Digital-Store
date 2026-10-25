@@ -36,7 +36,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
   arise_marketplace.sessions,
   arise_marketplace.moderation,
   arise_marketplace.reports,
-  arise_marketplace.rate_limits
+  arise_marketplace.rate_limits,
+  arise_marketplace.reviews,
+  arise_marketplace.shop_pages
 TO arise_marketplace_runtime;
 ```
 
@@ -45,6 +47,8 @@ Replace `arisesell` if the existing database has another name. The runtime login
 Vercel needs a reachable PostgreSQL hostname and verified TLS certificate (`sslmode=verify-full`). A VPS Docker hostname or `localhost` cannot be reached from Vercel. Configure the appropriate network access without broadly exposing the production database. Each function instance uses a small pool of up to three connections; size database/pooler capacity for the deployment's concurrency.
 
 The deployed VPS uses a separate PgBouncer listener at `187.53.134.195:6432` backed by the existing `arisesell_db` database. It requires both a client certificate and SCRAM authentication, admits only the marketplace runtime role, and leaves the PostgreSQL container's port private. See [the pooler operations guide](deploy/pgbouncer/README.md). Its private CA and client certificate are supplied through SQLx's existing `PGSSLROOTCERT`, `PGSSLCERT`, and `PGSSLKEY` environment variables as PEM contents; the client private key is a sensitive Vercel variable. `sslmode=verify-full` remains mandatory and validates the certificate's IP subject alternative name.
+
+Apply `migrations/003_reviews.sql` and `migrations/004_shop_pages.sql` with the migration role before deploying the current app. The runtime checks for schema version 3. Existing installations must also grant the runtime role access to `arise_marketplace.shop_pages` as above.
 
 ## 3. Add Vercel environment variables
 

@@ -56,6 +56,7 @@ export type Shop = {
   tagline?: string;
   social_links?: ShopSocialLinks;
   contact?: ShopContact;
+  pages?: Partial<Record<"privacy" | "returns" | "terms" | "about" | "contact", string>>;
 };
 export type Catalog = { shops: Shop[]; products: Product[]; synced_at: string };
 export type User = { id: string; name: string; email: string; admin: boolean };

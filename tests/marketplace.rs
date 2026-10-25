@@ -39,6 +39,7 @@ async fn setup() -> (AppState, Requests, tokio::task::JoinHandle<()>) {
 async fn setup_with_pool(pool: sqlx::AnyPool) -> (AppState, Requests, tokio::task::JoinHandle<()>) {
     let calls: Requests = Arc::new(Mutex::new(Vec::new()));
     let captured = calls.clone();
+    let listing_calls = calls.clone();
     let source=Router::new()
         .route("/api/v1/marketplace/feed",get(||async {Json(json!({"shops":[{"id":SHOP,"slug":"test-shop","name":"Test shop"}],"products":[{"id":PRODUCT,"shop_id":SHOP,"name":"Owned product"}]}))}))
         .route("/api/v1/marketplace/me",get(|headers:axum::http::HeaderMap|async move {
@@ -54,6 +55,19 @@ async fn setup_with_pool(pool: sqlx::AnyPool) -> (AppState, Requests, tokio::tas
                 "payment_status":if id.starts_with('4') {"unpaid"} else {"paid"},
                 "delivery_status":if id.starts_with('5') {"queued"} else {"delivered"},
                 "private_secret":"must not appear in public reviews"})).into_response()
+        }))
+        .route("/api/v1/marketplace/stores/{id}/catalog", get(|axum::extract::Path(id): axum::extract::Path<String>| async move {
+            Json(json!({"shop":{"id":id,"name":"Test shop"},"products":[]}))
+        }))
+        .route("/api/v1/marketplace/stores/{id}/listing", axum::routing::put(move |axum::extract::Path(id): axum::extract::Path<String>, headers: axum::http::HeaderMap, Json(body): Json<Value>| {
+            let calls = listing_calls.clone();
+            async move {
+                if id != SHOP || headers.get("authorization").and_then(|v| v.to_str().ok()) != Some("Bearer seller-source-access") {
+                    return (StatusCode::NOT_FOUND, Json(json!({"detail":"Shop not found"}))).into_response();
+                }
+                calls.lock().unwrap().push(("listing".into(), body));
+                Json(json!({"shop":{"id":id,"name":"Test shop"}})).into_response()
+            }
         }))
         .route("/api/v1/marketplace/token",post(move |Json(body):Json<Value>| {let calls=captured.clone();async move {calls.lock().unwrap().push(("token".into(),body));Json(json!({"access_token":"seller-source-access","expires_in":3600}))}}));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -100,6 +114,132 @@ async fn sign_in(state: &AppState, access: &str) -> String {
         .await
         .unwrap();
     session
+}
+
+#[tokio::test]
+async fn shop_pages_are_validated_owned_persistent_and_shop_scoped() {
+    let (state, calls, server) = setup().await;
+    let session = sign_in(&state, "seller-source-access").await;
+    let app = router(state.clone());
+    let save = |id: &str, payload: Value| {
+        let mut request = write(&format!("/api/seller/stores/{id}/listing"), payload);
+        request.headers_mut().insert(
+            "Cookie",
+            format!("arise_buyer={BUYER}; arise_session={session}")
+                .parse()
+                .unwrap(),
+        );
+        request
+    };
+    let pages = json!({"privacy":"Customer details stay private.\n\nবাংলা নীতিমালা", "returns":"Contact us before requesting a refund.", "terms":"Read the product terms.", "about":"Our digital shop.", "contact":"Email support@example.test"});
+    let payload = json!({"name":"Test shop", "published":true, "pages":pages});
+    let response = app
+        .clone()
+        .oneshot(save(SHOP, payload.clone()))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(body(response).await["shop"]["pages"], pages);
+    let forwarded = calls
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(kind, _)| kind == "listing")
+        .unwrap()
+        .1
+        .clone();
+    assert!(forwarded.get("pages").is_none());
+    assert_eq!(forwarded["name"], "Test shop");
+
+    let read = |path: &str| {
+        Request::builder()
+            .uri(path)
+            .header(
+                "Cookie",
+                format!("arise_buyer={BUYER}; arise_session={session}"),
+            )
+            .body(Body::empty())
+            .unwrap()
+    };
+    let saved = body(
+        app.clone()
+            .oneshot(read(&format!("/api/seller/stores/{SHOP}/catalog")))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(saved["shop"]["pages"], pages);
+    // Old callers omitting pages must not erase saved information.
+    assert_eq!(
+        app.clone()
+            .oneshot(save(SHOP, json!({"name":"Updated shop"})))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    let foreign_id = "66666666-6666-4666-8666-666666666666";
+    assert_eq!(
+        app.clone()
+            .oneshot(save(foreign_id, payload))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::NOT_FOUND
+    );
+    let foreign_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM shop_pages WHERE shop_id=$1")
+        .bind(foreign_id)
+        .fetch_one(&state.db)
+        .await
+        .unwrap();
+    assert_eq!(foreign_count, 0);
+    for invalid in [
+        json!(null),
+        json!("text"),
+        json!({"unknown":"text"}),
+        json!({"privacy":42}),
+        json!({"terms":"ক".repeat(3001)}),
+    ] {
+        assert_eq!(
+            app.clone()
+                .oneshot(save(SHOP, json!({"pages":invalid})))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+    }
+    assert_eq!(
+        app.clone()
+            .oneshot(write(
+                &format!("/api/seller/stores/{SHOP}/listing"),
+                json!({"pages":{}})
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    // Unpublished metadata is never added as a new public shop.
+    sqlx::query("INSERT INTO shop_pages(shop_id,content) VALUES($1,$2)")
+        .bind(foreign_id)
+        .bind(json!({"about":"Private unpublished shop"}).to_string())
+        .execute(&state.db)
+        .await
+        .unwrap();
+    let public = body(app.clone().oneshot(read("/api/catalog")).await.unwrap()).await;
+    assert_eq!(public["shops"].as_array().unwrap().len(), 1);
+    assert_eq!(public["shops"][0]["pages"], pages);
+    assert!(!public.to_string().contains("Private unpublished shop"));
+    let cleared = app
+        .clone()
+        .oneshot(save(SHOP, json!({"pages":{"privacy":""}})))
+        .await
+        .unwrap();
+    assert_eq!(cleared.status(), StatusCode::OK);
+    let public = body(app.oneshot(read("/api/catalog")).await.unwrap()).await;
+    assert_eq!(public["shops"][0]["pages"], json!({"privacy":""}));
+    server.abort();
 }
 
 #[tokio::test]
@@ -739,6 +879,22 @@ async fn postgres_state_survives_separate_function_instances_without_commerce_ta
     sqlx::raw_sql("DELETE FROM arise_marketplace.auth_requests; DELETE FROM arise_marketplace.sessions; DELETE FROM arise_marketplace.moderation; DELETE FROM arise_marketplace.reports; DELETE FROM arise_marketplace.rate_limits; DELETE FROM arise_marketplace.reviews;").execute(&pool).await.unwrap();
     let (first, calls, server) = setup_with_pool(pool).await;
     let second = AppState::new((*first.config).clone(), connect_pool(&url).await.unwrap()).unwrap();
+    let pages = json!({"privacy":"Privacy policy persisted in PostgreSQL. বাংলা"});
+    sqlx::query("INSERT INTO shop_pages(shop_id,content) VALUES($1,$2) ON CONFLICT(shop_id) DO UPDATE SET content=excluded.content")
+        .bind(SHOP).bind(pages.to_string()).execute(&first.db).await.unwrap();
+    let public = body(
+        router(second.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/api/catalog")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(public["shops"][0]["pages"], pages);
     let session = sign_in(&first, "admin").await;
     assert_eq!(
         second
