@@ -41,6 +41,10 @@ export function checkoutTotal(price: string, quantity: number): string | null {
   const total = (Number(whole) * 100 + Number(fraction.padEnd(2, "0"))) * quantity;
   return Number.isSafeInteger(total) ? (total / 100).toFixed(2) : null;
 }
+export function checkoutQuantity(value: string | null): number {
+  const quantity = Number(value);
+  return Number.isInteger(quantity) && quantity >= 1 && quantity <= 100 ? quantity : 1;
+}
 export const stock = (product: { variants: { stock: number }[] }) =>
   product.variants.reduce((total, v) => total + v.stock, 0);
 export const minimumPrice = (product: { variants: { price: string }[] }) =>

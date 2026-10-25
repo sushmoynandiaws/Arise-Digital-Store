@@ -59,6 +59,7 @@ import {
   setCsrf,
   money,
   checkoutTotal,
+  checkoutQuantity,
   stock,
   minimumPrice,
   paymentLabel,
@@ -149,6 +150,12 @@ function Header() {
   useEffect(() => setOpen(false), [location.pathname]);
   return (
     <header className="site-header">
+      <div className="top-ticker-bar">
+        <div className="container ticker-inner">
+          <span>Digital products from independent shops</span>
+          <span>Payment verified before private delivery</span>
+        </div>
+      </div>
       <div className="header-inner">
         {shop ? (
           <Link
@@ -375,7 +382,7 @@ function Art({
           <span />
           <span />
         </div>
-        <CategoryIcon category={product.category} size={38} />
+        <CategoryIcon category={product.category} size={large ? 40 : 28} />
         <strong>{product.category}</strong>
         <span className="art-lines">
           <i />
@@ -384,9 +391,13 @@ function Art({
         </span>
       </div>
       <span className="art-spark">
-        <Sparkles size={20} />
+        <Sparkles size={large ? 22 : 16} />
       </span>
-      <span className="art-tag">MADE FOR YOUR NEXT CHAPTER</span>
+      <span className="art-tag">
+        {product.delivery_mode === "automatic"
+          ? "AUTOMATIC DIGITAL DELIVERY"
+          : "DIRECT SELLER DELIVERY"}
+      </span>
     </div>
   );
 }
@@ -517,10 +528,8 @@ function Home() {
         <section className="hero container">
           <div className="hero-copy">
             <p className="hero-kicker">
-              <span className="little-star" aria-hidden="true">
-                ✳
-              </span>
-              Independent shops. Extraordinary finds.
+              <span className="kicker-pulse" />
+              Independent creator shops · Private digital delivery
             </p>
             <h1>
               Good things.
@@ -528,8 +537,7 @@ function Home() {
               <span>Digitally delivered.</span>
             </h1>
             <p className="hero-description">
-              Discover tools, learning, and little upgrades for your everyday.
-              Made by independent sellers. All in one place.
+              Discover software, developer assets, templates, and courses directly from independent creators. Fast, secure, and delivered privately to your browser.
             </p>
             <form
               className="hero-search"
@@ -544,7 +552,7 @@ function Home() {
               </label>
               <input
                 id="home-search"
-                placeholder="What will you discover today?"
+                placeholder="Search digital products, software, courses..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -564,68 +572,66 @@ function Home() {
             <div className="hero-note">
               <span>
                 <LockKeyhole size={15} />
-                Payment before private delivery
+                Seller payment options at checkout
+              </span>
+              <span>
+                <Zap size={15} />
+                Automatic & seller delivery
               </span>
               <span>
                 <Store size={15} />
-                Shop directly from sellers
+                Direct Creator Purchases
               </span>
             </div>
           </div>
           <div className="hero-visual" aria-hidden="true">
             <div className="visual-grid" />
+            <div className="visual-glow" />
             <div className="visual-label">
               <span />
-              IDEAS INTO EVERYDAY
+              VERIFIED DIGITAL DELIVERY PROTOCOL
             </div>
-            <span className="visual-orbit orbit-one" />
-            <span className="visual-orbit orbit-two" />
             <div className="visual-browser">
               <div className="browser-dots">
                 <i />
                 <i />
                 <i />
-                <span>your next possibility</span>
+                <span>arise://delivery-vault</span>
               </div>
               <div className="browser-body">
                 <div className="browser-symbol">
-                  <Command size={45} />
+                  <LockKeyhole size={38} />
                 </div>
-                <span>Less searching.</span>
+                <span>Direct to your browser.</span>
                 <strong>
-                  More
+                  Your picks.
                   <br />
-                  possibilities.
+                  Delivered.
                 </strong>
                 <div className="browser-footer">
-                  <span>Explore. Find. Make it yours.</span>
-                  <ArrowUpRight size={21} />
+                  <span>Zero-friction guest checkout</span>
+                  <ArrowUpRight size={18} />
                 </div>
               </div>
             </div>
             <div className="floating-mini mini-top">
               <div className="mini-icon">
-                <Palette />
+                <Zap />
               </div>
               <div>
-                <strong>A little inspiration</strong>
-                <span>For your next big idea</span>
+                <strong>Private digital items</strong>
+                <span>Available after verified payment</span>
               </div>
               <ArrowUpRight size={17} />
             </div>
             <div className="floating-mini mini-bottom">
               <div className="mini-icon">
-                <Zap />
+                <ShieldCheck />
               </div>
               <div>
-                <strong>Something worth discovering</strong>
-                <span>Ready for your digital everyday</span>
+                <strong>Authoritative Security</strong>
+                <span>Direct AriseSell order verification</span>
               </div>
-            </div>
-            <span className="visual-star star-one">✳</span>
-            <span className="visual-star star-two">✳</span>
-            <div className="visual-caption">
-              A WORLD OF GOOD FINDS, ONE CLICK AWAY.
             </div>
           </div>
         </section>
@@ -651,7 +657,7 @@ function Home() {
         </section>
         <section className="container section">
           <SectionTitle
-            eyebrow="A GOOD PLACE TO START"
+            eyebrow="CATALOG CATEGORIES"
             title="Find your kind of digital."
             link="Explore everything"
             to="/products"
@@ -678,7 +684,7 @@ function Home() {
         </section>
         <section className="container section products-section">
           <SectionTitle
-            eyebrow="YOUR NEXT GREAT FIND"
+            eyebrow="CURATED LISTINGS"
             title="Small upgrades. Big possibilities."
             link="View all products"
             to="/products"
@@ -711,7 +717,7 @@ function Home() {
         </section>
         <section className="container section">
           <SectionTitle
-            eyebrow="PEOPLE BEHIND THE PRODUCTS"
+            eyebrow="INDEPENDENT CREATORS"
             title="Meet your new favorite shops."
             link="Discover all shops"
             to="/shops"
@@ -731,7 +737,7 @@ function Home() {
             </div>
             <div>
               <p className="eyebrow">
-                YOUR PRODUCTS. YOUR LITTLE CORNER OF THE INTERNET.
+                SELLER PLATFORM
               </p>
               <h2>Have something good to share?</h2>
               <p>
@@ -1013,11 +1019,13 @@ function ProductPage() {
   }
   const { catalog, catalogError } = useMarket();
   const [variant, setVariant] = useState("");
+  const [quantity, setQuantity] = useState(1);
   const [report, setReport] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const product = catalog ? productForRoute(catalog, route) : undefined;
+  useEffect(() => setQuantity(1), [product?.id, variant]);
   useEffect(() => {
     if (!product || !catalog) return;
     const previousTitle = document.title;
@@ -1047,6 +1055,9 @@ function ProductPage() {
   const selected = product.variants.find((v) => v.id === variant) ||
     product.variants.find((v) => v.stock > 0) || product.variants[0];
   const available = Boolean(product.sales_enabled && selected && selected.stock > 0);
+  const maximum = Math.min(selected?.stock ?? 0, 100);
+  const total = selected ? checkoutTotal(selected.price, quantity) : null;
+  const canBuy = available && total !== null && quantity <= maximum;
   return (
     <main id="main" className="container detail-page">
       <nav className="breadcrumbs" aria-label="Breadcrumb">
@@ -1068,9 +1079,12 @@ function ProductPage() {
             <span><ShieldCheck size={16} />Private delivery</span>
             <span><ShoppingBag size={16} />No shipping needed</span>
           </div>
+          <div className="product-image-caption"><ShieldCheck size={18} /><span>Delivered privately to your purchase history.<small>No shipping address needed.</small></span></div>
         </div>
         <div className="product-summary">
-          <span className="product-category">{product.category}</span>
+          <div className="product-category-row">
+            <span className="product-category">{product.category}</span>
+          </div>
           <h1>{product.name}</h1>
           <Link className="by-shop" to={`/shops/${shop.slug}`}>
             <span className="tiny-avatar">{shop.name.slice(0, 1)}</span>
@@ -1079,8 +1093,16 @@ function ProductPage() {
           </Link>
           <div className="detail-price">
             {selected ? money(selected.price) : money(minimumPrice(product))}
-            <span>One-time payment · BDT</span>
+            <span>Per item · One-time payment</span>
           </div>
+          {product.description && <div className="product-brief">
+            <h2>Product description</h2>
+            <p className="preserve-lines">{product.description}</p>
+            <button type="button" className="text-link" onClick={() => {
+              selectSection("overview");
+              sectionTabs.current?.scrollIntoView({ block: "start" });
+            }}>Read full description <ArrowDown size={14} /></button>
+          </div>}
           {product.variants.length > 1 && (
             <label className="field">
               Choose your option
@@ -1120,19 +1142,44 @@ function ProductPage() {
               )}
             </span>
           </div>
-          {available && selected ? (
+          <div className="product-purchase-box">
+            <div className="product-purchase-total" aria-live="polite" aria-atomic="true">
+              <span>Total price <small>For {quantity} {quantity === 1 ? "item" : "items"}</small></span>
+              <strong>{total !== null ? money(total) : "—"}</strong>
+            </div>
+            <div className="product-purchase-actions">
+              <div className="product-quantity" role="group" aria-label="Product quantity">
+                <button type="button" aria-label="Decrease quantity" disabled={!available || quantity <= 1}
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}>−</button>
+                <input aria-label="Quantity" type="number" min={1} max={Math.max(1, maximum)} step={1}
+                  disabled={!available} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
+                <button type="button" aria-label="Increase quantity" disabled={!available || quantity >= maximum}
+                  onClick={() => setQuantity(Math.min(maximum, quantity + 1))}>+</button>
+              </div>
+          {canBuy && selected ? (
             <Link
-              className="button primary full-width buy-now"
-              to={`/checkout/${product.id}?variant=${selected.id}`}
+              className="button primary buy-now"
+              to={`/checkout/${product.id}?variant=${selected.id}&quantity=${quantity}`}
             >
               Buy now
               <ArrowRight size={18} />
             </Link>
           ) : (
-            <button className="button primary full-width" disabled>
-              {product.sales_enabled ? "Currently unavailable" : "Purchases paused"}
+            <button className="button primary buy-now" disabled>
+              {!available ? (product.sales_enabled ? "Currently unavailable" : "Purchases paused") : "Check quantity"}
             </button>
           )}
+            </div>
+            {available && !canBuy && <p role="alert" className="product-quantity-error">Choose a whole quantity between 1 and {maximum}.</p>}
+            <div className="product-policy-links">
+              <button type="button" onClick={() => {
+                selectSection("terms"); sectionTabs.current?.scrollIntoView({ block: "start" });
+              }}>Purchase terms</button>
+              <button type="button" onClick={() => {
+                selectSection("delivery"); sectionTabs.current?.scrollIntoView({ block: "start" });
+              }}>Delivery details</button>
+            </div>
+          </div>
           <p className="checkout-note">
             <LockKeyhole size={14} />
             Your items stay private. Delivery follows verified payment.
@@ -1154,6 +1201,10 @@ function ProductPage() {
               }}>View delivery details <ArrowDown size={13} /></button>
             </div>
           </div>
+          {!!shop.payment_methods?.length && <div className="product-payment-methods">
+            <span>Pay with</span>
+            {shop.payment_methods.map(method => <strong key={method}>{method === "bkash" ? "bKash" : method === "nagad" ? "Nagad" : method === "rocket" ? "Rocket" : method}</strong>)}
+          </div>}
           <Link className="visit-shop" to={`/shops/${shop.slug}`}>
             <ShopAvatar shop={shop} />
             <span>
@@ -1184,7 +1235,7 @@ function ProductPage() {
         <div className="product-sections">
           <section id="product-overview" className="product-section" role="tabpanel"
             aria-labelledby="product-tab-overview" tabIndex={0} hidden={section !== "overview"}>
-            <span className="eyebrow">THE DETAILS</span>
+            <span className="eyebrow">OVERVIEW</span>
             <h2>About this product</h2>
             <p className="preserve-lines">
               {product.description ||
@@ -1193,7 +1244,7 @@ function ProductPage() {
           </section>
           <section id="product-delivery" className="product-section" role="tabpanel"
             aria-labelledby="product-tab-delivery" tabIndex={0} hidden={section !== "delivery"}>
-            <span className="eyebrow">AFTER YOUR PURCHASE</span>
+            <span className="eyebrow">FULFILMENT SPECIFICATION</span>
             <h2>How delivery works</h2>
             <p>{product.delivery_mode === "automatic"
               ? "Once your payment is verified, open My purchases to access your items privately."
@@ -1203,7 +1254,7 @@ function ProductPage() {
           </section>
           <section id="product-terms" className="product-section" role="tabpanel"
             aria-labelledby="product-tab-terms" tabIndex={0} hidden={section !== "terms"}>
-            <span className="eyebrow">BEFORE YOU BUY</span>
+            <span className="eyebrow">PURCHASE LICENSE & TERMS</span>
             <h2>Purchase terms</h2>
             {product.purchase_terms && product.purchase_terms === product.description
               ? <p>The seller’s purchase terms are included in the <button type="button" className="text-link product-inline-link" onClick={() => selectSection("overview")}>product description</button>. Please read them before ordering.</p>
@@ -1295,7 +1346,7 @@ function Checkout() {
     email: session?.user?.email || "",
     phone: "",
   });
-  const [quantity, setQuantity] = useState(1),
+  const [quantity, setQuantity] = useState(() => checkoutQuantity(params.get("quantity"))),
     [provider, setProvider] = useState("");
   const [quote, setQuote] = useState<Quote | null>(null),
     [agreed, setAgreed] = useState(false),
@@ -1692,7 +1743,7 @@ function CopyButton({
   return (
     <button
       type="button"
-      className="button secondary small"
+      className={`button secondary small ${copied ? "copied" : ""}`}
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(value);

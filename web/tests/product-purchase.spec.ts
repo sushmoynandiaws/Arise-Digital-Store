@@ -1,0 +1,46 @@
+import { test, expect } from "@playwright/test";
+
+test("product options, quantity and total stay consistent through checkout", async ({ page }) => {
+  const product = {
+    id: "product-test", shop_id: "shop-test", name: "Digital course", category: "Education",
+    description: "Learn at your own pace. Includes the seller’s course materials.", image_url: "", currency: "BDT",
+    delivery_mode: "automatic", delivery_estimate: "After payment", delivery_note: "Open My purchases after payment verification.",
+    purchase_terms: "Read the course requirements before purchasing.", required_buyer_fields: [], sales_enabled: true,
+    variants: [{ id: "sold-out", name: "Starter", price: "5.00", stock: 0 }, { id: "available", name: "Full course", price: "10.00", stock: 9 }],
+  };
+  await page.route("**/api/**", route => {
+    const endpoint = new URL(route.request().url()).pathname;
+    if (endpoint === "/api/session") return route.fulfill({ json: { user: null, csrf: "test-csrf", demo: false, source_web: "" } });
+    if (endpoint === "/api/catalog") return route.fulfill({ json: {
+      products: [product], shops: [{ id: "shop-test", slug: "test-shop", name: "Test shop", support: "", payment_methods: ["bkash"] }],
+      synced_at: new Date().toISOString(),
+    } });
+    throw new Error(`Unexpected product request: ${endpoint}`);
+  });
+  await page.goto("/products/product-test");
+  await expect(page.getByRole("heading", { name: "Digital course", exact: true })).toBeVisible();
+  const option = page.getByRole("combobox", { name: "Choose your option", exact: true });
+  await expect(option).toHaveValue("available");
+  await option.selectOption("sold-out");
+  await expect(page.getByRole("button", { name: "Currently unavailable", exact: true })).toBeDisabled();
+  await option.selectOption("available");
+  const quantity = page.getByRole("spinbutton", { name: "Quantity", exact: true });
+  await quantity.fill("0");
+  await expect(page.getByRole("button", { name: "Check quantity", exact: true })).toBeDisabled();
+  await quantity.fill("6");
+  await expect(page.locator(".product-purchase-total strong")).toHaveText(/60\.00/);
+  const buy = page.getByRole("link", { name: "Buy now", exact: true });
+  await expect(buy).toHaveAttribute("href", "/checkout/product-test?variant=available&quantity=6");
+  for (const viewport of [{ width: 375, height: 812 }, { width: 812, height: 375 }, { width: 1440, height: 1000 }]) {
+    await page.setViewportSize(viewport);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    if (viewport.width === 375) await page.screenshot({ path: "../artifacts/product-reference/product-mobile.png", fullPage: true });
+  }
+  await page.screenshot({ path: "../artifacts/product-reference/product-desktop.png", fullPage: true });
+  await page.getByRole("tab", { name: "Delivery", exact: true }).click();
+  await expect(page.getByRole("tabpanel")).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "How delivery works", exact: true })).toBeVisible();
+  await buy.click();
+  await expect(page.getByRole("spinbutton", { name: "Quantity", exact: true })).toHaveValue("6");
+  await expect(page.locator(".summary-total strong")).toHaveText(/60\.00/);
+});

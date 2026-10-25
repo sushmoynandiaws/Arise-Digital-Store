@@ -30,6 +30,12 @@ test("checkout totals multiply exact minor units and reject incomplete or unsafe
   for(const quantity of [0,-1,1.5,101,NaN,Infinity]) assert.equal(checkoutTotal("10.00",quantity),null);
   for(const price of ["", "NaN", "-1", "1.001", "1e2", "9007199254740991"]) assert.equal(checkoutTotal(price,1),null);
 });
+test("quantity carried from a product link is a bounded whole number",()=>{
+  const {checkoutQuantity}=client();
+  assert.equal(checkoutQuantity("6"),6);
+  assert.equal(checkoutQuantity("100"),100);
+  for(const value of [null,"","0","-1","1.5","101","oops","Infinity"]) assert.equal(checkoutQuantity(value),1);
+});
 test("API writes include same-origin credentials and the current CSRF token",async()=>{
   let captured;const helpers=client(async(url,options)=>{captured={url,options};return {ok:true,json:async()=>({ok:true})};});
   helpers.setCsrf("bound-to-browser");await helpers.api("/checkout/accept",{method:"POST",body:'{"accepted":true}'});

@@ -1,13 +1,12 @@
-# Marketplace implementation decisions
+# Marketplace Implementation Decisions — Arise Digital Store
 
-The verified e-commerce skill search supplies the starting point. Apply these product-specific overrides across the storefront, seller and checkout pages.
+Overrides and standards applied across the storefront, seller, checkout, and purchase shelf interfaces:
 
-- Use a calm emerald accent (#08704f), warm white canvas (#fafbf8), charcoal text (#172b25), and restrained pale green surfaces. White text on the darker primary replaces the generated black-on-bright-green combination.
-- Use Rubik headings and Nunito Sans body with system sans-serif fallbacks; use fluid headings and at least 16px mobile form inputs.
-- Lead with useful catalog search, categories and actual products. Do not invent testimonials, sales counters, reviews, discounts, trust/verification badges or customer logos.
-- Product tiles are distinct, decorative geometric artwork with text labels, not imitation brand logos. Real seller artwork is shown when present.
-- All key actions have visible labels, 44px targets, keyboard focus, descriptive errors and retained form inputs. Respect reduced motion; no rotating carousels.
-- Customer shopping and seller setup use separate routes. One shop per checkout; payment and item delivery stay authoritative in AriseSell.
-- Shared `/shops/:slug` links open a seller-branded storefront. Keep search, category breadcrumbs and checkout navigation with that seller; expose the copyable link in seller setup. Marketplace discovery stays on the main homepage.
-- Development fixture data is labeled prominently. No demo purchase is presented as real payment verification.
-- Verify desktop, 375px portrait, landscape and 200% zoom. Light theme only for this release.
+- **Palette:** Violet (`#683DE6`) as primary brand accent, dark slate (`#0F172A`) for primary type, pale violet canvas (`#FAF9FE`), and emerald (`#10B981`) for stock indicators.
+- **Typography:** `Urbanist` headings and body typography, with `Hind Siliguri` for Bangla and `JetBrains Mono` for license keys and payment transaction references. Fluid headings with minimum 16px mobile input font sizes to avoid iOS zoom.
+- **Catalog Navigation:** Lead with instant catalog search, responsive category chips, and verified listings. No fake reviews, sales counters, or manufactured urgency tickers.
+- **Digital Specimen Artwork:** Product tiles display distinct, precision-crafted technical specimens with category emblems and delivery metadata. Real seller-provided artwork displays cleanly when available.
+- **Accessibility & Touch:** All actionable buttons and links maintain minimum 44px hit targets, visible 2px keyboard focus rings, descriptive inline errors, and persistent form inputs. Reduced-motion preferences are strictly respected.
+- **Single-Shop Checkout & Direct Links:** One shop per checkout transaction. Payment verification and license delivery remain authoritative in AriseSell. Shared `/shops/:slug` links open a seller-branded storefront preserving that seller's context throughout discovery and checkout.
+- **Development Preview Transparency:** Sample fixtures and demo data are clearly flagged. No test purchase is misrepresented as a live transaction.
+- **Viewport Resilience:** Fully validated across 375px portrait mobile, 812px landscape mobile, and wide desktop displays without horizontal overflow (`document.documentElement.scrollWidth <= window.innerWidth`).
