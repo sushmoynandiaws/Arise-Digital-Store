@@ -125,13 +125,18 @@ test("App.tsx integrates all advanced e-commerce components and routes", () => {
   assert.ok(appCode.includes("arise_wishlist"));
   assert.ok(appCode.includes("card-wishlist-btn"));
 
-  // Track Order / OTP by email
+  // Track Order / OTP by email (Global across shops)
   assert.ok(appCode.includes("function TrackOrderPage()"));
   assert.ok(appCode.includes("track-email"));
   assert.ok(!appCode.includes("track-phone"));
   assert.ok(appCode.includes("/orders/track/request-otp"));
   assert.ok(appCode.includes("/orders/track/verify-otp"));
   assert.ok(appCode.includes("<Route path=\"/track\" element={<TrackOrderPage />} />"));
+  assert.ok(appCode.includes("ordersByShop"));
+  assert.ok(appCode.includes("track-shop-card-section"));
+
+  // Shop customer reviews with clear product attribution
+  assert.ok(appCode.includes("<ShopReviews"));
 
   // Volume discount (opt-in from shop setup with customizable percentage tiers) and Bundle box (removed per user request)
   assert.ok(appCode.includes("volume-discount-widget"));
@@ -165,6 +170,9 @@ test("styles.css includes all corresponding responsive tokens and classes", () =
   assert.ok(stylesCode.includes(".bundle-cross-sell-box"));
   assert.ok(stylesCode.includes(".subscription-expiry-card"));
   assert.ok(stylesCode.includes(".track-order-page"));
+  assert.ok(stylesCode.includes(".track-shop-card-section"));
+  assert.ok(stylesCode.includes(".shop-reviews-section"));
+  assert.ok(stylesCode.includes(".shop-review-product-tag"));
 });
 
 test("Dark theme footer has clean 4-column layout, social pills, and information pages without unwanted cards or payment strip", () => {
