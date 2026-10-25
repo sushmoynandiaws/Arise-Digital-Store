@@ -71,6 +71,9 @@ export type Purchase = {
   ready: boolean;
   product_id?: string;
   buyer_name?: string | null;
+  buyer_email?: string | null;
+  buyer_phone?: string | null;
+  buyer_fields?: Record<string, any> | null;
   can_review?: boolean;
   review?: ProductReview | null;
   payment: {

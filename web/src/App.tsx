@@ -1351,6 +1351,7 @@ function Checkout() {
     name: session?.user?.name || "",
     email: session?.user?.email || "",
     phone: "",
+    note: "",
   });
   const [quantity, setQuantity] = useState(() => checkoutQuantity(params.get("quantity"))),
     [provider, setProvider] = useState("");
@@ -1478,6 +1479,25 @@ function Checkout() {
                   </label>
                 ))}
               <label className="field">
+                {product.delivery_mode === "manual"
+                  ? "Delivery / Account details"
+                  : "Order note (optional)"}
+                <textarea
+                  name="note"
+                  rows={2}
+                  maxLength={500}
+                  placeholder={
+                    product.delivery_mode === "manual"
+                      ? "e.g. Email address or username for activation, or delivery instructions"
+                      : "Optional note or instructions for the seller"
+                  }
+                  value={fields.note}
+                  onChange={(e) =>
+                    setFields({ ...fields, note: e.target.value })
+                  }
+                />
+              </label>
+              <label className="field">
                 Quantity
                 <input
                   type="number"
@@ -1539,6 +1559,24 @@ function Checkout() {
                 <span>Customer</span>
                 <strong>{fields.name}</strong>
               </div>
+              {fields.email && (
+                <div className="review-row">
+                  <span>Email</span>
+                  <strong>{fields.email}</strong>
+                </div>
+              )}
+              {fields.phone && (
+                <div className="review-row">
+                  <span>Phone</span>
+                  <strong>{fields.phone}</strong>
+                </div>
+              )}
+              {fields.note && (
+                <div className="review-row">
+                  <span>Delivery note</span>
+                  <strong className="preserve-lines">{fields.note}</strong>
+                </div>
+              )}
               <div className="review-row">
                 <span>Payment method</span>
                 <strong>{provider === "bkash" ? "bKash" : provider}</strong>
@@ -1884,6 +1922,39 @@ function PurchasePage() {
             <strong>{deliveryLabel(order.delivery_status)}</strong>
           </div>
         </div>
+        {(order.buyer_name || order.buyer_email || order.buyer_phone || order.buyer_fields?.note) && (
+          <div className="purchase-buyer-info">
+            <span className="muted" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              Customer Details
+            </span>
+            <div className="buyer-summary-grid">
+              {order.buyer_name && (
+                <div>
+                  <span className="muted">Name: </span>
+                  <strong>{order.buyer_name}</strong>
+                </div>
+              )}
+              {order.buyer_email && (
+                <div>
+                  <span className="muted">Email: </span>
+                  <strong>{order.buyer_email}</strong>
+                </div>
+              )}
+              {order.buyer_phone && (
+                <div>
+                  <span className="muted">Phone: </span>
+                  <strong>{order.buyer_phone}</strong>
+                </div>
+              )}
+            </div>
+            {order.buyer_fields?.note && (
+              <p className="preserve-lines" style={{ fontSize: "12px", marginTop: "4px" }}>
+                <span className="muted">Note / details: </span>
+                <strong>{String(order.buyer_fields.note)}</strong>
+              </p>
+            )}
+          </div>
+        )}
         {paymentOpen && !cancelled && order.payment && !expired && (
           <>
             <div className="payment-instructions">

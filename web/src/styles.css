@@ -2351,6 +2351,23 @@ svg {
   font-size: 11px;
   color: var(--muted);
 }
+.purchase-buyer-info {
+  border-top: 1px solid var(--line);
+  padding-block: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.buyer-summary-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 12px;
+}
+.buyer-summary-grid > div {
+  display: flex;
+  gap: 4px;
+}
 .payment-instructions {
   border-top: 1px solid var(--line);
   padding-top: 25px;

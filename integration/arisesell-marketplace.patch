@@ -388,6 +388,7 @@ new file mode 100644
 +    name: str = Field(min_length=1, max_length=100)
 +    email: str = Field(default="", max_length=255)
 +    phone: str = Field(default="", max_length=32)
++    note: str = Field(default="", max_length=500)
 +
 +    @field_validator("email")
 +    @classmethod
@@ -636,7 +637,10 @@ new file mode 100644
 +    business = await db.get(Business, order.business_id)
 +    quote = (order.checkout_data or {}).get("digital_quote") or {}
 +    units = await checkout.units_for(db, order)
++    buyer_fields = (order.checkout_data or {}).get("buyer_fields") or {}
 +    return {"id": str(order.id), "ref": order.ref, "shop": shop_json(business), "name": quote.get("name"),
++        "product_id": quote.get("product_id"), "buyer_name": order.customer_name,
++        "buyer_email": buyer_fields.get("email"), "buyer_phone": order.phone, "buyer_fields": buyer_fields,
 +        "quantity": quote.get("quantity"), "total": quote.get("total"), "currency": "BDT", "payment_status": order.payment_status,
 +        "delivery_status": order.digital_status, "delivery_mode": (quote.get("digital_config") or {}).get("delivery_mode"),
 +        "delivery_estimate": (quote.get("digital_config") or {}).get("delivery_estimate"),
