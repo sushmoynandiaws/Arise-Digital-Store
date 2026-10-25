@@ -17,8 +17,7 @@ import {
   useSearchParams,
   matchPath,
 } from "react-router-dom";
-import {
-  ArrowUpRight,
+import {
   ArrowRight,
   ArrowLeft,
   Search,
@@ -210,7 +209,6 @@ function Header() {
           {!shop && (
             <Link className="button primary seller-nav" to="/seller">
               {session?.user ? "My shop" : "Start selling"}
-              <ArrowUpRight size={16} />
             </Link>
           )}
           <button
@@ -299,7 +297,6 @@ function Footer() {
         </nav>
         <Link className="powered" to="/">
           Powered by <strong>Arise Digital Store</strong>
-          <ArrowUpRight size={14} />
         </Link>
       </footer>
     );
@@ -323,7 +320,6 @@ function Footer() {
             <Link to="/how-it-works">How it works</Link>
             <a href={session?.source_web || "https://arisesell.com"}>
               About AriseSell
-              <ArrowUpRight size={13} />
             </a>
           </div>
         </div>
@@ -449,9 +445,6 @@ function ProductCard({ product }: { product: Product }) {
         aria-label={`View ${product.name}`}
       >
         <Art product={product} />
-        <span className="art-arrow">
-          <ArrowUpRight size={19} />
-        </span>
       </Link>
       <div className="product-info">
         <Link
@@ -486,13 +479,6 @@ function ProductCard({ product }: { product: Product }) {
             {product.variants.length > 1 && <small>From </small>}
             {money(minimumPrice(product))}
           </span>
-          <Link
-            className="card-buy"
-            to={productPath(product, catalog!)}
-            aria-label={`View ${product.name}`}
-          >
-            <ArrowUpRight size={18} />
-          </Link>
         </div>
       </div>
     </article>
@@ -522,7 +508,6 @@ function ShopCard({ shop, heading: Heading = "h3" }: { shop: Shop; heading?: "h2
           {count} digital {count === 1 ? "product" : "products"}
         </p>
       </div>
-      <ArrowUpRight size={19} />
     </Link>
   );
 }
@@ -598,7 +583,6 @@ function Home() {
               {["Templates", "Courses", "Software"].map((term) => (
                 <Link key={term} to={`/products?q=${term}`}>
                   {term}
-                  <ArrowUpRight size={12} />
                 </Link>
               ))}
             </div>
@@ -623,7 +607,6 @@ function Home() {
               {catalog.products.slice(0, 3).map(product => <Link className="discovery-pick" key={product.id} to={productPath(product, catalog)}>
                 <span className="discovery-art"><CategoryIcon category={product.category} size={24} /></span>
                 <span><small>{product.category}</small><strong>{product.name}</strong><span>{product.variants.length > 1 ? "From " : ""}{money(minimumPrice(product))}</span></span>
-                <ArrowUpRight size={18} />
               </Link>)}
             </div> : catalog ? <p className="discovery-empty">No products are published yet.</p> : catalogError ? <p className="discovery-empty">Products could not be loaded. Use Try again in the product section below.</p> : <Loading />}
             <Link className="discovery-footer" to="/products">Browse all products <ArrowRight size={18} /></Link>
@@ -665,7 +648,6 @@ function Home() {
                 >
                   <CategoryIcon category={category} size={25} />
                   <span>{category}</span>
-                  <ArrowUpRight size={16} />
                 </Link>
               ))}
             </div>
@@ -701,7 +683,7 @@ function Home() {
               </p>
               <Link className="button primary" to="/shops">
                 Browse shops
-                <ArrowUpRight size={17} />
+                <ArrowRight size={17} />
               </Link>
             </Empty>
           )}
@@ -738,7 +720,6 @@ function Home() {
             </div>
             <Link to="/seller" className="button light">
               Open your shop
-              <ArrowUpRight size={18} />
             </Link>
           </div>
         </section>
@@ -982,7 +963,6 @@ function ShopPage() {
           {shop.support && (
             <a className="button light" href={supportHref(shop.support)}>
               Contact seller
-              <ArrowUpRight size={16} />
             </a>
           )}
         </div>
@@ -1181,7 +1161,6 @@ function ProductPage() {
           <Link className="by-shop" to={`/shops/${shop.slug}`}>
             <span className="tiny-avatar">{shop.name.slice(0, 1)}</span>
             {shop.name}
-            <ArrowUpRight size={13} />
           </Link>
           <div className="detail-price">
             {selected ? money(selected.price) : money(minimumPrice(product))}
@@ -1339,7 +1318,6 @@ function ProductPage() {
           {shop.support ? (
             <a className="text-link" href={supportHref(shop.support)}>
               Contact {shop.name}
-              <ArrowUpRight size={16} />
             </a>
           ) : (
             <p className="muted">
@@ -1820,7 +1798,6 @@ function Purchases() {
             href="/api/auth/start?return_to=%2Fpurchases"
           >
             Continue with AriseSell
-            <ArrowUpRight size={15} />
           </a>
         </div>
       )}
@@ -1867,7 +1844,6 @@ function Purchases() {
                   })}
                 </span>
               </div>
-              <ArrowUpRight size={18} />
             </Link>
           ))}
         </div>
@@ -2237,7 +2213,6 @@ function PurchasePage() {
         {order.shop.support ? (
           <a className="text-link" href={supportHref(order.shop.support)}>
             Contact {order.shop.name}
-            <ArrowUpRight size={16} />
           </a>
         ) : (
           <Link className="text-link" to={`/shops/${order.shop.slug}`}>
@@ -2407,7 +2382,6 @@ function Seller() {
           </p>
           <a href="/api/auth/start" className="text-link">
             Try connecting again
-            <ArrowUpRight size={15} />
           </a>
         </div>
       )}
@@ -2431,7 +2405,7 @@ function Seller() {
               <a className="button primary" href="/api/auth/start">
                 <img src="/favicon.svg" alt="" width="20" height="20" />
                 Continue with AriseSell
-                <ArrowUpRight size={17} />
+                <ArrowRight size={17} />
               </a>
               <p className="form-hint muted">
                 New to AriseSell? You can create an account in the next step.
@@ -2466,7 +2440,7 @@ function Seller() {
                 href={`${session.source_web}/onboarding`}
               >
                 Create a digital shop
-                <ArrowUpRight size={17} />
+                <ArrowRight size={17} />
               </a>
               <button
                 className="button secondary"
@@ -2510,7 +2484,6 @@ function Seller() {
                         to={`/shops/${data.shop.slug}`}
                       >
                         View shop
-                        <ArrowUpRight size={15} />
                       </Link>
                     )}
                   </div>
@@ -2555,7 +2528,6 @@ function Seller() {
                           to={`/shops/${data.shop.slug}`}
                         >
                           Open storefront
-                          <ArrowUpRight size={16} />
                         </Link>
                       </div>
                     ) : (
@@ -2761,7 +2733,7 @@ function Seller() {
                             : data.shop.published
                               ? "Save shop changes"
                               : "Publish shop"}
-                          <ArrowUpRight size={17} />
+                          <ArrowRight size={17} />
                         </button>
                       </div>
                       {data.shop.published && (
@@ -2838,7 +2810,6 @@ function Seller() {
                   href={`${session.source_web}/console/${data.shop.slug}/integrations`}
                 >
                   Connect a payment account
-                  <ArrowUpRight size={14} />
                 </a>
               )}
             </section>
