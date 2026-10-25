@@ -23,7 +23,7 @@ impl AppError {
     pub fn internal() -> Self {
         Self::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            "We could not complete this request. Refresh this page to check the result before trying again.",
+            "Something went wrong. Please retry.",
         )
     }
     pub fn unauthorized() -> Self {
@@ -210,7 +210,7 @@ fn buyer(headers: &HeaderMap) -> Result<String> {
 fn uuid(value: &str) -> Result<()> {
     uuid::Uuid::parse_str(value)
         .map(|_| ())
-        .map_err(|_| AppError::new(StatusCode::BAD_REQUEST, "This link is invalid. Return to the shop or My purchases and open the item again."))
+        .map_err(|_| AppError::new(StatusCode::BAD_REQUEST, "Invalid item identifier."))
 }
 async fn session(State(state): State<AppState>, headers: HeaderMap) -> Result<Response> {
     let mut guest = cookie(&headers, "arise_buyer").unwrap_or_else(token);
@@ -322,7 +322,7 @@ async fn auth_callback(
     let verifier = verifier.ok_or_else(|| {
         AppError::new(
             StatusCode::BAD_REQUEST,
-            "This sign-in link expired or has already been used. Select Continue with AriseSell to sign in again.",
+            "This sign-in link expired or has already been used.",
         )
     })?;
     let stored: Value =
@@ -494,7 +494,7 @@ async fn ensure_visible(state: &AppState, body: &Value) -> Result<()> {
     }) {
         return Err(AppError::new(
             StatusCode::CONFLICT,
-            "This product is no longer available. Return to the shop to choose another product.",
+            "This product is no longer available on the marketplace.",
         ));
     }
     Ok(())
@@ -607,7 +607,7 @@ async fn product_reviews(
     if page.offset > 100_000 {
         return Err(AppError::new(
             StatusCode::UNPROCESSABLE_ENTITY,
-            "More reviews could not be loaded. Reload the product page and try again.",
+            "Review page is out of range.",
         ));
     }
     let catalog = feed(&state).await?;
