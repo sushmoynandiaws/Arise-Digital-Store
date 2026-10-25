@@ -46,13 +46,12 @@ import {
   Flag,
   Plus,
   LogOut,
-  Sparkles,
   Layers,
   Play,
   Monitor,
   Command,
   Bot,
-} from "lucide-react";
+} from "./icons.js";
 import {
   api,
   setCsrf,
@@ -114,19 +113,19 @@ function ErrorBox({ message, retry }: { message: string; retry?: () => void }) {
 }
 function Loading() {
   return (
-    <div className="loading" role="status">
-      <LoaderCircle className="spin" size={24} />
-      <span>Getting things ready…</span>
+    <div className="loading" role="status" aria-busy="true">
+      <span className="sr-only">Getting things ready…</span>
+      <div className="loading-preview" aria-hidden="true"><span /><span /><span /></div>
     </div>
   );
 }
-function Empty({ title, children }: { title: string; children?: ReactNode }) {
+function Empty({ title, children, heading: Heading = "h2" }: { title: string; children?: ReactNode; heading?: "h1" | "h2" }) {
   return (
     <div className="empty">
       <div className="empty-icon">
         <ShoppingBag />
       </div>
-      <h2>{title}</h2>
+      <Heading>{title}</Heading>
       {children}
     </div>
   );
@@ -146,8 +145,17 @@ function Header() {
   const { session, refreshSession } = useMarket();
   const shop = useRouteShop();
   const [open, setOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
   const location = useLocation();
   useEffect(() => setOpen(false), [location.pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setOpen(false); menuButton.current?.focus(); }
+    };
+    document.addEventListener("keydown", close);
+    return () => document.removeEventListener("keydown", close);
+  }, [open]);
   return (
     <header className="site-header">
       <div className="top-ticker-bar">
@@ -204,9 +212,11 @@ function Header() {
             </Link>
           )}
           <button
+            ref={menuButton}
             className="icon-button mobile-menu"
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
+            aria-controls="mobile-navigation"
             onClick={() => setOpen(!open)}
           >
             {open ? <X /> : <Menu />}
@@ -214,7 +224,7 @@ function Header() {
         </div>
       </div>
       {open && (
-        <nav className="mobile-nav" aria-label="Mobile navigation">
+        <nav id="mobile-navigation" className="mobile-nav" aria-label="Mobile navigation">
           {shop ? (
             <>
               <Link to={`/shops/${shop.slug}`}>Shop products</Link>
@@ -296,10 +306,7 @@ function Footer() {
       <div className="footer-top">
         <div>
           <Brand />
-          <p>
-            A small discovery.
-            <br />A whole new possibility.
-          </p>
+          <p>Useful finds for your digital everyday.<br />From independent shops, directly to you.</p>
         </div>
         <div className="footer-links">
           <div>
@@ -407,8 +414,7 @@ function Art({
           }}
         />
       ) : null}
-      <div className="art-orbit" />
-      <div className="art-digital-badge">
+      {(!imageUrl || imgFailed) && <div className="art-digital-badge">
         <div className="art-emblem">
           {isAi ? (
             <Bot size={large ? 44 : 32} />
@@ -421,14 +427,11 @@ function Art({
         <span className="art-brand-pill">
           {product.category || "Digital Product"}
         </span>
-      </div>
-      <span className="art-spark">
-        <Sparkles size={large ? 22 : 16} />
-      </span>
+      </div>}
       <span className="art-tag">
         {product.delivery_mode === "automatic"
-          ? "AUTOMATIC DIGITAL DELIVERY"
-          : "DIRECT SELLER DELIVERY"}
+          ? "Automatic delivery"
+          : "Seller delivery"}
       </span>
     </div>
   );
@@ -504,7 +507,7 @@ function ShopAvatar({ shop }: { shop: Shop }) {
     </span>
   );
 }
-function ShopCard({ shop }: { shop: Shop }) {
+function ShopCard({ shop, heading: Heading = "h3" }: { shop: Shop; heading?: "h2" | "h3" }) {
   const count =
     useMarket().catalog?.products.filter((p) => p.shop_id === shop.id).length ||
     0;
@@ -512,7 +515,7 @@ function ShopCard({ shop }: { shop: Shop }) {
     <Link to={`/shops/${shop.slug}`} className="shop-card">
       <ShopAvatar shop={shop} />
       <div>
-        <h3>{shop.name}</h3>
+        <Heading>{shop.name}</Heading>
         <p>
           {count} digital {count === 1 ? "product" : "products"}
         </p>
@@ -559,17 +562,14 @@ function Home() {
       <main id="main">
         <section className="hero container">
           <div className="hero-copy">
-            <p className="hero-kicker">
-              <span className="kicker-pulse" />
-              Independent creator shops · Private digital delivery
-            </p>
+            <p className="hero-kicker"><Store size={16} /> A marketplace for your digital everyday</p>
             <h1>
               Good things.
               <br />
-              <span>Digitally delivered.</span>
+              For your digital life.
             </h1>
             <p className="hero-description">
-              Discover software, developer assets, templates, and courses directly from independent creators. Fast, secure, and delivered privately to your browser.
+              Tools for your next project. A course for your next chapter. Discover digital products from independent shops, all in one place.
             </p>
             <form
               className="hero-search"
@@ -584,7 +584,7 @@ function Home() {
               </label>
               <input
                 id="home-search"
-                placeholder="Search digital products, software, courses..."
+                placeholder="What are you looking for?"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -612,60 +612,21 @@ function Home() {
               </span>
               <span>
                 <Store size={15} />
-                Direct Creator Purchases
+                Buy directly from the shop
               </span>
             </div>
           </div>
-          <div className="hero-visual" aria-hidden="true">
-            <div className="visual-grid" />
-            <div className="visual-glow" />
-            <div className="visual-label">
-              <span />
-              VERIFIED DIGITAL DELIVERY PROTOCOL
-            </div>
-            <div className="visual-browser">
-              <div className="browser-dots">
-                <i />
-                <i />
-                <i />
-                <span>arise://delivery-vault</span>
-              </div>
-              <div className="browser-body">
-                <div className="browser-symbol">
-                  <LockKeyhole size={38} />
-                </div>
-                <span>Direct to your browser.</span>
-                <strong>
-                  Your picks.
-                  <br />
-                  Delivered.
-                </strong>
-                <div className="browser-footer">
-                  <span>Zero-friction guest checkout</span>
-                  <ArrowUpRight size={18} />
-                </div>
-              </div>
-            </div>
-            <div className="floating-mini mini-top">
-              <div className="mini-icon">
-                <Zap />
-              </div>
-              <div>
-                <strong>Private digital items</strong>
-                <span>Available after verified payment</span>
-              </div>
-              <ArrowUpRight size={17} />
-            </div>
-            <div className="floating-mini mini-bottom">
-              <div className="mini-icon">
-                <ShieldCheck />
-              </div>
-              <div>
-                <strong>Authoritative Security</strong>
-                <span>Direct AriseSell order verification</span>
-              </div>
-            </div>
-          </div>
+          <aside className="discovery-shelf" aria-labelledby="discovery-title">
+            <div className="discovery-heading"><span className="discovery-symbol"><ShoppingBag size={22} /></span><div><p>Inside the marketplace</p><h2 id="discovery-title">A little inspiration.</h2></div></div>
+            {catalog?.products.length ? <div className="discovery-picks">
+              {catalog.products.slice(0, 3).map(product => <Link className="discovery-pick" key={product.id} to={productPath(product, catalog)}>
+                <span className="discovery-art"><CategoryIcon category={product.category} size={24} /></span>
+                <span><small>{product.category}</small><strong>{product.name}</strong><span>{product.variants.length > 1 ? "From " : ""}{money(minimumPrice(product))}</span></span>
+                <ArrowUpRight size={18} />
+              </Link>)}
+            </div> : catalog ? <p className="discovery-empty">New finds will appear as shops publish their products.</p> : catalogError ? <p className="discovery-empty">Explore the catalog below to retry loading products.</p> : <Loading />}
+            <Link className="discovery-footer" to="/products">Find something for you <ArrowRight size={18} /></Link>
+          </aside>
         </section>
         <section className="benefit-strip">
           <div className="container">
@@ -689,7 +650,7 @@ function Home() {
         </section>
         <section className="container section">
           <SectionTitle
-            eyebrow="CATALOG CATEGORIES"
+            eyebrow="Browse by interest"
             title="Find your kind of digital."
             link="Explore everything"
             to="/products"
@@ -716,7 +677,7 @@ function Home() {
         </section>
         <section className="container section products-section">
           <SectionTitle
-            eyebrow="CURATED LISTINGS"
+            eyebrow="The product shelf"
             title="Small upgrades. Big possibilities."
             link="View all products"
             to="/products"
@@ -749,7 +710,7 @@ function Home() {
         </section>
         <section className="container section">
           <SectionTitle
-            eyebrow="INDEPENDENT CREATORS"
+            eyebrow="People behind the products"
             title="Meet your new favorite shops."
             link="Discover all shops"
             to="/shops"
@@ -769,7 +730,7 @@ function Home() {
             </div>
             <div>
               <p className="eyebrow">
-                SELLER PLATFORM
+                For independent sellers
               </p>
               <h2>Have something good to share?</h2>
               <p>
@@ -820,11 +781,12 @@ function Products({ shop }: { shop?: Shop }) {
     value ? next.set(name, value) : next.delete(name);
     setParams(next, { replace: true });
   };
+  const Container = shop ? "section" : "main";
   return (
-    <main id="main" className="container listing-page">
+    <Container id={shop ? undefined : "main"} className="container listing-page" aria-label={shop ? "Shop products" : undefined}>
       {!shop && (
         <div className="page-intro">
-          <p className="eyebrow">CURATED BY INDEPENDENT SHOPS</p>
+          <p className="eyebrow">Explore the marketplace</p>
           <h1>A good find starts here.</h1>
           <p>
             Explore digital products that help you learn, create, and do more.
@@ -924,7 +886,7 @@ function Products({ shop }: { shop?: Shop }) {
           </button>
         </Empty>
       )}
-    </main>
+    </Container>
   );
 }
 function Shops() {
@@ -936,7 +898,7 @@ function Shops() {
   return (
     <main id="main" className="container listing-page">
       <div className="page-intro">
-        <p className="eyebrow">GOOD PEOPLE. GOOD PRODUCTS.</p>
+        <p className="eyebrow">Meet the makers</p>
         <h1>
           Independent shops.
           <br />
@@ -971,7 +933,7 @@ function Shops() {
                 <span />
                 <i />
               </div>
-              <ShopCard shop={shop} />
+              <ShopCard shop={shop} heading="h2" />
               <p>{shop.description}</p>
               <Link className="text-link" to={`/shops/${shop.slug}`}>
                 Visit shop
@@ -1001,14 +963,14 @@ function ShopPage() {
   const shop = catalog.shops.find((s) => s.slug === slug || s.id === slug);
   if (!shop) return <NotFound />;
   return (
-    <>
+    <main id="main">
       <section className="shop-hero container">
         <div
           className="shop-banner"
           style={
             shop.cover_url
               ? {
-                  backgroundImage: `linear-gradient(90deg,rgba(14,47,35,.92),rgba(14,47,35,.55)),url(${JSON.stringify(shop.cover_url)})`,
+                  backgroundImage: `linear-gradient(90deg,rgba(15,23,42,.94),rgba(15,23,42,.7)),url(${JSON.stringify(shop.cover_url)})`,
                 }
               : undefined
           }
@@ -1016,7 +978,7 @@ function ShopPage() {
           <div className="shop-identity">
             <ShopAvatar shop={shop} />
             <div>
-              <p className="eyebrow">AN INDEPENDENT DIGITAL SHOP</p>
+              <p className="eyebrow">Independent digital shop</p>
               <h1>{shop.name}</h1>
               <p>{shop.description}</p>
             </div>
@@ -1030,7 +992,7 @@ function ShopPage() {
         </div>
       </section>
       <Products shop={shop} />
-    </>
+    </main>
   );
 }
 function supportHref(value: string) {
@@ -1417,7 +1379,7 @@ function Checkout() {
         Back to product
       </Link>
       <div className="checkout-heading">
-        <p className="eyebrow">CHECKOUT · {shop.name}</p>
+        <p className="eyebrow">Checkout · {shop.name}</p>
         <h1>{quote ? "One last look." : "Complete your order."}</h1>
         <p>
           {quote
@@ -1649,7 +1611,7 @@ function Checkout() {
         <aside className="panel order-summary" aria-label="Order summary">
           <Art product={product} />
           <div className="order-summary-content">
-            <span className="eyebrow">FROM {shop.name.toUpperCase()}</span>
+            <span className="eyebrow">From {shop.name}</span>
             <h2>{quote?.snapshot.name ?? product.name}</h2>
             {product.variants.length > 1 && <p>{quote?.snapshot.variant ?? variant.name}</p>}
             <div className="summary-line">
@@ -1691,7 +1653,7 @@ function Purchases() {
   return (
     <main id="main" className="container listing-page narrow-page">
       <div className="page-intro">
-        <p className="eyebrow">ALL YOUR GOOD FINDS</p>
+        <p className="eyebrow">My purchases</p>
         <h1>Your digital shelf.</h1>
         <p>
           Payment updates, delivery details, and the things you’ve made yours.
@@ -1924,8 +1886,8 @@ function PurchasePage() {
         </div>
         {(order.buyer_name || order.buyer_email || order.buyer_phone || order.buyer_fields?.note) && (
           <div className="purchase-buyer-info">
-            <span className="muted" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-              Customer Details
+            <span className="buyer-details-label">
+              Customer details
             </span>
             <div className="buyer-summary-grid">
               {order.buyer_name && (
@@ -1948,7 +1910,7 @@ function PurchasePage() {
               )}
             </div>
             {order.buyer_fields?.note && (
-              <p className="preserve-lines" style={{ fontSize: "12px", marginTop: "4px" }}>
+              <p className="preserve-lines buyer-note">
                 <span className="muted">Note / details: </span>
                 <strong>{String(order.buyer_fields.note)}</strong>
               </p>
@@ -2264,14 +2226,9 @@ function Seller() {
   return (
     <main id="main" className="container seller-page">
       <div className="page-intro">
-        <p className="eyebrow">A NEW HOME FOR YOUR DIGITAL SHOP</p>
-        <h1>
-          Your products.
-          <br />A whole new audience.
-        </h1>
-        <p>
-          One AriseSell account. One connected shop. A little more possibility.
-        </p>
+        <p className="eyebrow">Seller workspace</p>
+        <h1>{session?.user ? "Make your shop your own." : <>Your products.<br />A whole new audience.</>}</h1>
+        <p>{session?.user ? "Your profile, your product selection, and a storefront ready to share." : "Connect your AriseSell shop. Give your digital products a new place to be found."}</p>
       </div>
       <ol className="onboarding-steps">
         <li className={session?.user ? "complete" : "active"}>
@@ -2415,7 +2372,7 @@ function Seller() {
                   >
                     <div className="seller-panel-heading">
                       <div>
-                        <span className="eyebrow">YOUR OWN SHOP PAGE</span>
+                        <span className="eyebrow">Your storefront</span>
                         <h2 id="store-link-title">Share your store</h2>
                       </div>
                       <Store size={24} />
@@ -2465,7 +2422,7 @@ function Seller() {
                     <section className="panel seller-panel">
                       <div className="seller-panel-heading">
                         <div>
-                          <span className="eyebrow">MAKE IT YOURS</span>
+                          <span className="eyebrow">Shop settings</span>
                           <h2>Your shop profile</h2>
                         </div>
                         <span
@@ -2546,7 +2503,7 @@ function Seller() {
                       <div className="seller-panel-heading">
                         <div>
                           <span className="eyebrow">
-                            CHOOSE YOUR GOOD FINDS
+                            Your catalog
                           </span>
                           <h2>Products to publish</h2>
                         </div>
@@ -2742,7 +2699,7 @@ function HowItWorks() {
   return (
     <main id="main" className="container listing-page">
       <div className="page-intro">
-        <p className="eyebrow">SIMPLE BY DESIGN</p>
+        <p className="eyebrow">How it works</p>
         <h1>
           A good find.
           <br />A few easy steps.
@@ -2856,6 +2813,16 @@ function Admin() {
       name: string;
       hidden: boolean;
     } | null>(null);
+  const moderationDialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (!target) return;
+    const dialog = moderationDialog.current;
+    dialog?.showModal();
+    dialog?.querySelector("textarea")?.focus();
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = overflow; };
+  }, [target]);
   const load = () =>
     api<AdminData>("/admin")
       .then(setData)
@@ -2867,7 +2834,7 @@ function Admin() {
   if (!session.user?.admin)
     return (
       <main id="main" className="container section">
-        <Empty title="Administrator access required.">
+        <Empty title="Administrator access required." heading="h1">
           <p>Continue with an authorized AriseSell administrator account.</p>
           <a className="button primary" href="/api/auth/start">
             Continue with AriseSell
@@ -2878,11 +2845,11 @@ function Admin() {
   return (
     <main id="main" className="container listing-page">
       <div className="page-intro">
-        <p className="eyebrow">MARKETPLACE ADMINISTRATION</p>
-        <h1>Keep the good finds good.</h1>
+        <p className="eyebrow">Marketplace administration</p>
+        <h1>A clear view of your marketplace.</h1>
         <p>Review published shops, product listings, and customer reports.</p>
       </div>
-      {error && <ErrorBox message={error} retry={() => void load()} />}
+      {error && !target && <ErrorBox message={error} retry={() => void load()} />}
       <div role="status">{busy && <p>Saving moderation changes…</p>}</div>
       {data ? (
         <>
@@ -2991,10 +2958,10 @@ function Admin() {
         <Loading />
       )}
       {target && (
-        <section className="panel moderation-form">
-          <h2>
+        <dialog ref={moderationDialog} className="moderation-form" aria-labelledby="moderation-title" onClose={() => setTarget(null)} onClick={event => { if (!busy && event.target === event.currentTarget) moderationDialog.current?.close(); }} onCancel={event => { if (busy) event.preventDefault(); }}>
+          <div className="product-info-header"><h2 id="moderation-title">
             {target.hidden ? "Hide" : "Restore"} {target.name}
-          </h2>
+          </h2><button className="icon-button" type="button" aria-label="Close moderation" disabled={busy} onClick={() => moderationDialog.current?.close()}><X size={20} /></button></div>
           <form
             onSubmit={async (e) => {
               e.preventDefault();
@@ -3010,7 +2977,7 @@ function Admin() {
                     reason,
                   }),
                 });
-                setTarget(null);
+                moderationDialog.current?.close();
                 await Promise.all([load(), reloadCatalog()]);
               } catch (e) {
                 setError((e as Error).message);
@@ -3029,6 +2996,7 @@ function Admin() {
                 onChange={(e) => setReason(e.target.value)}
               />
             </label>
+            {error && <ErrorBox message={error} />}
             <div className="button-row">
               <button className="button primary" disabled={busy}>
                 Confirm change
@@ -3037,13 +3005,13 @@ function Admin() {
                 className="button secondary"
                 type="button"
                 disabled={busy}
-                onClick={() => setTarget(null)}
+                onClick={() => moderationDialog.current?.close()}
               >
                 Cancel
               </button>
             </div>
           </form>
-        </section>
+        </dialog>
       )}
     </main>
   );
@@ -3051,7 +3019,7 @@ function Admin() {
 function NotFound() {
   return (
     <main id="main" className="container section">
-      <Empty title="This find isn’t here anymore.">
+      <Empty title="This find isn’t here anymore." heading="h1">
         <p>
           The link may have changed, or the seller may have unpublished the
           product.

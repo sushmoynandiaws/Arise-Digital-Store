@@ -36,7 +36,7 @@ Inspired by top-tier Bangladeshi digital product platforms like **Subscriptions 
 | Ink Primary | `#0F172A` | `--ink` | Slate 900 high-contrast headings & product titles |
 | Ink Muted | `#64748B` | `--muted` | Slate 500 secondary guidance, timestamps, and terms |
 | Border Line | `#EDE9FE` | `--line` | Clean violet-slate structural card boundaries |
-| Border Strong | `#DDD6FE` | `--line-strong` | Input focus outlines and hover card borders |
+| Border Strong | `#CCC6DF` | `--line-strong` | Input boundaries and hover card borders; focus uses the primary violet |
 | Accent Orange | `#FF6B00` | `--accent-orange` | Urgency badges, live alerts, and sale tags |
 | Verification Emerald | `#10B981` | `--mint` | Instant delivery confirmed, active stock, secure badges |
 
