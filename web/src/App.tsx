@@ -766,20 +766,9 @@ function SubNavBar() {
                 <NavLink to={`/shops/${shop.slug}/info/about`} className="sub-nav-text-btn">
                   {lang === "bn" ? "আমাদের সম্পর্কে" : "About Us"}
                 </NavLink>
-              <a
-                href={`/shops/${shop.slug}#customer-reviews`}
-                className="sub-nav-link"
-                onClick={(e) => {
-                  const el = document.getElementById("customer-reviews");
-                  if (el) {
-                    e.preventDefault();
-                    el.scrollIntoView({ behavior: "smooth" });
-                    window.history.replaceState(null, "", `#customer-reviews`);
-                  }
-                }}
-              >
+              <NavLink to={`/shops/${shop.slug}/reviews`} className="sub-nav-link">
                 {lang === "bn" ? "রিভিউসমূহ" : "Reviews"}
-              </a>
+              </NavLink>
               <NavLink to="/track">
                 {t("trackOrder")}
               </NavLink>
@@ -2144,7 +2133,43 @@ function ShopPage() {
         <h1>{shop.name}</h1>
       </section>
       <Products shop={shop} />
-      <div className="container shop-reviews-wrapper">
+      <WhatsAppFloatingButton shop={shop} />
+    </main>
+  );
+}
+
+function ShopReviewsPage() {
+  const { slug } = useParams();
+  const { catalog, catalogError } = useMarket();
+  const { lang } = useLang();
+  if (catalogError)
+    return (
+      <main id="main" className="container section">
+        <ErrorBox message={catalogError} />
+      </main>
+    );
+  if (!catalog) return <Loading />;
+  const shop = catalog.shops.find((s) => s.slug === slug || s.id === slug);
+  if (!shop) return <NotFound />;
+
+  return (
+    <main id="main" className="shop-reviews-page">
+      <div className="container shop-reviews-container">
+        <nav className="breadcrumbs shop-reviews-breadcrumbs" aria-label="Breadcrumb">
+          <Link to="/">{lang === "bn" ? "হোম" : "Home"}</Link>
+          <span>/</span>
+          <Link to="/shops">{lang === "bn" ? "স্বাধীন শপসমূহ" : "Shops"}</Link>
+          <span>/</span>
+          <Link to={`/shops/${shop.slug}`}>{shop.name}</Link>
+          <span>/</span>
+          <span aria-current="page">{lang === "bn" ? "রিভিউসমূহ" : "Reviews"}</span>
+        </nav>
+        <div className="shop-reviews-page-header">
+          <Link to={`/shops/${shop.slug}`} className="back-link">
+            <ArrowLeft size={16} />
+            {lang === "bn" ? `${shop.name}-এর শপে ফিরে যান` : `Back to ${shop.name}`}
+          </Link>
+        </div>
         <ShopReviews shop={shop} catalog={catalog} lang={lang} />
       </div>
       <WhatsAppFloatingButton shop={shop} />
@@ -4746,6 +4771,7 @@ export default function App() {
           <Route path="/shops/:slug/products/:productSlug" element={<ProductPage />} />
           <Route path="/shops" element={<Shops />} />
           <Route path="/shops/:slug" element={<ShopPage />} />
+          <Route path="/shops/:slug/reviews" element={<ShopReviewsPage />} />
           <Route path="/shops/:slug/info/:section" element={<ShopInformationPage />} />
           <Route path="/info/:section" element={<ShopInformationPage />} />
           <Route path="/track" element={<TrackOrderPage />} />
