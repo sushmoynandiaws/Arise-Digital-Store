@@ -58,6 +58,7 @@ import {
   api,
   setCsrf,
   money,
+  checkoutTotal,
   stock,
   minimumPrice,
   paymentLabel,
@@ -1307,9 +1308,12 @@ function Checkout() {
   if (!catalog) return <Loading />;
   if (!product || !variant || !shop) return <NotFound />;
   const required = new Set(["name", ...product.required_buyer_fields]);
+  const estimatedTotal = checkoutTotal(variant.price, quantity);
+  const validQuantity = estimatedTotal !== null && quantity <= Math.min(variant.stock, 100);
+  const total = quote?.snapshot.total ?? (validQuantity ? estimatedTotal : null);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (busy || !product || !variant || !shop) return;
+    if (busy || !product || !variant || !shop || (!quote && !validQuantity)) return;
     setBusy(true);
     setError("");
     try {
@@ -1355,13 +1359,17 @@ function Checkout() {
         Back to product
       </Link>
       <div className="checkout-heading">
-        <p className="eyebrow">ONE GOOD FIND, ALMOST YOURS</p>
-        <h1>{quote ? "One last look." : "Make it yours."}</h1>
+        <p className="eyebrow">CHECKOUT · {shop.name}</p>
+        <h1>{quote ? "One last look." : "Complete your order."}</h1>
         <p>
           {quote
             ? "Review the current price and seller terms before creating your payment request."
-            : "Just the essentials. Your seller handles the rest."}
+            : "Your product, your total, and a simple way to pay."}
         </p>
+        <ol className="checkout-progress" aria-label="Checkout progress">
+          <li aria-current={!quote ? "step" : undefined}><span>{quote ? <Check size={14} /> : "1"}</span>Details & payment</li>
+          <li aria-current={quote ? "step" : undefined}><span>2</span>Review order</li>
+        </ol>
       </div>
       <div className="checkout-grid">
         <form onSubmit={submit} className="panel checkout-form">
@@ -1416,15 +1424,21 @@ function Checkout() {
                 Quantity
                 <input
                   type="number"
+                  aria-label="Quantity"
+                  aria-describedby="checkout-quantity-hint"
                   min={1}
                   max={Math.min(variant.stock, 100)}
+                  step={1}
                   required
                   value={quantity}
                   onChange={(e) => setQuantity(Number(e.target.value))}
                 />
+                <small id="checkout-quantity-hint">{money(variant.price)} each · Up to {Math.min(variant.stock, 100)} per order</small>
               </label>
-              <h3>How would you like to pay?</h3>
-              <div className="payment-options">
+              <fieldset className="checkout-payment">
+                <legend>Payment method</legend>
+                <p className="form-hint muted">Choose how you’ll pay {shop.name}.</p>
+                <div className="payment-options">
                 {shop.payment_methods?.map((method) => (
                   <label
                     key={method}
@@ -1456,10 +1470,11 @@ function Checkout() {
                   </label>
                 ))}
               </div>
+              {!shop.payment_methods?.length && <ErrorBox message="This seller has no payment method available. Please contact the seller." />}
               <p className="form-hint muted">
-                Payment goes to this seller’s connected account. You’ll get the
-                instructions on the next screen.
+                You’ll get payment instructions after reviewing and confirming your order.
               </p>
+              </fieldset>
             </>
           ) : (
             <>
@@ -1493,9 +1508,13 @@ function Checkout() {
             </>
           )}
           {error && <ErrorBox message={error} />}
+          <div className="checkout-payable" aria-live="polite" aria-atomic="true">
+            <span>{quote ? "Total to pay" : "Estimated total"}<small>BDT · {quote?.snapshot.quantity ?? quantity} item{(quote?.snapshot.quantity ?? quantity) === 1 ? "" : "s"}</small></span>
+            <strong>{total !== null ? money(total) : "—"}</strong>
+          </div>
           <button
             className="button primary full-width"
-            disabled={busy || !session || !provider || (!!quote && !agreed)}
+            disabled={busy || !session || !provider || (!quote && !validQuantity) || (!!quote && !agreed)}
           >
             {busy ? (
               <>
@@ -1529,32 +1548,32 @@ function Checkout() {
           )}
           <p className="checkout-note">
             <LockKeyhole size={14} />
-            No payment is marked complete until AriseSell verifies it.
+            Payment is verified before your digital items are delivered.
           </p>
         </form>
-        <aside className="panel order-summary">
+        <aside className="panel order-summary" aria-label="Order summary">
           <Art product={product} />
           <div className="order-summary-content">
             <span className="eyebrow">FROM {shop.name.toUpperCase()}</span>
-            <h2>{product.name}</h2>
-            {product.variants.length > 1 && <p>{variant.name}</p>}
+            <h2>{quote?.snapshot.name ?? product.name}</h2>
+            {product.variants.length > 1 && <p>{quote?.snapshot.variant ?? variant.name}</p>}
             <div className="summary-line">
               <span>Quantity</span>
-              <strong>{quote?.snapshot.quantity || quantity}</strong>
+              <strong>{quote?.snapshot.quantity ?? quantity}</strong>
             </div>
-            <div className="summary-line">
-              <span>{quote ? "Verified order total" : "Price per item"}</span>
-              <strong>{money(quote?.snapshot.total || variant.price)}</strong>
-            </div>
+            {!quote && <div className="summary-line">
+              <span>Price per item</span>
+              <strong>{money(variant.price)}</strong>
+            </div>}
             <div className="summary-line">
               <span>Delivery</span>
               <strong>Digital · no shipping</strong>
             </div>
-            {!quote && (
-              <p className="muted form-hint">
-                Your exact total is confirmed when you review the order.
-              </p>
-            )}
+            <div className="summary-total" aria-live="polite" aria-atomic="true">
+              <span>{quote ? "Total to pay" : "Estimated total"}</span>
+              <strong>{total !== null ? money(total) : "—"}</strong>
+              <small>{quote ? "Current price confirmed by the seller." : "Price and availability are confirmed at review."}</small>
+            </div>
           </div>
         </aside>
       </div>

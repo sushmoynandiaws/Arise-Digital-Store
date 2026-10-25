@@ -20,6 +20,16 @@ test("customer status copy does not expose internal enum names or claim unverifi
   assert.equal(helpers.deliveryLabel("awaiting_manual"),"Seller is preparing your order");
   assert.equal(helpers.paymentLabel("refunded"),"Refunded");
 });
+test("checkout totals multiply exact minor units and reject incomplete or unsafe values",()=>{
+  const {checkoutTotal}=client();
+  assert.equal(checkoutTotal("10.00",6),"60.00");
+  assert.equal(checkoutTotal("0.29",3),"0.87");
+  assert.equal(checkoutTotal("1290.5",2),"2581.00");
+  assert.equal(checkoutTotal("0",1),"0.00");
+  assert.equal(checkoutTotal("11",100),"1100.00");
+  for(const quantity of [0,-1,1.5,101,NaN,Infinity]) assert.equal(checkoutTotal("10.00",quantity),null);
+  for(const price of ["", "NaN", "-1", "1.001", "1e2", "9007199254740991"]) assert.equal(checkoutTotal(price,1),null);
+});
 test("API writes include same-origin credentials and the current CSRF token",async()=>{
   let captured;const helpers=client(async(url,options)=>{captured={url,options};return {ok:true,json:async()=>({ok:true})};});
   helpers.setCsrf("bound-to-browser");await helpers.api("/checkout/accept",{method:"POST",body:'{"accepted":true}'});

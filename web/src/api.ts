@@ -34,6 +34,13 @@ export const money = (amount: string) =>
     currency: "BDT",
     maximumFractionDigits: 2,
   }).format(Number(amount));
+export function checkoutTotal(price: string, quantity: number): string | null {
+  if (!/^\d+(?:\.\d{1,2})?$/.test(price) || !Number.isInteger(quantity) || quantity < 1 || quantity > 100)
+    return null;
+  const [whole, fraction = ""] = price.split(".");
+  const total = (Number(whole) * 100 + Number(fraction.padEnd(2, "0"))) * quantity;
+  return Number.isSafeInteger(total) ? (total / 100).toFixed(2) : null;
+}
 export const stock = (product: { variants: { stock: number }[] }) =>
   product.variants.reduce((total, v) => total + v.stock, 0);
 export const minimumPrice = (product: { variants: { price: string }[] }) =>
