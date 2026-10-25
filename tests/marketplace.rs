@@ -733,7 +733,7 @@ fn serverless_storage_rejects_ephemeral_files_and_unverified_remote_database_con
 async fn postgres_state_survives_separate_function_instances_without_commerce_table_access() {
     let url = postgres_test_url().expect("Set the disposable local PostgreSQL test URL");
     let pool = connect_pool(&url).await.unwrap();
-    sqlx::raw_sql("TRUNCATE arise_marketplace.auth_requests,arise_marketplace.sessions,arise_marketplace.moderation,arise_marketplace.reports,arise_marketplace.rate_limits,arise_marketplace.reviews;").execute(&pool).await.unwrap();
+    sqlx::raw_sql("DELETE FROM arise_marketplace.auth_requests; DELETE FROM arise_marketplace.sessions; DELETE FROM arise_marketplace.moderation; DELETE FROM arise_marketplace.reports; DELETE FROM arise_marketplace.rate_limits; DELETE FROM arise_marketplace.reviews;").execute(&pool).await.unwrap();
     let (first, calls, server) = setup_with_pool(pool).await;
     let second = AppState::new((*first.config).clone(), connect_pool(&url).await.unwrap()).unwrap();
     let session = sign_in(&first, "admin").await;

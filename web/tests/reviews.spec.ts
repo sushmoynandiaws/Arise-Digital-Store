@@ -53,6 +53,10 @@ test("verified customers can publish and edit one review, and products show real
   await expect(page.locator(".review-card")).toHaveCount(1);
   await expect(page.locator(".review-card script")).toHaveCount(0);
   await expect(page.locator(".review-author strong")).toHaveText("ক্রেতা");
+  review!.comment = "পণ্যটি পেয়েছি। কেনাকাটা ও ডেলিভারি সহজ ছিল।";
+  await page.getByRole("button", { name: "Close product details" }).click();
+  await page.getByRole("button", { name: "Reviews", exact: true }).click();
+  await expect(page.locator(".review-card")).toContainText(review!.comment);
   await page.setViewportSize({ width: 375, height: 812 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   await page.screenshot({ path: "../artifacts/product-reference/reviews-popup.png" });
