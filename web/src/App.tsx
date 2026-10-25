@@ -338,10 +338,40 @@ function Footer() {
 export function resolveImageUrl(
   url: string | null | undefined,
   sourceWeb?: string,
+  shopSlug?: string,
+  productName?: string,
 ): string | null {
-  if (!url) return null;
+  const base = (sourceWeb || "https://arisesell.com").replace(/\/+$/, "");
+  const toSlug = (text: string) =>
+    text
+      .normalize("NFKC")
+      .toLowerCase()
+      .replace(/['\u2019]/g, "")
+      .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-")
+      .replace(/^-+|-+$/g, "");
+
+  if (!url) {
+    if (shopSlug && productName) {
+      const slug = toSlug(productName);
+      if (slug) return `${base}/${encodeURIComponent(shopSlug)}/${encodeURIComponent(slug)}`;
+    }
+    return null;
+  }
   const trimmed = url.trim();
-  if (!trimmed) return null;
+  if (!trimmed) {
+    if (shopSlug && productName) {
+      const slug = toSlug(productName);
+      if (slug) return `${base}/${encodeURIComponent(shopSlug)}/${encodeURIComponent(slug)}`;
+    }
+    return null;
+  }
+  // When an internal unsigned upload path is received, resolve to the public permanent store route
+  if (/^\/?api\/v1\/catalog\/image-assets\/[0-9a-fA-F-]{36}\/content$/i.test(trimmed)) {
+    if (shopSlug && productName) {
+      const slug = toSlug(productName);
+      if (slug) return `${base}/${encodeURIComponent(shopSlug)}/${encodeURIComponent(slug)}`;
+    }
+  }
   if (/^https?:\/\//i.test(trimmed)) {
     return trimmed;
   }
@@ -349,7 +379,6 @@ export function resolveImageUrl(
     return `https:${trimmed}`;
   }
   if (trimmed.startsWith("/")) {
-    const base = (sourceWeb || "https://arisesell.com").replace(/\/+$/, "");
     return `${base}${trimmed}`;
   }
   return null;
@@ -383,9 +412,10 @@ function Art({
   product: Product;
   large?: boolean;
 }) {
-  const { session } = useMarket();
+  const { session, catalog } = useMarket();
   const [imgFailed, setImgFailed] = useState(false);
-  const imageUrl = resolveImageUrl(product.image_url, session?.source_web);
+  const shop = catalog?.shops.find((s) => s.id === product.shop_id);
+  const imageUrl = resolveImageUrl(product.image_url, session?.source_web, shop?.slug, product.name);
   let hash = 0;
   for (const c of product.category) hash += c.charCodeAt(0);
   const tone = hash % 6;

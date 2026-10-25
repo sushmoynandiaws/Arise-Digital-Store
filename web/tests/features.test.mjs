@@ -92,3 +92,85 @@ test("App.tsx contains promo code input, WhatsApp support button, and download b
   assert.ok(appCode.includes("WhatsAppFloatingButton"), "Missing WhatsAppFloatingButton in App.tsx");
   assert.ok(appCode.includes("download-action-btn"), "Missing download-action-btn in App.tsx");
 });
+
+test("resolveImageUrl resolves full URLs, relative paths and unsigned catalog asset content URLs", () => {
+  assert.ok(appCode.includes("export function resolveImageUrl"), "resolveImageUrl should be exported");
+  // Test slug conversion and public URL fallback logic
+  const unsignedPath = "/api/v1/catalog/image-assets/24cd2075-38a5-4811-8914-1775ca4441ef/content";
+  const toSlug = (text) =>
+    text
+      .normalize("NFKC")
+      .toLowerCase()
+      .replace(/['\u2019]/g, "")
+      .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-")
+      .replace(/^-+|-+$/g, "");
+
+  function resolveImageUrl(url, sourceWeb, shopSlug, productName) {
+    const base = (sourceWeb || "https://arisesell.com").replace(/\/+$/, "");
+    if (!url) {
+      if (shopSlug && productName) {
+        const slug = toSlug(productName);
+        if (slug) return `${base}/${encodeURIComponent(shopSlug)}/${encodeURIComponent(slug)}`;
+      }
+      return null;
+    }
+    const trimmed = url.trim();
+    if (!trimmed) {
+      if (shopSlug && productName) {
+        const slug = toSlug(productName);
+        if (slug) return `${base}/${encodeURIComponent(shopSlug)}/${encodeURIComponent(slug)}`;
+      }
+      return null;
+    }
+    if (/^\/?api\/v1\/catalog\/image-assets\/[0-9a-fA-F-]{36}\/content$/i.test(trimmed)) {
+      if (shopSlug && productName) {
+        const slug = toSlug(productName);
+        if (slug) return `${base}/${encodeURIComponent(shopSlug)}/${encodeURIComponent(slug)}`;
+      }
+    }
+    if (/^https?:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+    if (trimmed.startsWith("//")) {
+      return `https:${trimmed}`;
+    }
+    if (trimmed.startsWith("/")) {
+      return `${base}${trimmed}`;
+    }
+    return null;
+  }
+
+  // 1. Full HTTPS URL remains untouched
+  assert.equal(
+    resolveImageUrl("https://arisesell.com/nandi-digital-products/udemy-personal-1-month"),
+    "https://arisesell.com/nandi-digital-products/udemy-personal-1-month"
+  );
+
+  // 2. Unsigned asset path resolves to shop and product public slug link
+  assert.equal(
+    resolveImageUrl(
+      unsignedPath,
+      "https://arisesell.com",
+      "nandi-digital-products",
+      "Chatgpt Plus No Warranty (Upi) - Without 5H Limit"
+    ),
+    "https://arisesell.com/nandi-digital-products/chatgpt-plus-no-warranty-upi-without-5h-limit"
+  );
+
+  // 3. Signed asset path with query parameters is preserved
+  const signedUrl = "https://arisesell.com/api/v1/catalog/image-assets/24cd2075-38a5-4811-8914-1775ca4441ef/content?expires=1793551407&signature=abc";
+  assert.equal(resolveImageUrl(signedUrl), signedUrl);
+
+  // 4. Relative paths are prefixed with base
+  assert.equal(
+    resolveImageUrl("/images/banner.png", "https://arisesell.com"),
+    "https://arisesell.com/images/banner.png"
+  );
+
+  // 5. Empty or null inputs with shop/product fallback
+  assert.equal(
+    resolveImageUrl(null, "https://arisesell.com", "nandi-digital-products", "Demo Item"),
+    "https://arisesell.com/nandi-digital-products/demo-item"
+  );
+  assert.equal(resolveImageUrl(null), null);
+});
