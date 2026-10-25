@@ -125,8 +125,10 @@ test("App.tsx integrates all advanced e-commerce components and routes", () => {
   assert.ok(appCode.includes("arise_wishlist"));
   assert.ok(appCode.includes("card-wishlist-btn"));
 
-  // Track Order / OTP
+  // Track Order / OTP by email
   assert.ok(appCode.includes("function TrackOrderPage()"));
+  assert.ok(appCode.includes("track-email"));
+  assert.ok(!appCode.includes("track-phone"));
   assert.ok(appCode.includes("/orders/track/request-otp"));
   assert.ok(appCode.includes("/orders/track/verify-otp"));
   assert.ok(appCode.includes("<Route path=\"/track\" element={<TrackOrderPage />} />"));
