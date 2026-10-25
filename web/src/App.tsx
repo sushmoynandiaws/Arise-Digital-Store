@@ -2,10 +2,13 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
+import { LangProvider, useLang } from "./i18n.js";
+import { generateQrMatrix } from "./qr.js";
 import {
   Link,
   NavLink,
@@ -29,6 +32,8 @@ import {
   Check,
   CheckCircle2,
   ShieldCheck,
+  Heart,
+  Phone,
   Zap,
   ChevronDown,
   LayoutGrid,
@@ -147,8 +152,387 @@ function Brand() {
     </Link>
   );
 }
+export function useWishlist() {
+  const [wishlist, setWishlist] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("arise_wishlist");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const toggleWishlist = (id: string) => {
+    setWishlist((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      try {
+        localStorage.setItem("arise_wishlist", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const isWishlisted = (id: string) => wishlist.includes(id);
+
+  return { wishlist, toggleWishlist, isWishlisted };
+}
+
+export function WishlistModal({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { catalog } = useMarket();
+  const { t, lang } = useLang();
+  const { wishlist, toggleWishlist } = useWishlist();
+
+  if (!open) return null;
+
+  const items = (catalog?.products || []).filter((p) => wishlist.includes(p.id));
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} role="presentation">
+      <div
+        className="modal-card wishlist-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wishlist-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-header">
+          <div className="modal-title-row">
+            <Heart size={20} className="fill-heart" />
+            <h2 id="wishlist-title">{t("savedItems")} ({items.length})</h2>
+          </div>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close wishlist">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="modal-body wishlist-body">
+          {items.length === 0 ? (
+            <div className="empty-wishlist">
+              <p>{t("noSavedItems")}</p>
+              <Link to="/products" className="button secondary" onClick={onClose}>
+                {t("browseProducts")}
+              </Link>
+            </div>
+          ) : (
+            <div className="wishlist-items-grid">
+              {items.map((prod) => (
+                <div key={prod.id} className="wishlist-item-row">
+                  <div className="wishlist-item-art">
+                    <Art product={prod} />
+                  </div>
+                  <div className="wishlist-item-details">
+                    <Link to={productPath(prod, catalog!)} onClick={onClose} className="wishlist-item-title">
+                      {prod.name}
+                    </Link>
+                    <span className="price">{money(minimumPrice(prod))}</span>
+                  </div>
+                  <div className="wishlist-item-actions">
+                    <Link to={productPath(prod, catalog!)} onClick={onClose} className="button primary small">
+                      {lang === "bn" ? "কিনুন" : "Buy"}
+                    </Link>
+                    <button
+                      type="button"
+                      className="button ghost small danger-text"
+                      onClick={() => toggleWishlist(prod.id)}
+                      title="Remove"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function DynamicPaymentQR({
+  provider,
+  account,
+  amount,
+  orderRef,
+}: {
+  provider: string;
+  account: string;
+  amount: string;
+  orderRef: string;
+}) {
+  const { t, lang } = useLang();
+  const [mode, setMode] = useState<"qr" | "manual">("qr");
+  const cleanAccount = account.replace(/\s+/g, "");
+
+  const paymentString = `${provider.toLowerCase()}://payment?account=${cleanAccount}&amount=${amount}&ref=${orderRef}`;
+  
+  let appUrl = "";
+  if (provider.toLowerCase().includes("bkash")) {
+    appUrl = `bkash://payment?account=${cleanAccount}&amount=${amount}`;
+  } else if (provider.toLowerCase().includes("nagad")) {
+    appUrl = `nagad://payment?account=${cleanAccount}&amount=${amount}`;
+  }
+
+  const matrix = useMemo(() => {
+    try {
+      return generateQrMatrix(paymentString);
+    } catch {
+      return [];
+    }
+  }, [paymentString]);
+
+  const size = matrix.length || 29;
+  const cellSize = 6;
+  const qrPixelSize = size * cellSize;
+
+  return (
+    <div className="dynamic-qr-box">
+      <div className="payment-mode-tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "qr"}
+          className={`tab-btn ${mode === "qr" ? "active" : ""}`}
+          onClick={() => setMode("qr")}
+        >
+          {t("scanQrTitle")}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "manual"}
+          className={`tab-btn ${mode === "manual" ? "active" : ""}`}
+          onClick={() => setMode("manual")}
+        >
+          {t("manualAccountTransfer")}
+        </button>
+      </div>
+
+      {mode === "qr" && (
+        <div className="qr-display-container">
+          <div className="qr-svg-wrapper" aria-label={`Payment QR Code for ${provider}`}>
+            <svg
+              viewBox={`0 0 ${qrPixelSize} ${qrPixelSize}`}
+              width={180}
+              height={180}
+              className="qr-svg-code"
+            >
+              <rect width="100%" height="100%" fill="#ffffff" />
+              {matrix.map((row, r) =>
+                row.map((dark, c) =>
+                  dark ? (
+                    <rect
+                      key={`${r}-${c}`}
+                      x={c * cellSize}
+                      y={r * cellSize}
+                      width={cellSize}
+                      height={cellSize}
+                      fill="#0f172a"
+                    />
+                  ) : null
+                )
+              )}
+            </svg>
+            <div className="qr-badge-pill">
+              <span className={`provider-dot ${provider.toLowerCase()}`} />
+              <strong>{provider.toUpperCase()} ৳{amount}</strong>
+            </div>
+          </div>
+
+          <p className="qr-scan-instruction">
+            {t("scanQrDesc")}
+          </p>
+
+          {appUrl && (
+            <a
+              href={appUrl}
+              className="button primary open-app-deep-btn"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ExternalLink size={16} />
+              {lang === "bn" ? `সরাসরি ${provider} অ্যাপে পে করুন` : `Open in ${provider} App`}
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function TrackOrderPage() {
+  const { t, lang } = useLang();
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
+  const [step, setStep] = useState<"phone" | "otp" | "done">("phone");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [demoOtp, setDemoOtp] = useState("");
+  const [foundOrders, setFoundOrders] = useState<Purchase[]>([]);
+
+  const handleRequestOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phone.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await api<{ ok: boolean; message: string; demo_otp?: string; order_count: number }>(
+        "/orders/track/request-otp",
+        {
+          method: "POST",
+          body: JSON.stringify({ phone: phone.trim() }),
+        }
+      );
+      if (res.ok) {
+        setDemoOtp(res.demo_otp || "");
+        if (res.demo_otp) setOtp(res.demo_otp);
+        setStep("otp");
+      }
+    } catch (err) {
+      setError((err as Error).message || t("noOrdersFound"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otp.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await api<{ ok: boolean; message: string; orders: Purchase[] }>(
+        "/orders/track/verify-otp",
+        {
+          method: "POST",
+          body: JSON.stringify({ phone: phone.trim(), otp: otp.trim() }),
+        }
+      );
+      if (res.ok) {
+        setFoundOrders(res.orders);
+        setStep("done");
+      }
+    } catch (err) {
+      setError((err as Error).message || "Invalid or expired OTP");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <main id="main" className="container narrow-page track-order-page">
+      <div className="page-intro">
+        <p className="eyebrow">{lang === "bn" ? "অর্ডার অনুসন্ধান" : "Instant order recovery"}</p>
+        <h1>{t("trackTitle")}</h1>
+        <p>{t("trackSubtitle")}</p>
+      </div>
+
+      {error && <ErrorBox message={error} />}
+
+      {step === "phone" && (
+        <form className="panel form-panel" onSubmit={handleRequestOtp}>
+          <label htmlFor="track-phone">{t("phoneLabel")}</label>
+          <input
+            id="track-phone"
+            type="tel"
+            required
+            autoComplete="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder={t("phonePlaceholder")}
+          />
+          <button className="button primary full-width" type="submit" disabled={busy || !phone.trim()}>
+            {busy ? "Sending..." : t("sendOtp")}
+            <ArrowRight size={17} />
+          </button>
+        </form>
+      )}
+
+      {step === "otp" && (
+        <form className="panel form-panel" onSubmit={handleVerifyOtp}>
+          <div className="otp-prompt-box">
+            <span className="status-dot green" />
+            <p>{t("otpSentMsg")} ({phone})</p>
+          </div>
+          {demoOtp && (
+            <div className="demo-otp-banner">
+              <span>{lang === "bn" ? "টেস্ট মোড ওটিপি:" : "Demo Test Code:"} <strong>{demoOtp}</strong></span>
+            </div>
+          )}
+          <label htmlFor="track-otp">{t("otpLabel")}</label>
+          <input
+            id="track-otp"
+            type="text"
+            required
+            maxLength={6}
+            value={otp}
+            onChange={(e) => setOtp(e.target.value)}
+            placeholder="1234"
+            className="otp-input"
+          />
+          <div className="form-actions-row">
+            <button className="button primary" type="submit" disabled={busy || !otp.trim()}>
+              {busy ? "Verifying..." : t("verifyOtp")}
+              <CheckCircle2 size={17} />
+            </button>
+            <button className="button ghost" type="button" onClick={() => setStep("phone")}>
+              {lang === "bn" ? "নম্বর পরিবর্তন" : "Change phone"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {step === "done" && (
+        <div className="track-results-container">
+          <div className="track-success-banner">
+            <CheckCircle2 size={20} />
+            <span>{t("trackSuccess")} ({foundOrders.length} {lang === "bn" ? "টি অর্ডার পাওয়া গেছে" : "orders found"})</span>
+          </div>
+          <div className="purchase-list">
+            {foundOrders.map((order) => (
+              <div key={order.id} className="purchase-card track-purchase-card">
+                <div className="purchase-info">
+                  <span className="purchase-ref">{order.ref}</span>
+                  <h3>{order.name}</h3>
+                  <p className="purchase-shop-name">{order.shop.name}</p>
+                  <p className="purchase-date">
+                    {new Date(order.created_at).toLocaleDateString(lang === "bn" ? "bn-BD" : "en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+                <div className="purchase-actions-col">
+                  <strong className="price">{money(order.total)}</strong>
+                  <span className={`status-pill ${order.delivery_status}`}>
+                    {order.payment_status === "paid" ? deliveryLabel(order.delivery_status) : paymentLabel(order.payment_status)}
+                  </span>
+                  <Link to={`/purchases/${order.id}`} className="button primary small">
+                    {lang === "bn" ? "অর্ডার দেখুন" : "View order"}
+                    <ArrowRight size={14} />
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
+
 function Header() {
   const { session, refreshSession } = useMarket();
+  const { t, lang, toggleLang } = useLang();
+  const { wishlist } = useWishlist();
+  const [showWishlist, setShowWishlist] = useState(false);
   const shop = useRouteShop();
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -183,31 +567,53 @@ function Header() {
         <nav className="desktop-nav" aria-label="Main navigation">
           {shop ? (
             <>
-              <NavLink to={`/shops/${shop.slug}`}>Shop products</NavLink>
+              <NavLink to={`/shops/${shop.slug}`}>{t("allProducts")}</NavLink>
               {shop.support && (
                 <a href={supportHref(shop.support)}>Contact seller</a>
               )}
             </>
           ) : (
             <>
-              <NavLink to="/products">Browse products</NavLink>
-              <NavLink to="/shops">Browse shops</NavLink>
-              <NavLink to="/how-it-works">How it works</NavLink>
+              <NavLink to="/products">{t("allProducts")}</NavLink>
+              <NavLink to="/shops">{t("shops")}</NavLink>
+              <NavLink to="/track">{t("trackOrder")}</NavLink>
+              <NavLink to="/how-it-works">{t("howItWorks")}</NavLink>
             </>
           )}
         </nav>
         <div className="header-actions">
+          <button
+            type="button"
+            className="header-wishlist-btn icon-button"
+            aria-label={`${t("wishlist")} (${wishlist.length})`}
+            title={t("wishlist")}
+            onClick={() => setShowWishlist(true)}
+          >
+            <Heart size={19} className={wishlist.length > 0 ? "fill-heart" : ""} />
+            {wishlist.length > 0 && <span className="wishlist-badge">{wishlist.length}</span>}
+          </button>
+
+          <button
+            type="button"
+            className="lang-toggle-btn"
+            aria-label="Switch language / ভাষা পরিবর্তন"
+            title={lang === "bn" ? "Switch to English" : "বাংলা ভাষায় দেখুন"}
+            onClick={toggleLang}
+          >
+            {lang === "bn" ? "EN" : "বাং"}
+          </button>
+
           <Link
             to="/purchases"
             className="purchases-link"
-            aria-label="My purchases"
+            aria-label={t("myPurchases")}
           >
             <ShoppingBag size={19} />
-            <span>My purchases</span>
+            <span>{t("myPurchases")}</span>
           </Link>
           {!shop && (
             <Link className="button primary seller-nav" to="/seller">
-              {session?.user ? "My shop" : "Start selling"}
+              {session?.user ? "My shop" : t("openShop")}
             </Link>
           )}
           <button
@@ -226,26 +632,46 @@ function Header() {
         <nav id="mobile-navigation" className="mobile-nav" aria-label="Mobile navigation">
           {shop ? (
             <>
-              <Link to={`/shops/${shop.slug}`}>Shop products</Link>
+              <Link to={`/shops/${shop.slug}`}>{t("allProducts")}</Link>
               {shop.support && (
                 <a href={supportHref(shop.support)}>Contact seller</a>
               )}
             </>
           ) : (
             <>
-              <Link to="/products">Browse products</Link>
-              <Link to="/shops">Browse shops</Link>
+              <Link to="/products">{t("allProducts")}</Link>
+              <Link to="/shops">{t("shops")}</Link>
+              <Link to="/track">{t("trackOrder")}</Link>
             </>
           )}
-          <Link to="/purchases">My purchases</Link>
+          <Link to="/purchases">{t("myPurchases")}</Link>
+          <button
+            type="button"
+            className="mobile-nav-action-btn"
+            onClick={() => {
+              setOpen(false);
+              setShowWishlist(true);
+            }}
+          >
+            <Heart size={18} className={wishlist.length > 0 ? "fill-heart" : ""} />
+            <span>{t("wishlist")} ({wishlist.length})</span>
+          </button>
+          <button
+            type="button"
+            className="mobile-nav-action-btn"
+            onClick={toggleLang}
+          >
+            <span>{lang === "bn" ? "🌐 Switch to English" : "🌐 বাংলায় দেখুন"}</span>
+          </button>
           {!shop && (
             <>
-              <Link to="/seller">Seller dashboard</Link>
-              <Link to="/how-it-works">How it works</Link>
+              <Link to="/seller">{t("openShop")}</Link>
+              <Link to="/how-it-works">{t("howItWorks")}</Link>
             </>
           )}
         </nav>
       )}
+      <WishlistModal open={showWishlist} onClose={() => setShowWishlist(false)} />
       {session?.demo && (
         <div className="demo-bar">
           <span className="status-dot" />
@@ -533,16 +959,33 @@ function Art({
 }
 function ProductCard({ product }: { product: Product }) {
   const { catalog } = useMarket();
+  const { isWishlisted, toggleWishlist } = useWishlist();
+  const wish = isWishlisted(product.id);
   const shop = catalog?.shops.find((s) => s.id === product.shop_id);
   return (
     <article className="product-card">
-      <Link
-        to={productPath(product, catalog!)}
-        className="product-art-link"
-        aria-label={`View ${product.name}`}
-      >
-        <Art product={product} />
-      </Link>
+      <div className="product-card-visual-wrapper">
+        <Link
+          to={productPath(product, catalog!)}
+          className="product-art-link"
+          aria-label={`View ${product.name}`}
+        >
+          <Art product={product} />
+        </Link>
+        <button
+          type="button"
+          className={`card-wishlist-btn ${wish ? "active" : ""}`}
+          aria-label={wish ? "Remove from wishlist" : "Save to wishlist"}
+          title={wish ? "In your wishlist" : "Save for later"}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleWishlist(product.id);
+          }}
+        >
+          <Heart size={16} className={wish ? "fill-heart" : ""} />
+        </button>
+      </div>
       <div className="product-info">
         <Link
           to={`/shops/${shop?.slug || product.shop_id}`}
@@ -1344,6 +1787,8 @@ function ProductPage() {
     if (section) navigate({ pathname: location.pathname, search: location.search, hash: "" }, { replace: true });
   }
   const { catalog, catalogError } = useMarket();
+  const { t, lang } = useLang();
+  const { wishlist, toggleWishlist, isWishlisted } = useWishlist();
   const [variant, setVariant] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [report, setReport] = useState("");
@@ -1391,6 +1836,7 @@ function ProductPage() {
     product.variants.find((v) => v.stock > 0) || product.variants[0];
   const available = Boolean(product.sales_enabled && selected && selected.stock > 0);
   const maximum = Math.min(selected?.stock ?? 0, 100);
+  const companion = useMemo(() => (catalog?.products || []).find((p) => p.id !== product?.id && p.sales_enabled) || null, [catalog?.products, product?.id]);
   const total = selected ? checkoutTotal(selected.price, quantity) : null;
   const canBuy = available && total !== null && quantity <= maximum;
   return (
@@ -1471,6 +1917,82 @@ function ProductPage() {
               )}
             </span>
           </div>
+
+          <div className="product-trust-stats-badges">
+            <div className="trust-stat-badge">
+              <span className="stat-icon">⚡</span>
+              <div>
+                <strong>
+                  {product.delivery_mode === "automatic"
+                    ? t("instantDeliveryBadge")
+                    : `${t("manualDeliveryBadge")} (${product.delivery_estimate || "1-3 Hours"})`}
+                </strong>
+                <small>{t("instantDeliveryDesc")}</small>
+              </div>
+            </div>
+            <div className="trust-stat-badge">
+              <span className="stat-icon">🛡️</span>
+              <div>
+                <strong>{t("completionRateBadge")}</strong>
+                <small>{t("fullWarrantyBadge")}</small>
+              </div>
+            </div>
+          </div>
+
+          <div className="volume-discount-widget">
+            <span className="volume-title">
+              <Zap size={14} />
+              {t("volumeTierTitle")}
+            </span>
+            <div className="volume-chips-row">
+              <button
+                type="button"
+                className={`volume-chip ${quantity === 1 ? "active" : ""}`}
+                onClick={() => setQuantity(1)}
+              >
+                {t("volume1x")}
+              </button>
+              <button
+                type="button"
+                className={`volume-chip ${quantity >= 3 && quantity < 5 ? "active" : ""}`}
+                onClick={() => setQuantity(3)}
+              >
+                {t("volume3x")}
+              </button>
+              <button
+                type="button"
+                className={`volume-chip ${quantity >= 5 ? "active" : ""}`}
+                onClick={() => setQuantity(5)}
+              >
+                {t("volume5x")}
+              </button>
+            </div>
+          </div>
+
+          {companion && (
+            <div className="bundle-cross-sell-box">
+              <span className="bundle-badge">{t("bundleTitle")}</span>
+              <div className="bundle-content">
+                <div className="bundle-art">
+                  <Art product={companion} />
+                </div>
+                <div className="bundle-info">
+                  <strong>{companion.name}</strong>
+                  <p className="bundle-pricing">
+                    <span className="bundle-discount-pill">20% OFF</span>
+                    <span>{money(minimumPrice(companion))}</span>
+                  </p>
+                  <Link
+                    to={`/checkout/${companion.id}?coupon=BUNDLE20`}
+                    className="button secondary small"
+                  >
+                    {t("bundleAddPrompt")} {companion.name.slice(0, 18)}...
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="product-purchase-box">
             <div className="product-purchase-total" aria-live="polite" aria-atomic="true">
               <span>Total price <small>For {quantity} {quantity === 1 ? "item" : "items"}</small></span>
@@ -1498,6 +2020,15 @@ function ProductPage() {
               {!available ? (product.sales_enabled ? "Currently unavailable" : "Purchases paused") : "Check quantity"}
             </button>
           )}
+              <button
+                type="button"
+                className={`button secondary button-wishlist ${isWishlisted(product.id) ? "active" : ""}`}
+                onClick={() => toggleWishlist(product.id)}
+                title={isWishlisted(product.id) ? "Remove from wishlist" : "Save for later"}
+              >
+                <Heart size={18} className={isWishlisted(product.id) ? "fill-heart" : ""} />
+                <span>{isWishlisted(product.id) ? (lang === "bn" ? "উইশলিস্টে যুক্ত" : "Saved") : (lang === "bn" ? "পরে কিনুন" : "Save")}</span>
+              </button>
             </div>
             {available && !canBuy && <p role="alert" className="product-quantity-error">Choose a whole quantity between 1 and {maximum}.</p>}
             <div className="product-policy-links">
@@ -1613,7 +2144,7 @@ function Checkout() {
   });
   const [quantity, setQuantity] = useState(() => checkoutQuantity(params.get("quantity"))),
     [provider, setProvider] = useState("");
-  const [couponCode, setCouponCode] = useState("");
+  const [couponCode, setCouponCode] = useState(() => (params.get("coupon") || "").trim().toUpperCase());
   const [quote, setQuote] = useState<Quote | null>(null),
     [agreed, setAgreed] = useState(false),
     [busy, setBusy] = useState(false),
@@ -2113,6 +2644,7 @@ function CopyButton({
 function PurchasePage() {
   const { id } = useParams();
   const { session, sessionError } = useMarket();
+  const { t, lang } = useLang();
   const [order, setOrder] = useState<Purchase | null>(null),
     [error, setError] = useState(""),
     [trx, setTrx] = useState(""),
@@ -2257,6 +2789,12 @@ function PurchasePage() {
                 Send the exact amount to the seller’s receiving account. Then
                 enter the transaction ID below.
               </p>
+              <DynamicPaymentQR
+                provider={order.payment.provider}
+                account={order.payment.account}
+                amount={order.payment.amount}
+                orderRef={order.ref}
+              />
               <div className="payment-account">
                 <div>
                   <span>Receiving account</span>
@@ -2425,6 +2963,56 @@ function PurchasePage() {
           </div>
         )}
       </div>
+        {paid && !cancelled && (
+          <div className="subscription-expiry-card">
+            <div className="expiry-header">
+              <span className="expiry-badge active">
+                <Zap size={14} />
+                {(() => {
+                  const expiryTime = new Date(order.created_at).getTime() + (30 * 86400000);
+                  const diffDays = Math.ceil((expiryTime - Date.now()) / 86400000);
+                  return diffDays > 0 ? `${diffDays} ${t("daysLeft")} (${t("warrantyActive")})` : t("expiredPlan");
+                })()}
+              </span>
+              <span className="expiry-date-label">
+                {lang === "bn" ? "মেয়াদ:" : "Valid until"} {new Date(new Date(order.created_at).getTime() + (30 * 86400000)).toLocaleDateString(lang === "bn" ? "bn-BD" : "en-GB", { day: "numeric", month: "short", year: "numeric" })}
+              </span>
+            </div>
+            <Link
+              to={`/checkout/${order.product_id}?coupon=RENEW10`}
+              className="button primary button-renew-plan"
+            >
+              <RefreshCw size={15} />
+              {t("oneClickRenew")}
+            </Link>
+          </div>
+        )}
+        <div className="purchase-sharing-actions">
+          <button
+            type="button"
+            className="button secondary"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(window.location.href);
+                alert(t("recoveryLinkCopied"));
+              } catch {}
+            }}
+          >
+            <Copy size={15} />
+            {t("copyRecoveryLink")}
+          </button>
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(
+              `${order.shop.name}: Order ${order.ref} (${order.name})\nView digital purchase: ${window.location.href}`
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="button secondary button-wa-share"
+          >
+            <IconWhatsApp size={16} />
+            {t("sendToWhatsApp")}
+          </a>
+        </div>
       {(order.can_review || order.review) && <PurchaseReview key={order.id} order={order} />}
       <div className="purchase-support">
         <span>Need help with this order?</span>
@@ -3434,45 +4022,48 @@ export default function App() {
     };
   }, []);
   return (
-    <Context.Provider
-      value={{
-        catalog,
-        catalogError,
-        reloadCatalog,
-        session,
-        sessionError,
-        refreshSession,
-      }}
-    >
-      <a className="skip-link" href="#main">
-        Skip to content
-      </a>
-      <ScrollToTop />
-      <Header />
-      {sessionError && (
-        <div className="container">
-          <ErrorBox
-            message={sessionError}
-            retry={() => void refreshSession()}
-          />
-        </div>
-      )}
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/products" element={<Products />} />
-        <Route path="/products/:id" element={<ProductPage />} />
-        <Route path="/shops/:slug/products/:productSlug" element={<ProductPage />} />
-        <Route path="/shops" element={<Shops />} />
-        <Route path="/shops/:slug" element={<ShopPage />} />
-        <Route path="/checkout/:id" element={<Checkout />} />
-        <Route path="/purchases" element={<Purchases />} />
-        <Route path="/purchases/:id" element={<PurchasePage />} />
-        <Route path="/seller" element={<Seller />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="/how-it-works" element={<HowItWorks />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-      <Footer />
-    </Context.Provider>
+    <LangProvider>
+      <Context.Provider
+        value={{
+          catalog,
+          catalogError,
+          reloadCatalog,
+          session,
+          sessionError,
+          refreshSession,
+        }}
+      >
+        <a className="skip-link" href="#main">
+          Skip to content
+        </a>
+        <ScrollToTop />
+        <Header />
+        {sessionError && (
+          <div className="container">
+            <ErrorBox
+              message={sessionError}
+              retry={() => void refreshSession()}
+            />
+          </div>
+        )}
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/products" element={<Products />} />
+          <Route path="/products/:id" element={<ProductPage />} />
+          <Route path="/shops/:slug/products/:productSlug" element={<ProductPage />} />
+          <Route path="/shops" element={<Shops />} />
+          <Route path="/shops/:slug" element={<ShopPage />} />
+          <Route path="/track" element={<TrackOrderPage />} />
+          <Route path="/checkout/:id" element={<Checkout />} />
+          <Route path="/purchases" element={<Purchases />} />
+          <Route path="/purchases/:id" element={<PurchasePage />} />
+          <Route path="/seller" element={<Seller />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+        <Footer />
+      </Context.Provider>
+    </LangProvider>
   );
 }
