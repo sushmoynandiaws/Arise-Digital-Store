@@ -86,11 +86,7 @@ test("WhatsApp URL generator normalizes BD phone numbers and encodes custom cont
   assert.equal(generateWhatsAppUrl(existingWaLink), existingWaLink);
 });
 
-test("App.tsx contains trust badges, warranty badges, promo code input, and download button logic", () => {
-  assert.ok(appCode.includes("product-trust-badges"), "Missing product-trust-badges in App.tsx");
-  assert.ok(appCode.includes("Replacement Warranty"), "Missing warranty text in App.tsx");
-  assert.ok(appCode.includes("Instant Auto-Delivery (10s)"), "Missing auto-delivery badge text in App.tsx");
-  assert.ok(appCode.includes("100% Verified & Private"), "Missing privacy badge in App.tsx");
+test("App.tsx contains promo code input, WhatsApp support button, and download button logic", () => {
   assert.ok(appCode.includes("Promo code / Coupon"), "Missing promo code input in App.tsx");
   assert.ok(appCode.includes("coupon_code"), "Missing coupon_code handling in App.tsx");
   assert.ok(appCode.includes("WhatsAppFloatingButton"), "Missing WhatsAppFloatingButton in App.tsx");

@@ -17,7 +17,8 @@ import {
   useSearchParams,
   matchPath,
 } from "react-router-dom";
-import {
+import {
+
   ArrowRight,
   ArrowLeft,
   Search,
@@ -1165,45 +1166,6 @@ function ProductPage() {
           <div className="detail-price">
             {selected ? money(selected.price) : money(minimumPrice(product))}
             <span>Price per item</span>
-          </div>
-          <div className="product-trust-badges" aria-label="Purchase guarantees and warranties">
-            <div className="trust-badge">
-              <ShieldCheck size={18} className="trust-badge-icon" />
-              <div className="trust-badge-info">
-                <strong>
-                  {product.warranty_type === "warranty"
-                    ? `${product.warranty_days || 30}-Day Replacement Warranty`
-                    : "Replacement Guarantee"}
-                </strong>
-                <span>{product.warranty_type === "warranty" ? "Direct replacement for any valid issue" : "Authentic item verified by seller"}</span>
-              </div>
-            </div>
-            <div className="trust-badge">
-              {product.delivery_mode === "automatic" ? (
-                <>
-                  <Zap size={18} className="trust-badge-icon zap-icon" />
-                  <div className="trust-badge-info">
-                    <strong>Instant Auto-Delivery (10s)</strong>
-                    <span>Access immediately after payment verification</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <Package size={18} className="trust-badge-icon" />
-                  <div className="trust-badge-info">
-                    <strong>Fast Seller Delivery</strong>
-                    <span>{product.delivery_estimate || "Delivered within 1-2 hours"}</span>
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="trust-badge">
-              <LockKeyhole size={18} className="trust-badge-icon" />
-              <div className="trust-badge-info">
-                <strong>100% Verified & Private</strong>
-                <span>Credentials delivered only to your private account</span>
-              </div>
-            </div>
           </div>
           {product.description && <div className="product-brief">
             <h2>Product description</h2>
