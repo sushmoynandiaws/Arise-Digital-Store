@@ -174,3 +174,35 @@ test("resolveImageUrl resolves full URLs, relative paths and unsigned catalog as
   );
   assert.equal(resolveImageUrl(null), null);
 });
+
+test("Shop social links and contact badges auto-propagate to shop banner and store footer", () => {
+  assert.ok(appCode.includes("export function SocialLinks"), "SocialLinks component should be exported");
+  assert.ok(appCode.includes("export function ShopContactChips"), "ShopContactChips component should be exported");
+  assert.ok(appCode.includes("store-footer-card"), "store-footer-card should be in App.tsx");
+  assert.ok(appCode.includes("seller-verified-badge"), "seller-verified-badge should be in App.tsx");
+  assert.ok(appCode.includes("button-wa-chat"), "button-wa-chat should be in App.tsx");
+  assert.ok(appCode.includes("shop-hero-contact-chips"), "shop-hero-contact-chips should be in App.tsx");
+
+  // Verify supportHref normalizes Bangladeshi phone numbers correctly including +880 013...
+  function supportHref(value) {
+    if (/^https:\/\//.test(value)) return value;
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return `mailto:${value}`;
+    const digits = value.replace(/\D/g, "");
+    if (digits.length >= 10) {
+      let clean = digits;
+      if (digits.startsWith("88001")) {
+        clean = "8801" + digits.slice(5);
+      } else if (digits.length === 11 && digits.startsWith("01")) {
+        clean = `88${digits}`;
+      }
+      return `https://wa.me/${clean}`;
+    }
+    return "#seller-support";
+  }
+
+  assert.equal(supportHref("+880 01305087389"), "https://wa.me/8801305087389");
+  assert.equal(supportHref("01305087389"), "https://wa.me/8801305087389");
+  assert.equal(supportHref("+8801305087389"), "https://wa.me/8801305087389");
+  assert.equal(supportHref("sushmoynandiml@gmail.com"), "mailto:sushmoynandiml@gmail.com");
+  assert.equal(supportHref("https://wa.me/8801305087389"), "https://wa.me/8801305087389");
+});

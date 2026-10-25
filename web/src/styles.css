@@ -227,11 +227,25 @@ textarea { resize: vertical; }
 .shop-discovery > .text-link { margin: 12px 24px 20px; }
 .shop-hero { padding-top: 32px; }
 .shop-banner { display: flex; justify-content: space-between; align-items: center; gap: 32px; padding: 48px; border-radius: 24px; color: var(--surface); background: var(--ink) center / cover; }
-.shop-identity { display: flex; align-items: center; gap: 24px; min-width: 0; }
-.shop-identity .shop-avatar { width: 80px; height: 80px; font-size: 28px; background: var(--surface); }
-.shop-identity h1 { color: var(--surface); font-size: var(--title-page); overflow-wrap: anywhere; }
+.shop-identity { display: flex; align-items: flex-start; gap: 24px; min-width: 0; flex: 1; }
+.shop-identity .shop-avatar { width: 84px; height: 84px; font-size: 30px; background: var(--surface); border-radius: 20px; overflow: hidden; flex-shrink: 0; display: grid; place-items: center; }
+.shop-identity-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.shop-badge-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.seller-verified-badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; background: color-mix(in srgb, #10b981 22%, transparent); color: #34d399; border: 1px solid color-mix(in srgb, #10b981 35%, transparent); letter-spacing: 0.02em; }
+.shop-identity h1 { color: var(--surface); font-size: var(--title-page); overflow-wrap: anywhere; line-height: 1.15; }
 .shop-identity .eyebrow { color: var(--line-strong); }
-.shop-identity p:last-child { max-width: 560px; margin-top: 12px; color: color-mix(in srgb, var(--surface) 75%, transparent); font-size: var(--text-body); }
+.shop-tagline { font-size: 16px; font-weight: 600; color: color-mix(in srgb, var(--surface) 95%, transparent); }
+.shop-identity-desc { max-width: 620px; color: color-mix(in srgb, var(--surface) 80%, transparent); font-size: var(--text-body); line-height: 1.5; }
+.shop-hero-contact-chips, .shop-contact-chips { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; margin-top: 6px; }
+.contact-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; font-size: 13px; color: var(--surface); background: color-mix(in srgb, var(--surface) 12%, transparent); border: 1px solid color-mix(in srgb, var(--surface) 20%, transparent); text-decoration: none; transition: all var(--duration-short); }
+.contact-chip:hover { background: color-mix(in srgb, var(--surface) 22%, transparent); color: #fff; }
+.shop-hero-social, .shop-social-links { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.social-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; min-height: 44px; border-radius: 9999px; font-size: 13px; font-weight: 600; text-decoration: none; transition: transform var(--duration-short), box-shadow var(--duration-short), background var(--duration-short), color var(--duration-short); }
+.shop-hero .social-pill { background: color-mix(in srgb, var(--surface) 15%, transparent); color: var(--surface); border: 1px solid color-mix(in srgb, var(--surface) 25%, transparent); }
+.shop-banner-actions { display: flex; flex-direction: column; gap: 10px; align-items: stretch; flex-shrink: 0; min-width: 220px; }
+.button-wa-chat { background: #25d366 !important; color: #fff !important; border: none; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 12px; box-shadow: 0 4px 14px rgba(37, 211, 102, 0.35); transition: background var(--duration-short), transform var(--duration-short); }
+.button-wa-chat:hover { background: #20ba5a !important; transform: translateY(-1px); }
+.button-email { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; }
 .shop-banner > .button { flex-shrink: 0; }
 .shop-hero + .listing-page { padding-top: 32px; }
 
@@ -534,10 +548,33 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
 .footer-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; border-top: 1px solid var(--line); padding-block: 24px; color: var(--muted); font-size: var(--text-small); }
 .powered { display: inline-flex; align-items: center; gap: 4px; font-size: var(--text-small); }
 .powered strong { font-weight: 700; color: var(--ink); }
-.store-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 24px; padding-block: 32px; }
-.store-footer p { color: var(--muted); font-size: var(--text-meta); margin-top: 4px; }
-.store-footer nav { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 24px; font-size: var(--text-meta); }
-.store-footer nav a, .store-footer > a { display: inline-flex; align-items: center; min-height: 44px; }
+.store-footer { display: flex; flex-direction: column; gap: 24px; padding-block: 40px 32px; }
+.store-footer-card { display: flex; flex-direction: column; gap: 28px; padding: 28px 32px; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow-sm); }
+.store-footer-brand-section { display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+.store-footer-identity { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.store-footer-identity .shop-avatar { width: 56px; height: 56px; font-size: 20px; flex-shrink: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: grid; place-items: center; }
+.store-footer-name-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.store-footer-name-row strong { font-size: 18px; color: var(--ink); font-weight: 700; }
+.store-footer-desc { color: var(--muted); font-size: 14px; margin-top: 4px; max-width: 520px; line-height: 1.5; }
+.store-footer .social-pill { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+.social-facebook:hover { background: #1877f2 !important; color: #fff !important; border-color: #1877f2 !important; }
+.social-instagram:hover { background: #e1306c !important; color: #fff !important; border-color: #e1306c !important; }
+.social-tiktok:hover { background: #000 !important; color: #fff !important; border-color: #000 !important; }
+.social-whatsapp:hover { background: #25d366 !important; color: #fff !important; border-color: #25d366 !important; }
+.social-maps:hover { background: #ea4335 !important; color: #fff !important; border-color: #ea4335 !important; }
+.social-website:hover { background: var(--primary) !important; color: #fff !important; border-color: var(--primary) !important; }
+.store-footer-details-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 28px; }
+.store-footer-col { display: flex; flex-direction: column; gap: 12px; }
+.store-footer-col-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.store-footer-contact-list { display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
+.store-footer-contact-item { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; color: var(--ink); text-decoration: none; word-break: break-all; transition: color var(--duration-short); }
+.store-footer-contact-item svg { color: var(--primary); flex-shrink: 0; }
+.store-footer-contact-item:hover { color: var(--primary); }
+.store-footer-nav { display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
+.store-footer-nav a { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); text-decoration: none; transition: color var(--duration-short); }
+.store-footer-nav a:hover { color: var(--primary); }
+.store-footer-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--muted); padding-top: 8px; }
+.store-footer-guarantee { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
 
 @media (min-width: 1025px) { .order-summary { position: sticky; top: 24px; } }
 @media (max-width: 1120px) {
@@ -686,11 +723,15 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
   .filter-row { flex-direction: column; gap: 12px; }
   .results-count { margin-block: 16px; }
   .shop-hero { padding-top: 16px; }
-  .shop-banner { padding: 28px 24px; gap: 24px; border-radius: 20px; }
-  .shop-identity { flex-direction: column; gap: 20px; }
+  .shop-banner { padding: 28px 24px; gap: 24px; border-radius: 20px; flex-direction: column; align-items: stretch; }
+  .shop-identity { flex-direction: column; gap: 16px; }
   .shop-identity .shop-avatar { width: 64px; height: 64px; font-size: 24px; }
   .shop-identity p:last-child { font-size: var(--text-label); }
-  .shop-banner > .button { width: 100%; }
+  .shop-banner > .button, .shop-banner-actions { width: 100%; min-width: auto; }
+  .store-footer-card { padding: 20px 16px; gap: 20px; }
+  .store-footer-brand-section { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .store-footer-details-grid { grid-template-columns: 1fr; gap: 20px; }
+  .store-footer-bottom { flex-direction: column; align-items: flex-start; gap: 8px; }
   .detail-page { padding-block: 12px 40px; }
   .breadcrumbs { gap: 4px 8px; margin-bottom: 16px; }
   .large-art { height: 320px; }

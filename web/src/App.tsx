@@ -28,6 +28,7 @@ import {
   X,
   Check,
   CheckCircle2,
+  ShieldCheck,
   Zap,
   ChevronDown,
   LayoutGrid,
@@ -281,21 +282,95 @@ function Footer() {
   const { session } = useMarket();
   if (shop)
     return (
-      <footer className="store-footer">
-        <div>
-          <strong>{shop.name}</strong>
-          <p>Digital products, directly from this seller.</p>
+      <footer className="store-footer container">
+        <div className="store-footer-card">
+          <div className="store-footer-brand-section">
+            <div className="store-footer-identity">
+              <ShopAvatar shop={shop} />
+              <div>
+                <div className="store-footer-name-row">
+                  <strong>{shop.name}</strong>
+                  <span className="seller-verified-badge" title="Verified AriseSell Merchant">
+                    <ShieldCheck size={13} /> Verified Seller
+                  </span>
+                </div>
+                <p className="store-footer-desc">
+                  {shop.tagline || shop.description || "Digital products, directly from this seller."}
+                </p>
+              </div>
+            </div>
+            <SocialLinks shop={shop} className="store-footer-social" />
+          </div>
+
+          <div className="store-footer-details-grid">
+            {(shop.contact?.email || shop.contact?.phone || shop.contact?.whatsapp || shop.contact?.address) && (
+              <div className="store-footer-col">
+                <span className="store-footer-col-title">Direct Seller Contact</span>
+                <div className="store-footer-contact-list">
+                  {shop.contact.whatsapp && (
+                    <a
+                      href={supportHref(shop.contact.whatsapp)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="store-footer-contact-item"
+                    >
+                      <IconWhatsApp size={16} />
+                      <span>{shop.contact.whatsapp}</span>
+                    </a>
+                  )}
+                  {shop.contact.email && (
+                    <a
+                      href={`mailto:${shop.contact.email}`}
+                      className="store-footer-contact-item"
+                    >
+                      <IconMail size={16} />
+                      <span>{shop.contact.email}</span>
+                    </a>
+                  )}
+                  {shop.contact.phone && shop.contact.phone !== shop.contact.whatsapp && (
+                    <a
+                      href={`tel:${shop.contact.phone.replace(/\s+/g, "")}`}
+                      className="store-footer-contact-item"
+                    >
+                      <IconPhone size={16} />
+                      <span>{shop.contact.phone}</span>
+                    </a>
+                  )}
+                  {(shop.contact.address || shop.contact.city_division) && (
+                    <span className="store-footer-contact-item location">
+                      <IconMapPin size={16} />
+                      <span>
+                        {[shop.contact.address, shop.contact.city_division, shop.contact.postal_code]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="store-footer-col">
+              <span className="store-footer-col-title">Store Navigation</span>
+              <nav aria-label="Shop footer navigation" className="store-footer-nav">
+                <Link to={`/shops/${shop.slug}`}>Shop products</Link>
+                <Link to="/purchases">My purchases</Link>
+                {shop.support && (
+                  <a href={supportHref(shop.support)}>Contact seller</a>
+                )}
+              </nav>
+            </div>
+          </div>
         </div>
-        <nav aria-label="Shop footer navigation">
-          <Link to={`/shops/${shop.slug}`}>Shop products</Link>
-          <Link to="/purchases">My purchases</Link>
-          {shop.support && (
-            <a href={supportHref(shop.support)}>Contact seller</a>
-          )}
-        </nav>
-        <Link className="powered" to="/">
-          Powered by <strong>Arise Digital Store</strong>
-        </Link>
+
+        <div className="store-footer-bottom">
+          <Link className="powered" to="/">
+            Powered by <strong>Arise Digital Store</strong>
+          </Link>
+          <span className="store-footer-guarantee">
+            Secured payments & instant digital delivery via AriseSell
+          </span>
+        </div>
       </footer>
     );
   return (
@@ -506,11 +581,171 @@ function ProductCard({ product }: { product: Product }) {
     </article>
   );
 }
+function IconFacebook({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+    </svg>
+  );
+}
+
+function IconInstagram({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+    </svg>
+  );
+}
+
+function IconTikTok({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.298-.002.595.042.88.13V9.4a6.33 6.33 0 0 0-1-.08A6.34 6.34 0 0 0 3 15.66a6.34 6.34 0 0 0 10.82 4.48c.84-.84 1.34-1.98 1.38-3.18V8.92a8.27 8.27 0 0 0 4.39 1.25V6.69z" />
+    </svg>
+  );
+}
+
+function IconWhatsApp({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm.01 1.67c2.2 0 4.26.86 5.82 2.41a8.16 8.16 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24zm4.52 11.53c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.06-.39-2.02-1.25-.75-.67-1.26-1.5-1.4-1.75-.14-.25-.02-.39.11-.51.11-.11.25-.29.38-.44.13-.14.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.61.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.44.53.6.19 1.15.16 1.58.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.15-1.18-.06-.11-.22-.18-.47-.3z" />
+    </svg>
+  );
+}
+
+function IconMapPin({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+function IconMail({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect width="20" height="16" x="2" y="4" rx="2" />
+      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+    </svg>
+  );
+}
+
+function IconPhone({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  );
+}
+
+function IconGlobe({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" x2="22" y1="12" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  );
+}
+
+export function SocialLinks({ shop, className = "shop-social-links" }: { shop: Shop; className?: string }) {
+  const links = shop.social_links;
+  if (!links) return null;
+
+  const items: { key: string; label: string; url: string; icon: ReactNode }[] = [
+    { key: "facebook", label: "Facebook", url: links.facebook || "", icon: <IconFacebook size={18} /> },
+    { key: "instagram", label: "Instagram", url: links.instagram || "", icon: <IconInstagram size={18} /> },
+    { key: "tiktok", label: "TikTok", url: links.tiktok || "", icon: <IconTikTok size={18} /> },
+    { key: "whatsapp", label: "WhatsApp", url: links.whatsapp || "", icon: <IconWhatsApp size={18} /> },
+    { key: "maps", label: "Google Maps", url: links.maps || "", icon: <IconMapPin size={18} /> },
+    { key: "website", label: "Website", url: links.website || "", icon: <IconGlobe size={18} /> },
+  ].filter((item) => Boolean(item.url));
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className={className} aria-label={`${shop.name} social links`}>
+      {items.map((item) => (
+        <a
+          key={item.key}
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`social-pill social-${item.key}`}
+          aria-label={`${item.label} (${shop.name})`}
+          title={`${shop.name} on ${item.label}`}
+        >
+          <span className="social-icon" aria-hidden="true">{item.icon}</span>
+          <span className="social-text">{item.label}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+export function ShopContactChips({ shop, className = "shop-contact-chips" }: { shop: Shop; className?: string }) {
+  const contact = shop.contact;
+  if (!contact) return null;
+
+  const fullAddress = [contact.address, contact.city_division, contact.postal_code]
+    .filter(Boolean)
+    .join(", ");
+
+  const hasAny = Boolean(contact.email || contact.phone || contact.whatsapp || fullAddress);
+  if (!hasAny) return null;
+
+  return (
+    <div className={className} aria-label={`${shop.name} contact details`}>
+      {contact.whatsapp && (
+        <a
+          href={supportHref(contact.whatsapp)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="contact-chip contact-whatsapp"
+          title="Chat on WhatsApp"
+        >
+          <span aria-hidden="true"><IconWhatsApp size={15} /></span>
+          <span>{contact.whatsapp}</span>
+        </a>
+      )}
+      {contact.email && (
+        <a
+          href={`mailto:${contact.email}`}
+          className="contact-chip contact-email"
+          title="Send email"
+        >
+          <span aria-hidden="true"><IconMail size={15} /></span>
+          <span>{contact.email}</span>
+        </a>
+      )}
+      {contact.phone && contact.phone !== contact.whatsapp && (
+        <a
+          href={`tel:${contact.phone.replace(/\s+/g, "")}`}
+          className="contact-chip contact-phone"
+          title="Call store phone"
+        >
+          <span aria-hidden="true"><IconPhone size={15} /></span>
+          <span>{contact.phone}</span>
+        </a>
+      )}
+      {fullAddress && (
+        <span className="contact-chip contact-address" title="Store Location">
+          <span aria-hidden="true"><IconMapPin size={15} /></span>
+          <span>{fullAddress}</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
 function ShopAvatar({ shop }: { shop: Shop }) {
+  const { session } = useMarket();
+  const logo = resolveImageUrl(shop.logo_url, session?.source_web, shop.slug);
   return (
     <span className="shop-avatar">
-      {shop.logo_url ? (
-        <img src={shop.logo_url} alt="" referrerPolicy="no-referrer" />
+      {logo ? (
+        <img src={logo} alt={shop.name} referrerPolicy="no-referrer" />
       ) : (
         shop.name.slice(0, 2).toUpperCase()
       )}
@@ -917,7 +1152,7 @@ function Shops() {
 }
 function ShopPage() {
   const { slug } = useParams();
-  const { catalog, catalogError } = useMarket();
+  const { catalog, catalogError, session } = useMarket();
   if (catalogError)
     return (
       <main id="main" className="container section">
@@ -927,32 +1162,71 @@ function ShopPage() {
   if (!catalog) return <Loading />;
   const shop = catalog.shops.find((s) => s.slug === slug || s.id === slug);
   if (!shop) return <NotFound />;
+
+  const coverUrl = resolveImageUrl(shop.cover_url, session?.source_web, shop.slug);
+  const waUrl =
+    shop.social_links?.whatsapp ||
+    (shop.contact?.whatsapp ? supportHref(shop.contact.whatsapp) : undefined);
+
   return (
     <main id="main">
       <section className="shop-hero container">
         <div
           className="shop-banner"
           style={
-            shop.cover_url
+            coverUrl
               ? {
-                  backgroundImage: `linear-gradient(90deg,rgba(15,23,42,.94),rgba(15,23,42,.7)),url(${JSON.stringify(shop.cover_url)})`,
+                  backgroundImage: `linear-gradient(90deg,rgba(15,23,42,.94),rgba(15,23,42,.7)),url(${JSON.stringify(coverUrl)})`,
                 }
               : undefined
           }
         >
           <div className="shop-identity">
             <ShopAvatar shop={shop} />
-            <div>
-              <p className="eyebrow">Independent digital shop</p>
+            <div className="shop-identity-body">
+              <div className="shop-badge-row">
+                <span className="eyebrow">Verified digital shop</span>
+                <span className="seller-verified-badge" title="Verified seller on AriseSell">
+                  <ShieldCheck size={13} /> Verified
+                </span>
+              </div>
               <h1>{shop.name}</h1>
-              <p>{shop.description}</p>
+              {shop.tagline && <p className="shop-tagline">{shop.tagline}</p>}
+              <p className="shop-identity-desc">{shop.description}</p>
+              <ShopContactChips shop={shop} className="shop-hero-contact-chips" />
+              <SocialLinks shop={shop} className="shop-hero-social" />
             </div>
           </div>
-          {shop.support && (
-            <a className="button light" href={supportHref(shop.support)}>
-              Contact seller
-            </a>
-          )}
+          <div className="shop-banner-actions">
+            {waUrl ? (
+              <a
+                className="button primary button-wa-chat"
+                href={waUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <span aria-hidden="true">
+                  <IconWhatsApp size={18} />
+                </span>
+                Chat on WhatsApp
+              </a>
+            ) : shop.support ? (
+              <a className="button light" href={supportHref(shop.support)}>
+                Contact seller
+              </a>
+            ) : null}
+            {shop.contact?.email && (
+              <a
+                className="button light button-email"
+                href={`mailto:${shop.contact.email}`}
+              >
+                <span aria-hidden="true">
+                  <IconMail size={16} />
+                </span>
+                Email support
+              </a>
+            )}
+          </div>
         </div>
       </section>
       <Products shop={shop} />
@@ -965,7 +1239,12 @@ function supportHref(value: string) {
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return `mailto:${value}`;
   const digits = value.replace(/\D/g, "");
   if (digits.length >= 10) {
-    const clean = digits.length === 11 && digits.startsWith("01") ? `88${digits}` : digits;
+    let clean = digits;
+    if (digits.startsWith("88001")) {
+      clean = "8801" + digits.slice(5);
+    } else if (digits.length === 11 && digits.startsWith("01")) {
+      clean = `88${digits}`;
+    }
     return `https://wa.me/${clean}`;
   }
   return "#seller-support";

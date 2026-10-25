@@ -23,6 +23,24 @@ export type Product = {
   sales_enabled: boolean;
   selected?: boolean;
 };
+export type ShopSocialLinks = {
+  facebook?: string;
+  instagram?: string;
+  tiktok?: string;
+  whatsapp?: string;
+  maps?: string;
+  website?: string;
+};
+
+export type ShopContact = {
+  email?: string;
+  phone?: string;
+  whatsapp?: string;
+  address?: string;
+  city_division?: string;
+  postal_code?: string;
+};
+
 export type Shop = {
   id: string;
   slug: string;
@@ -33,6 +51,9 @@ export type Shop = {
   support: string;
   published: boolean;
   payment_methods?: string[];
+  tagline?: string;
+  social_links?: ShopSocialLinks;
+  contact?: ShopContact;
 };
 export type Catalog = { shops: Shop[]; products: Product[]; synced_at: string };
 export type User = { id: string; name: string; email: string; admin: boolean };
