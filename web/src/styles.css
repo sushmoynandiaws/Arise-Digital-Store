@@ -1118,6 +1118,71 @@ svg {
   border-radius: 50%;
   border: 1px solid color-mix(in srgb, var(--art-ink) 9%, transparent);
 }
+.art-digital-badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -55%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  z-index: 2;
+  text-align: center;
+  width: 90%;
+  pointer-events: none;
+}
+.art-emblem {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  transition: transform 0.25s var(--ease-out);
+}
+.product-card:hover .art-emblem {
+  transform: scale(1.08);
+}
+.art-brand-pill {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.3px;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  max-width: 85%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.large-art .art-digital-badge {
+  transform: translate(-50%, -50%);
+  gap: 16px;
+}
+.large-art .art-emblem {
+  width: 96px;
+  height: 96px;
+  border-radius: 28px;
+}
+.large-art .art-brand-pill {
+  font-size: 13px;
+  padding: 6px 16px;
+}
 .art-sheet {
   position: absolute;
   top: 24px;

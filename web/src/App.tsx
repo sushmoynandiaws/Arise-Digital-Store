@@ -51,6 +51,7 @@ import {
   Play,
   Monitor,
   Command,
+  Bot,
 } from "lucide-react";
 import {
   api,
@@ -328,6 +329,25 @@ function Footer() {
     </footer>
   );
 }
+export function resolveImageUrl(
+  url: string | null | undefined,
+  sourceWeb?: string,
+): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  if (trimmed.startsWith("//")) {
+    return `https:${trimmed}`;
+  }
+  if (trimmed.startsWith("/")) {
+    const base = (sourceWeb || "https://arisesell.com").replace(/\/+$/, "");
+    return `${base}${trimmed}`;
+  }
+  return null;
+}
 function CategoryIcon({
   category,
   size = 20,
@@ -335,17 +355,19 @@ function CategoryIcon({
   category: string;
   size?: number;
 }) {
-  const Icon = /learn|course|education/i.test(category)
-    ? BookOpen
-    : /design|template/i.test(category)
-      ? Palette
-      : /develop|code|software/i.test(category)
-        ? Code2
-        : /photo|video|creative/i.test(category)
-          ? Play
-          : /productiv/i.test(category)
-            ? Command
-            : Layers;
+  const Icon = /ai|gpt|chatgpt|openai|bot|intelligence/i.test(category)
+    ? Bot
+    : /learn|course|education|udemy|academy/i.test(category)
+      ? BookOpen
+      : /design|template/i.test(category)
+        ? Palette
+        : /develop|code|software/i.test(category)
+          ? Code2
+          : /photo|video|creative/i.test(category)
+            ? Play
+            : /productiv/i.test(category)
+              ? Command
+              : Layers;
   return <Icon size={size} />;
 }
 function Art({
@@ -355,38 +377,49 @@ function Art({
   product: Product;
   large?: boolean;
 }) {
+  const { session } = useMarket();
+  const [imgFailed, setImgFailed] = useState(false);
+  const imageUrl = resolveImageUrl(product.image_url, session?.source_web);
   let hash = 0;
   for (const c of product.category) hash += c.charCodeAt(0);
   const tone = hash % 6;
+
+  const isAi = /ai|gpt|chatgpt|openai|claude|gemini/i.test(
+    `${product.name} ${product.category}`,
+  );
+  const isEducation = /learn|course|education|udemy|coursera|tutorial/i.test(
+    `${product.name} ${product.category}`,
+  );
+
   return (
     <div
       aria-hidden="true"
       className={`product-art art-${tone} ${large ? "large-art" : ""}`}
     >
-      {product.image_url && /^https:\/\//.test(product.image_url) ? (
+      {imageUrl && !imgFailed ? (
         <img
-          src={product.image_url}
-          alt=""
+          src={imageUrl}
+          alt={product.name}
           loading="lazy"
           referrerPolicy="no-referrer"
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
+          onError={() => {
+            setImgFailed(true);
           }}
         />
       ) : null}
       <div className="art-orbit" />
-      <div className="art-sheet">
-        <div className="art-sheet-top">
-          <span />
-          <span />
-          <span />
+      <div className="art-digital-badge">
+        <div className="art-emblem">
+          {isAi ? (
+            <Bot size={large ? 44 : 32} />
+          ) : isEducation ? (
+            <BookOpen size={large ? 44 : 32} />
+          ) : (
+            <CategoryIcon category={product.category} size={large ? 44 : 32} />
+          )}
         </div>
-        <CategoryIcon category={product.category} size={large ? 40 : 28} />
-        <strong>{product.category}</strong>
-        <span className="art-lines">
-          <i />
-          <i />
-          <i />
+        <span className="art-brand-pill">
+          {product.category || "Digital Product"}
         </span>
       </div>
       <span className="art-spark">

@@ -1,0 +1,10 @@
+{
+  "name": "arise-digital-store",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "test": "npm --prefix web test",
+    "test:e2e": "npm --prefix web run test:e2e"
+  }
+}

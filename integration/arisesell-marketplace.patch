@@ -479,7 +479,7 @@ new file mode 100644
 +    listing = (business.settings_data or {}).get("marketplace_listing") or {}
 +    selected = set(listing.get("product_ids") or [])
 +    products = list(await db.scalars(select(Product).where(Product.business_id == business.id,
-+        Product.fulfilment_kind == "digital", Product.digital_archived.is_(False)).options(selectinload(Product.variants))))
++        Product.fulfilment_kind == "digital", Product.digital_archived.is_(False)).options(selectinload(Product.variants), selectinload(Product.images))))
 +    available = dict((await db.execute(select(DigitalStockUnit.variant_id, func.count()).where(
 +        DigitalStockUnit.business_id == business.id, DigitalStockUnit.state == "available").group_by(DigitalStockUnit.variant_id))).all())
 +    result = []
@@ -489,8 +489,9 @@ new file mode 100644
 +            continue
 +        variants = [{"id": str(v.id), "name": v.label, "price": str(v.price),
 +            "stock": available.get(v.id, 0) if config.delivery_mode == "automatic" else v.stock} for v in product.variants]
++        img = display_image_url(product) or getattr(product, "image_url", "")
 +        result.append({"id": str(product.id), "shop_id": str(business.id), "name": product.name,
-+            "category": product.category, "description": product.blurb or "", "image_url": product.image_url,
++            "category": product.category, "description": product.blurb or "", "image_url": img,
 +            "variants": variants, "currency": "BDT", "delivery_mode": config.delivery_mode,
 +            "delivery_estimate": config.delivery_estimate, "delivery_note": config.delivery_note,
 +            "purchase_terms": config.purchase_terms, "required_buyer_fields": config.required_buyer_fields,
