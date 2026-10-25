@@ -197,3 +197,22 @@ test("Top bar, central search, sub-nav, and shop hero match modern header design
   assert.ok(stylesCode.includes(".shop-online-indicator"));
   assert.ok(stylesCode.includes(".shop-hero-features-row"));
 });
+
+test("Top bar and footer dynamically isolate shop contact and marketplace info without hardcoding", () => {
+  // Ensure no hardcoded dummy email or phone in TopAnnouncementBar or Footer
+  assert.ok(!appCode.includes("sushmoynandiml@gmail.com"));
+  assert.ok(!appCode.includes("01305087389"));
+  assert.ok(!appCode.includes('"https://instagram.com"'));
+  assert.ok(!appCode.includes('"https://linkedin.com"'));
+
+  // Marketplace footer provides platform shortcuts
+  assert.ok(appCode.includes('to="/seller" className="dark-social-pill"'));
+  assert.ok(appCode.includes('to="/shops" className="dark-social-pill"'));
+  assert.ok(appCode.includes("MARKETPLACE & PLATFORM"));
+
+  // Shop footer dynamically consumes shop.contact and shop.social_links
+  assert.ok(appCode.includes("shop?.social_links?.facebook"));
+  assert.ok(appCode.includes("shop?.social_links?.instagram"));
+  assert.ok(appCode.includes("shop?.contact?.email"));
+  assert.ok(appCode.includes("shop?.contact?.whatsapp || shop?.contact?.phone"));
+});

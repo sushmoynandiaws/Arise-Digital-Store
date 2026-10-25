@@ -144,6 +144,28 @@ test("information pages preserve shop isolation and handle missing pages and cat
   expect(errors).toEqual([]);
 });
 
+test("shop information links stay scoped before the catalog loads", async ({ page }) => {
+  await fixture(page);
+  let releaseCatalog!: () => void;
+  const catalogReady = new Promise<void>(resolve => { releaseCatalog = resolve; });
+  await page.route("**/api/catalog", async route => {
+    await catalogReady;
+    await route.fallback();
+  });
+  try {
+    await page.goto("/shops/test-shop");
+    for (const [key, title] of sections) {
+      await expect(page.locator("footer").getByRole("link", { name: title, exact: true })).toHaveAttribute("href", `/shops/test-shop/info/${key}`);
+    }
+    await expect(page.getByRole("navigation", { name: "Store navigation" }).getByRole("link", { name: "About Us", exact: true })).toHaveAttribute("href", "/shops/test-shop/info/about");
+    await page.locator("footer").getByRole("link", { name: "Privacy policy", exact: true }).click();
+    await expect(page).toHaveURL("/shops/test-shop/info/privacy");
+  } finally {
+    releaseCatalog();
+  }
+  await expect(page.getByRole("heading", { name: "Privacy policy", level: 1, exact: true })).toBeVisible();
+});
+
 test("failed save preserves seller input for retry", async ({ page }) => {
   const state = await fixture(page);
   await page.goto("/seller");

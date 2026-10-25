@@ -537,8 +537,28 @@ export function TrackOrderPage() {
 function TopAnnouncementBar() {
   const shop = useRouteShop();
   const { lang } = useLang();
-  const phone = shop?.contact?.whatsapp || shop?.contact?.phone || "01305087389";
-  const email = shop?.contact?.email || "sushmoynandiml@gmail.com";
+
+  const email = shop?.contact?.email;
+  const waOrPhone = shop?.social_links?.whatsapp || shop?.contact?.whatsapp || shop?.contact?.phone;
+
+  const shopSocials: { key: string; url: string; icon: ReactNode; label: string }[] = [];
+  if (shop) {
+    if (shop.social_links?.facebook) {
+      shopSocials.push({ key: "facebook", url: shop.social_links.facebook, icon: <IconFacebook size={14} />, label: "Facebook" });
+    }
+    if (shop.social_links?.instagram) {
+      shopSocials.push({ key: "instagram", url: shop.social_links.instagram, icon: <IconInstagram size={14} />, label: "Instagram" });
+    }
+    if (shop.social_links?.linkedin) {
+      shopSocials.push({ key: "linkedin", url: shop.social_links.linkedin, icon: <IconLinkedin size={14} />, label: "LinkedIn" });
+    }
+    if (shop.social_links?.youtube) {
+      shopSocials.push({ key: "youtube", url: shop.social_links.youtube, icon: <IconYouTube size={14} />, label: "YouTube" });
+    }
+    if (waOrPhone) {
+      shopSocials.push({ key: "whatsapp", url: supportHref(waOrPhone), icon: <IconWhatsApp size={14} />, label: "WhatsApp" });
+    }
+  }
 
   return (
     <div className="site-top-bar" aria-label="Announcement & seller contact">
@@ -547,9 +567,11 @@ function TopAnnouncementBar() {
           <Link to={shop ? `/shops/${shop.slug}` : "/products"} className="announcement-pill-link">
             <span className="announcement-flash">⚡</span>
             <span>
-              {lang === "bn"
-                ? "ইউটিউব প্রিমিয়াম, চ্যাটজিপিটি ও অফিস এখন স্টকে! এখনই কিনুন"
-                : "YouTube Premium, ChatGPT, Office In Stock Now!! Buy Now"}
+              {shop
+                ? (shop.tagline || (lang === "bn" ? `${shop.name}-এর স্টকে থাকা ডিজিটাল প্রোডাক্ট দেখুন` : `${shop.name} · Verified Digital Products In Stock`))
+                : (lang === "bn"
+                  ? "ইউটিউব প্রিমিয়াম, চ্যাটজিপিটি ও অফিস এখন স্টকে! এখনই কিনুন"
+                  : "YouTube Premium, ChatGPT, Office In Stock Now!! Buy Now")}
             </span>
             <span className="announcement-arrow">→</span>
           </Link>
@@ -558,52 +580,42 @@ function TopAnnouncementBar() {
         <div className="top-bar-meta">
           <div className="top-meta-item">
             <Clock size={13} className="top-meta-icon" />
-            <span>{lang === "bn" ? "কাজের সময় : সকাল ১০.০০ - রাত ১২.০০ (BD TIME)" : "Working Hours : 10.00 AM - 12.00 AM (BD TIME)"}</span>
+            <span>
+              {shop
+                ? (lang === "bn" ? "সাপোর্ট সময় : সকাল ১০.০০ - রাত ১২.০০" : "Support Hours : 10.00 AM - 12.00 AM (BD TIME)")
+                : (lang === "bn" ? "২৪/৭ ইনস্ট্যান্ট অটো-ডেলিভারি" : "24/7 Automated Delivery & Instant Support")}
+            </span>
           </div>
 
-          <div className="top-meta-item email-meta">
-            <Mail size={13} className="top-meta-icon" />
-            <a href={`mailto:${email}`}>{email}</a>
-          </div>
+          {email && (
+            <div className="top-meta-item email-meta">
+              <Mail size={13} className="top-meta-icon" />
+              <a href={`mailto:${email}`}>{email}</a>
+            </div>
+          )}
 
-          <div className="top-bar-socials">
-            <a
-              href={shop?.social_links?.instagram || "https://instagram.com"}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Instagram"
-              title="Instagram"
-            >
-              <IconInstagram size={14} />
-            </a>
-            <a
-              href={shop?.social_links?.linkedin || "https://linkedin.com"}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="LinkedIn"
-              title="LinkedIn"
-            >
-              <IconLinkedin size={14} />
-            </a>
-            <a
-              href={shop?.social_links?.facebook || (shop?.support ? supportHref(shop.support) : "https://facebook.com")}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Facebook"
-              title="Facebook"
-            >
-              <IconFacebook size={14} />
-            </a>
-            <a
-              href={supportHref(phone)}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="WhatsApp"
-              title="WhatsApp"
-            >
-              <IconWhatsApp size={14} />
-            </a>
-          </div>
+          {shop ? (
+            shopSocials.length > 0 && (
+              <div className="top-bar-socials" aria-label={`${shop.name} social links`}>
+                {shopSocials.map((item) => (
+                  <a
+                    key={item.key}
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${item.label} (${shop.name})`}
+                    title={`${shop.name} on ${item.label}`}
+                  >
+                    {item.icon}
+                  </a>
+                ))}
+              </div>
+            )
+          ) : (
+            <div className="top-bar-badges">
+              <span className="top-trust-badge">🛡️ {lang === "bn" ? "ভেরিফাইড স্বাধীন বিক্রেতা" : "100% Verified Sellers"}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -612,6 +624,8 @@ function TopAnnouncementBar() {
 
 function SubNavBar() {
   const shop = useRouteShop();
+  const { pathname } = useLocation();
+  const shopSlug = shop?.slug || matchPath("/shops/:slug/*", pathname)?.params.slug;
   const { t, lang } = useLang();
 
   return (
@@ -656,7 +670,7 @@ function SubNavBar() {
               <NavLink to="/shops">{t("shops")}</NavLink>
               <NavLink to="/track">{t("trackOrder")}</NavLink>
               <NavLink to="/how-it-works">{t("howItWorks")}</NavLink>
-                <NavLink to="/info/about" className="sub-nav-text-btn">
+                <NavLink to={`${shopSlug ? `/shops/${shopSlug}` : ""}/info/about`} className="sub-nav-text-btn">
                   {lang === "bn" ? "আমাদের সম্পর্কে" : "About Us"}
                 </NavLink>
             </>
@@ -859,6 +873,14 @@ function IconLinkedin({ size = 18 }: { size?: number }) {
   );
 }
 
+function IconYouTube({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+    </svg>
+  );
+}
+
 function ShopInformationPage() {
   const { slug, section: sectionKey } = useParams();
   const { catalog, catalogError, reloadCatalog } = useMarket();
@@ -906,81 +928,234 @@ function ShopInformationPage() {
 
 function Footer() {
   const shop = useRouteShop();
-  const { catalog, session } = useMarket();
+  const { pathname } = useLocation();
+  const shopSlug = shop?.slug ||
+    matchPath("/shops/:slug/*", pathname)?.params.slug ||
+    matchPath("/shops/:slug", pathname)?.params.slug;
+  const { catalog } = useMarket();
   const { t, lang } = useLang();
 
-  const brandName = shop ? shop.name : "Arise Digital Store";
-  const brandTagline = shop
-    ? shop.tagline || shop.description || (lang === "bn" ? "সেরা মূল্যে সর্বোচ্চ মানের ভেরিফাইড ডিজিটাল সাবস্ক্রিপশন ও সফটওয়্যার সেবা।" : "Committed to the best service and verified digital products with convenient prices.")
-    : (lang === "bn" ? "স্বতন্ত্র বিক্রেতাদের নির্ভরযোগ্য ডিজিটাল স্টোর এবং ইনস্ট্যান্ট লাইসেন্স মার্কেটপ্লেস।" : "Digital products from verified independent shops with instant delivery and warranty.");
+  if (shop || shopSlug) {
+    const slug = shop?.slug || shopSlug!;
+    const shopName = shop?.name || slug;
+    const fullAddress = [shop?.contact?.address, shop?.contact?.city_division, shop?.contact?.postal_code]
+      .filter(Boolean)
+      .join(", ");
+    const phone = shop?.contact?.whatsapp || shop?.contact?.phone;
+    const email = shop?.contact?.email;
 
-  const address = shop && [shop.contact?.address, shop.contact?.city_division, shop.contact?.postal_code].filter(Boolean).length > 0
-    ? [shop.contact?.address, shop.contact?.city_division, shop.contact?.postal_code].filter(Boolean).join(", ")
-    : (lang === "bn" ? "সাভার, ঢাকা, বাংলাদেশ" : "Dhaka, Savar, Bangladesh");
+    const productsList = (catalog?.products || [])
+      .filter((p) => (shop ? p.shop_id === shop.id : false) && p.sales_enabled)
+      .slice(0, 5);
 
-  const phone = shop?.contact?.whatsapp || shop?.contact?.phone || "01305087389";
-  const email = shop?.contact?.email || "sushmoynandiml@gmail.com";
+    const shopSocials: { key: string; label: string; url: string; icon: ReactNode }[] = [
+      shop?.social_links?.facebook && { key: "facebook", label: "Facebook", url: shop.social_links.facebook, icon: <IconFacebook size={14} /> },
+      shop?.social_links?.instagram && { key: "instagram", label: "Instagram", url: shop.social_links.instagram, icon: <IconInstagram size={14} /> },
+      shop?.social_links?.tiktok && { key: "tiktok", label: "TikTok", url: shop.social_links.tiktok, icon: <IconTikTok size={14} /> },
+      shop?.social_links?.linkedin && { key: "linkedin", label: "LinkedIn", url: shop.social_links.linkedin, icon: <IconLinkedin size={14} /> },
+      shop?.social_links?.youtube && { key: "youtube", label: "YouTube", url: shop.social_links.youtube, icon: <IconYouTube size={14} /> },
+      shop?.social_links?.website && { key: "website", label: "Website", url: shop.social_links.website, icon: <IconGlobe size={14} /> },
+      (shop?.social_links?.whatsapp || phone) && {
+        key: "whatsapp",
+        label: "WhatsApp",
+        url: supportHref(shop?.social_links?.whatsapp || phone || ""),
+        icon: <IconWhatsApp size={14} />,
+      },
+    ].filter(Boolean) as { key: string; label: string; url: string; icon: ReactNode }[];
 
-  const productsList = (catalog?.products || [])
-    .filter((p) => (shop ? p.shop_id === shop.id : true) && p.sales_enabled)
-    .slice(0, 5);
+    return (
+      <footer className="dark-theme-footer store-footer">
+        <div className="dark-footer-inner store-footer-card container">
+          <div className="dark-footer-grid">
+            {/* Column 1: Shop Brand & Dynamic Contact Info */}
+            <div className="dark-footer-col dark-brand-col">
+              <div className="dark-footer-brand-header">
+                {shop ? (
+                  <div className="dark-shop-avatar-wrap">
+                    <ShopAvatar shop={shop} />
+                  </div>
+                ) : (
+                  <div className="dark-logo-icon">
+                    <span className="logo-sparkle">✦</span>
+                  </div>
+                )}
+                <div className="dark-brand-title-wrap">
+                  <strong className="dark-brand-name">{shopName}</strong>
+                  {shop && (
+                    <span className="seller-verified-badge dark-verified-badge" title="Verified AriseSell Merchant">
+                      <ShieldCheck size={12} /> {lang === "bn" ? "ভেরিফাইড সেলার" : "Verified Seller"}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <p className="dark-brand-tagline">
+                {shop?.tagline || shop?.description || (lang === "bn" ? "সেরা মূল্যে সর্বোচ্চ মানের ভেরিফাইড ডিজিটাল সাবস্ক্রিপশন ও সফটওয়্যার সেবা।" : "Committed to the best service and verified digital products with convenient prices.")}
+              </p>
+              <div className="dark-contact-list">
+                {fullAddress && (
+                  <div className="dark-contact-item">
+                    <span className="dark-contact-icon"><IconMapPin size={16} /></span>
+                    <span><strong>{lang === "bn" ? "ঠিকানা:" : "Address:"}</strong> {fullAddress}</span>
+                  </div>
+                )}
+                {phone && (
+                  <div className="dark-contact-item">
+                    <span className="dark-contact-icon"><IconWhatsApp size={16} /></span>
+                    <span>
+                      <strong>{lang === "bn" ? "হোয়াটসঅ্যাপ (মেসেজ):" : "WhatsApp (Message only):"}</strong>{" "}
+                      <a href={supportHref(phone)} target="_blank" rel="noopener noreferrer">{phone}</a>
+                    </span>
+                  </div>
+                )}
+                {email && (
+                  <div className="dark-contact-item">
+                    <span className="dark-contact-icon"><IconMail size={16} /></span>
+                    <span>
+                      <strong>{lang === "bn" ? "ইমেইল:" : "Email:"}</strong>{" "}
+                      <a href={`mailto:${email}`}>{email}</a>
+                    </span>
+                  </div>
+                )}
+                {!fullAddress && !phone && !email && shop?.support && (
+                  <div className="dark-contact-item">
+                    <span className="dark-contact-icon"><IconGlobe size={16} /></span>
+                    <span>
+                      <strong>{lang === "bn" ? "সাপোর্ট:" : "Support:"}</strong>{" "}
+                      <a href={supportHref(shop.support)} target="_blank" rel="noopener noreferrer">{shop.support}</a>
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
 
+            {/* Column 2: Recent Products in this Shop */}
+            <div className="dark-footer-col dark-products-col">
+              <span className="dark-footer-heading">{lang === "bn" ? "শপ প্রোডাক্টসমূহ" : "RECENT PRODUCTS"}</span>
+              <ul className="dark-footer-links-list">
+                {productsList.length > 0 ? (
+                  productsList.map((p) => (
+                    <li key={p.id}>
+                      <Link to={catalog ? productPath(p, catalog) : `/products/${p.id}`} className="dark-product-link">
+                        <span className="bullet-dot">›</span>
+                        <span className="product-link-text">{p.name}</span>
+                      </Link>
+                    </li>
+                  ))
+                ) : (
+                  <li>
+                    <Link to={`/shops/${slug}`} className="dark-product-link">
+                      <span className="bullet-dot">›</span>
+                      <span>{lang === "bn" ? "সব প্রোডাক্ট দেখুন" : "View all products"}</span>
+                    </Link>
+                  </li>
+                )}
+              </ul>
+            </div>
 
+            {/* Column 3: Shop Social Links (Dynamic) */}
+            <div className="dark-footer-col dark-social-col">
+              <span className="dark-footer-heading">{lang === "bn" ? "সোশ্যাল মিডিয়া ও সাপোর্ট" : "COMMUNITY & SOCIAL"}</span>
+              {shopSocials.length > 0 ? (
+                <div className="dark-social-pills-row">
+                  {shopSocials.map((item) => (
+                    <a
+                      key={item.key}
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="dark-social-pill"
+                    >
+                      {item.icon}
+                      <span>{item.label}</span>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className="dark-muted-text">
+                  {lang === "bn" ? "যেকোনো সহায়তায় সরাসরি সেলারের সাথে যোগাযোগ করুন।" : "Contact seller directly for any inquiries or support."}
+                </p>
+              )}
+            </div>
+
+            {/* Column 4: Shop Useful Links */}
+            <div className="dark-footer-col dark-links-col">
+              <span className="dark-footer-heading">{lang === "bn" ? "প্রয়োজনীয় লিংকসমূহ" : "USEFUL LINKS"}</span>
+              <ul className="dark-footer-links-list">
+                {shopPageSections.map(section => (
+                  <li key={section.key}>
+                    <Link to={`/shops/${slug}/info/${section.key}`} className="dark-footer-link-btn">
+                      {lang === "bn" ? section.titleBn : section.title}
+                    </Link>
+                  </li>
+                ))}
+                <li>
+                  <Link to="/track" className="dark-footer-link-btn highlight-link">
+                    {lang === "bn" ? "অর্ডার ট্র্যাক" : "Track Order"}
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Sub-bottom Bar */}
+          <div className="dark-footer-subbottom">
+            <span className="dark-copyright">
+              © {new Date().getFullYear()} {shopName}. {lang === "bn" ? "সর্বস্বত্ব সংরক্ষিত।" : "All rights reserved."}
+            </span>
+            <span className="dark-powered">
+              {lang === "bn" ? "সিকিউর পেমেন্ট ও অটোমেটেড ডিজিটাল ডেলিভারি পাওয়ারড বাই " : "Secured payments & instant digital delivery via "}
+              <strong>AriseSell</strong>
+            </span>
+          </div>
+        </div>
+      </footer>
+    );
+  }
+
+  // Marketplace Level Footer (When not inside a specific shop)
+  const trendingProducts = (catalog?.products || []).filter((p) => p.sales_enabled).slice(0, 5);
 
   return (
     <footer className="dark-theme-footer store-footer">
       <div className="dark-footer-inner store-footer-card container">
         <div className="dark-footer-grid">
-          {/* Column 1: Brand & Contact Info */}
+          {/* Column 1: Marketplace Brand */}
           <div className="dark-footer-col dark-brand-col">
             <div className="dark-footer-brand-header">
-              {shop ? (
-                <div className="dark-shop-avatar-wrap">
-                  <ShopAvatar shop={shop} />
-                </div>
-              ) : (
-                <div className="dark-logo-icon">
-                  <span className="logo-sparkle">✦</span>
-                </div>
-              )}
+              <div className="dark-logo-icon">
+                <span className="logo-sparkle">✦</span>
+              </div>
               <div className="dark-brand-title-wrap">
-                <strong className="dark-brand-name">{brandName}</strong>
-                {shop && (
-                  <span className="seller-verified-badge dark-verified-badge" title="Verified AriseSell Merchant">
-                    <ShieldCheck size={12} /> {lang === "bn" ? "ভেরিফাইড সেলার" : "Verified Seller"}
-                  </span>
-                )}
+                <strong className="dark-brand-name">Arise Digital Store</strong>
               </div>
             </div>
-            <p className="dark-brand-tagline">{brandTagline}</p>
+            <p className="dark-brand-tagline">
+              {lang === "bn"
+                ? "স্বতন্ত্র বিক্রেতাদের নির্ভরযোগ্য ডিজিটাল স্টোর এবং ইনস্ট্যান্ট লাইসেন্স মার্কেটপ্লেস।"
+                : "Digital products from verified independent shops with instant delivery and warranty."}
+            </p>
             <div className="dark-contact-list">
               <div className="dark-contact-item">
-                <span className="dark-contact-icon"><IconMapPin size={16} /></span>
-                <span><strong>{lang === "bn" ? "ঠিকানা:" : "Address:"}</strong> {address}</span>
+                <span className="dark-contact-icon">🛡️</span>
+                <span>{lang === "bn" ? "১০০% ভেরিফাইড স্বাধীন বিক্রেতা" : "100% Verified Independent Sellers"}</span>
               </div>
               <div className="dark-contact-item">
-                <span className="dark-contact-icon"><IconWhatsApp size={16} /></span>
-                <span>
-                  <strong>{lang === "bn" ? "হোয়াটসঅ্যাপ (মেসেজ):" : "WhatsApp (Message only):"}</strong>{" "}
-                  <a href={supportHref(phone)} target="_blank" rel="noopener noreferrer">{phone}</a>
-                </span>
+                <span className="dark-contact-icon">⚡</span>
+                <span>{lang === "bn" ? "অটোমেটেড ইনস্ট্যান্ট লাইসেন্স ডেলিভারি" : "Instant Automated License Delivery"}</span>
               </div>
               <div className="dark-contact-item">
-                <span className="dark-contact-icon"><IconMail size={16} /></span>
-                <span>
-                  <strong>{lang === "bn" ? "ইমেইল:" : "Email:"}</strong>{" "}
-                  <a href={`mailto:${email}`}>{email}</a>
-                </span>
+                <span className="dark-contact-icon">🔒</span>
+                <span>{lang === "bn" ? "নিরাপদ ডিজিটাল পেমেন্ট এসক্রো" : "Secure Payment Escrow Protection"}</span>
               </div>
             </div>
           </div>
 
-          {/* Column 2: Recent / Popular Products */}
+          {/* Column 2: Trending Marketplace Products */}
           <div className="dark-footer-col dark-products-col">
             <span className="dark-footer-heading">{lang === "bn" ? "জনপ্রিয় প্রোডাক্টসমূহ" : "RECENT POSTS / PRODUCTS"}</span>
             <ul className="dark-footer-links-list">
-              {productsList.length > 0 ? (
-                productsList.map((p) => (
+              {trendingProducts.length > 0 ? (
+                trendingProducts.map((p) => (
                   <li key={p.id}>
                     <Link to={catalog ? productPath(p, catalog) : `/products/${p.id}`} className="dark-product-link">
                       <span className="bullet-dot">›</span>
@@ -999,58 +1174,36 @@ function Footer() {
             </ul>
           </div>
 
-          {/* Column 3: Social Community */}
+          {/* Column 3: Platform Community & Shortcuts */}
           <div className="dark-footer-col dark-social-col">
-            <span className="dark-footer-heading">{lang === "bn" ? "সোশ্যাল মিডিয়া ও সাপোর্ট" : "COMMUNITY & SOCIAL"}</span>
+            <span className="dark-footer-heading">{lang === "bn" ? "মার্কেটপ্লেস ও প্ল্যাটফর্ম" : "MARKETPLACE & PLATFORM"}</span>
             <div className="dark-social-pills-row">
-              <a
-                href={shop?.social_links?.instagram || "https://instagram.com"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="dark-social-pill"
-              >
-                <IconInstagram size={14} />
-                <span>Instagram</span>
-              </a>
-              <a
-                href={shop?.social_links?.linkedin || "https://linkedin.com"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="dark-social-pill"
-              >
-                <IconLinkedin size={14} />
-                <span>LinkedIn</span>
-              </a>
-              <a
-                href={shop?.social_links?.facebook || (shop?.support ? supportHref(shop.support) : "https://facebook.com")}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="dark-social-pill"
-              >
-                <IconFacebook size={14} />
-                <span>Facebook</span>
-              </a>
-              {phone && (
-                <a
-                  href={supportHref(phone)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="dark-social-pill"
-                >
-                  <IconWhatsApp size={14} />
-                  <span>WhatsApp</span>
-                </a>
-              )}
+              <Link to="/seller" className="dark-social-pill">
+                <Store size={14} />
+                <span>{lang === "bn" ? "নিজের শপ খুলুন" : "Open Your Shop"}</span>
+              </Link>
+              <Link to="/shops" className="dark-social-pill">
+                <LayoutGrid size={14} />
+                <span>{lang === "bn" ? "সকল শপ ব্রাউজ করুন" : "Browse All Shops"}</span>
+              </Link>
+              <Link to="/track" className="dark-social-pill">
+                <Package size={14} />
+                <span>{lang === "bn" ? "অর্ডার ট্র্যাক করুন" : "Track Orders"}</span>
+              </Link>
+              <Link to="/how-it-works" className="dark-social-pill">
+                <BookOpen size={14} />
+                <span>{lang === "bn" ? "কীভাবে কাজ করে" : "How It Works"}</span>
+              </Link>
             </div>
           </div>
 
-          {/* Column 4: Useful Links */}
+          {/* Column 4: Marketplace Useful Links */}
           <div className="dark-footer-col dark-links-col">
             <span className="dark-footer-heading">{lang === "bn" ? "প্রয়োজনীয় লিংকসমূহ" : "USEFUL LINKS"}</span>
             <ul className="dark-footer-links-list">
               {shopPageSections.map(section => (
                 <li key={section.key}>
-                  <Link to={`${shop ? `/shops/${shop.slug}` : ""}/info/${section.key}`} className="dark-footer-link-btn">
+                  <Link to={`/info/${section.key}`} className="dark-footer-link-btn">
                     {lang === "bn" ? section.titleBn : section.title}
                   </Link>
                 </li>
@@ -1064,12 +1217,10 @@ function Footer() {
           </div>
         </div>
 
-
-
         {/* Sub-bottom Bar */}
         <div className="dark-footer-subbottom">
           <span className="dark-copyright">
-            © {new Date().getFullYear()} {brandName}. {lang === "bn" ? "সর্বস্বত্ব সংরক্ষিত।" : "All rights reserved."}
+            © {new Date().getFullYear()} Arise Digital Store. {lang === "bn" ? "সর্বস্বত্ব সংরক্ষিত।" : "All rights reserved."}
           </span>
           <span className="dark-powered">
             {lang === "bn" ? "সিকিউর পেমেন্ট ও অটোমেটেড ডিজিটাল ডেলিভারি পাওয়ারড বাই " : "Secured payments & instant digital delivery via "}
@@ -1077,7 +1228,6 @@ function Footer() {
           </span>
         </div>
       </div>
-
     </footer>
   );
 }
