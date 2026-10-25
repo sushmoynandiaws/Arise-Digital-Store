@@ -50,6 +50,7 @@ async fn setup_with_pool(pool: sqlx::AnyPool) -> (AppState, Requests, tokio::tas
                 return (StatusCode::NOT_FOUND, Json(json!({"detail":"Purchase not found"}))).into_response();
             }
             Json(json!({"id":id,"product_id":PRODUCT,"shop":{"id":SHOP},"name":"Owned product",
+                "buyer_name":"Private checkout buyer",
                 "payment_status":if id.starts_with('4') {"unpaid"} else {"paid"},
                 "delivery_status":if id.starts_with('5') {"queued"} else {"delivered"},
                 "private_secret":"must not appear in public reviews"})).into_response()
@@ -192,6 +193,7 @@ async fn reviews_require_an_owned_paid_delivered_purchase_and_never_leak_order_d
     assert_eq!(public["reviews"].as_array().unwrap().len(), 1);
     assert!(!public.to_string().contains(id));
     assert!(!public.to_string().contains("private_secret"));
+    assert!(!public.to_string().contains("Private checkout buyer"));
     let owned = app
         .clone()
         .oneshot(
@@ -204,6 +206,7 @@ async fn reviews_require_an_owned_paid_delivered_purchase_and_never_leak_order_d
         .await
         .unwrap();
     let owned = body(owned).await;
+    assert_eq!(owned["buyer_name"], "Private checkout buyer");
     assert_eq!(owned["can_review"], true);
     assert_eq!(owned["review"]["rating"], 3);
     assert_eq!(
