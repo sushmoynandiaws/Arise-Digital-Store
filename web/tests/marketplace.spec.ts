@@ -11,7 +11,7 @@ test("storefront search, category filters, shop navigation and mobile reflow",as
   await expect(page.getByRole("link",{name:"Practical Rust Essentials",exact:true})).toBeVisible();await expect(page.locator(".product-card")).toHaveCount(1);
   await page.getByRole("button",{name:"Clear search"}).click();await page.getByRole("button",{name:"Templates",exact:true}).click();
   await expect(page.locator(".product-card")).toHaveCount(2);
-  await page.goto("/shops");await page.getByRole("link",{name:"Visit shop"}).first().click();await expect(page.locator(".shop-identity h1")).toBeVisible();
+  await page.goto("/shops");await page.getByRole("link",{name:"Visit shop"}).first().click();await expect(page.locator(".shop-hero h1")).toBeVisible();
   await page.setViewportSize({width:375,height:812});await page.goto("/");await expect(page.locator(".product-card")).toHaveCount(8);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
   await page.screenshot({path:"../artifacts/home-mobile.png",fullPage:true});
@@ -58,7 +58,7 @@ test("seller uses PKCE connection and updates the source-owned shop profile",asy
   await page.screenshot({path:"../artifacts/seller-dashboard.png",fullPage:true});
   await page.setViewportSize({width:375,height:812});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
   await expect(page.getByLabel("Shop link",{exact:true})).toBeVisible();
-  await page.getByRole("link",{name:"View shop",exact:true}).click();await expect(page.locator(".shop-identity h1")).toHaveText("Studio North");
+  await page.getByRole("link",{name:"View shop",exact:true}).click();await expect(page.locator(".shop-hero h1")).toHaveText("Studio North");
 });
 
 test("shared store link opens a branded guest storefront and keeps shopping with that seller",async({page})=>{

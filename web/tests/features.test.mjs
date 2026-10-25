@@ -175,13 +175,13 @@ test("resolveImageUrl resolves full URLs, relative paths and unsigned catalog as
   assert.equal(resolveImageUrl(null), null);
 });
 
-test("Shop social links and contact badges auto-propagate to shop banner and store footer", () => {
+test("Shop social links and contact details remain available in footer and floating support", () => {
   assert.ok(appCode.includes("export function SocialLinks"), "SocialLinks component should be exported");
   assert.ok(appCode.includes("export function ShopContactChips"), "ShopContactChips component should be exported");
   assert.ok(appCode.includes("store-footer-card"), "store-footer-card should be in App.tsx");
   assert.ok(appCode.includes("seller-verified-badge"), "seller-verified-badge should be in App.tsx");
-  assert.ok(appCode.includes("button-wa-chat"), "button-wa-chat should be in App.tsx");
-  assert.ok(appCode.includes("shop-hero-contact-chips"), "shop-hero-contact-chips should be in App.tsx");
+  assert.ok(appCode.includes('<WhatsAppFloatingButton shop={shop} />'), "Shop should use the existing floating support control");
+  assert.ok(!appCode.includes('className="shop-banner"'), "The large shop banner should be removed");
 
   // Verify supportHref normalizes Bangladeshi phone numbers correctly including +880 013...
   function supportHref(value) {

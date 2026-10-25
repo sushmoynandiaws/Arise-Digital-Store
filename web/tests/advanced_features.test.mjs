@@ -133,9 +133,12 @@ test("App.tsx integrates all advanced e-commerce components and routes", () => {
   assert.ok(appCode.includes("/orders/track/verify-otp"));
   assert.ok(appCode.includes("<Route path=\"/track\" element={<TrackOrderPage />} />"));
 
-  // Volume discount (opt-in from shop setup) and Bundle box (removed per user request)
+  // Volume discount (opt-in from shop setup with customizable percentage tiers) and Bundle box (removed per user request)
   assert.ok(appCode.includes("volume-discount-widget"));
   assert.ok(appCode.includes("isVolumeDiscountEnabled"));
+  assert.ok(appCode.includes("getShopVolumeConfig"));
+  assert.ok(appCode.includes("volume-discount-settings-row"));
+  assert.ok(appCode.includes("tier-quick-presets"));
   assert.ok(!appCode.includes("bundle-cross-sell-box"));
   assert.ok(appCode.includes("RENEW10"));
 
@@ -157,6 +160,8 @@ test("styles.css includes all corresponding responsive tokens and classes", () =
   assert.ok(stylesCode.includes(".open-app-deep-btn"));
   assert.ok(stylesCode.includes(".product-trust-stats-badges"));
   assert.ok(stylesCode.includes(".volume-discount-widget"));
+  assert.ok(stylesCode.includes(".volume-discount-settings-row"));
+  assert.ok(stylesCode.includes(".preset-pill"));
   assert.ok(stylesCode.includes(".bundle-cross-sell-box"));
   assert.ok(stylesCode.includes(".subscription-expiry-card"));
   assert.ok(stylesCode.includes(".track-order-page"));
@@ -181,23 +186,21 @@ test("Dark theme footer has clean 4-column layout, social pills, and information
   assert.ok(stylesCode.includes(".shop-policy-page"));
 });
 
-test("Top bar, central search, sub-nav, and shop hero match modern header design", () => {
+test("Top bar, central search and sub-nav remain available above the compact shop heading", () => {
   // App.tsx contains top bar and sub-nav components
   assert.ok(appCode.includes("function TopAnnouncementBar()"));
   assert.ok(appCode.includes("function SubNavBar()"));
   assert.ok(appCode.includes("header-center-search"));
   assert.ok(appCode.includes("site-top-bar"));
   assert.ok(appCode.includes("category-pill-btn"));
-  assert.ok(appCode.includes("shop-online-indicator"));
-  assert.ok(appCode.includes("shop-hero-features-row"));
+  assert.ok(appCode.includes('className="shop-page"'));
 
   // styles.css contains corresponding rules
   assert.ok(stylesCode.includes(".site-top-bar"));
   assert.ok(stylesCode.includes(".header-center-search"));
   assert.ok(stylesCode.includes(".site-sub-nav"));
   assert.ok(stylesCode.includes(".category-pill-btn"));
-  assert.ok(stylesCode.includes(".shop-online-indicator"));
-  assert.ok(stylesCode.includes(".shop-hero-features-row"));
+  assert.ok(stylesCode.includes(".shop-page .whatsapp-floating-btn"));
 });
 
 test("Top bar and footer dynamically isolate shop contact and marketplace info without hardcoding", () => {

@@ -245,27 +245,13 @@ textarea { resize: vertical; }
 .shop-discovery > p { padding: 0 24px; font-size: var(--text-body); color: var(--muted); }
 .shop-discovery > .text-link { margin: 12px 24px 20px; }
 .shop-hero { padding-top: 32px; }
-.shop-banner { display: flex; justify-content: space-between; align-items: center; gap: 32px; padding: 48px; border-radius: 24px; color: var(--surface); background: var(--ink) center / cover; }
-.shop-identity { display: flex; align-items: flex-start; gap: 24px; min-width: 0; flex: 1; }
-.shop-identity .shop-avatar { width: 84px; height: 84px; font-size: 30px; background: var(--surface); border-radius: 20px; overflow: hidden; flex-shrink: 0; display: grid; place-items: center; }
-.shop-identity-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.shop-badge-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.shop-hero h1 { overflow-wrap: anywhere; }
 .seller-verified-badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; background: color-mix(in srgb, #10b981 22%, transparent); color: #34d399; border: 1px solid color-mix(in srgb, #10b981 35%, transparent); letter-spacing: 0.02em; }
-.shop-identity h1 { color: var(--surface); font-size: var(--title-page); overflow-wrap: anywhere; line-height: 1.15; }
-.shop-identity .eyebrow { color: var(--line-strong); }
-.shop-tagline { font-size: 16px; font-weight: 600; color: color-mix(in srgb, var(--surface) 95%, transparent); }
-.shop-identity-desc { max-width: 620px; color: color-mix(in srgb, var(--surface) 80%, transparent); font-size: var(--text-body); line-height: 1.5; }
-.shop-hero-contact-chips, .shop-contact-chips { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; margin-top: 6px; }
+.shop-contact-chips { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; margin-top: 6px; }
 .contact-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; font-size: 13px; color: var(--surface); background: color-mix(in srgb, var(--surface) 12%, transparent); border: 1px solid color-mix(in srgb, var(--surface) 20%, transparent); text-decoration: none; transition: all var(--duration-short); }
 .contact-chip:hover { background: color-mix(in srgb, var(--surface) 22%, transparent); color: #fff; }
-.shop-hero-social, .shop-social-links { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.shop-social-links { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .social-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; min-height: 44px; border-radius: 9999px; font-size: 13px; font-weight: 600; text-decoration: none; transition: transform var(--duration-short), box-shadow var(--duration-short), background var(--duration-short), color var(--duration-short); }
-.shop-hero .social-pill { background: color-mix(in srgb, var(--surface) 15%, transparent); color: var(--surface); border: 1px solid color-mix(in srgb, var(--surface) 25%, transparent); }
-.shop-banner-actions { display: flex; flex-direction: column; gap: 10px; align-items: stretch; flex-shrink: 0; min-width: 220px; }
-.button-wa-chat { background: #25d366 !important; color: #fff !important; border: none; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 12px; box-shadow: 0 4px 14px rgba(37, 211, 102, 0.35); transition: background var(--duration-short), transform var(--duration-short); }
-.button-wa-chat:hover { background: #20ba5a !important; transform: translateY(-1px); }
-.button-email { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; }
-.shop-banner > .button { flex-shrink: 0; }
 .shop-hero + .listing-page { padding-top: 32px; }
 
 /* Product purchase layout: details expand in a dialog instead of long panels. */
@@ -625,8 +611,6 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
   .discovery-pick strong { font-size: var(--text-label); }
   .shop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .shop-grid > .shop-card:last-child { grid-column: 1 / -1; }
-  .shop-banner { padding: 32px; flex-wrap: wrap; }
-  .shop-identity { align-items: start; }
   .product-detail { gap: 24px; }
   .product-purchase-box { padding: 16px; }
   .product-purchase-actions { flex-direction: column; }
@@ -742,11 +726,6 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
   .filter-row { flex-direction: column; gap: 12px; }
   .results-count { margin-block: 16px; }
   .shop-hero { padding-top: 16px; }
-  .shop-banner { padding: 28px 24px; gap: 24px; border-radius: 20px; flex-direction: column; align-items: stretch; }
-  .shop-identity { flex-direction: column; gap: 16px; }
-  .shop-identity .shop-avatar { width: 64px; height: 64px; font-size: 24px; }
-  .shop-identity p:last-child { font-size: var(--text-label); }
-  .shop-banner > .button, .shop-banner-actions { width: 100%; min-width: auto; }
   .store-footer-card { padding: 20px 16px; gap: 20px; }
   .store-footer-brand-section { flex-direction: column; align-items: flex-start; gap: 16px; }
   .store-footer-details-grid { grid-template-columns: 1fr; gap: 20px; }
@@ -888,6 +867,8 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
 .whatsapp-icon-wrapper { display: flex; align-items: center; justify-content: center; }
 .whatsapp-svg { fill: currentColor; }
 .whatsapp-label { font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; }
+.shop-page .whatsapp-floating-btn { width: 56px; height: 56px; padding: 0; justify-content: center; border-radius: 50%; background: var(--success); }
+.shop-page .whatsapp-label { display: none; }
 
 @media (max-width: 600px) {
   .whatsapp-floating-container { bottom: 20px; right: 20px; }
@@ -1151,6 +1132,93 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
   background: var(--primary);
   color: #fff;
   box-shadow: 0 2px 8px rgba(104, 61, 230, 0.25);
+}
+
+/* Seller Dashboard: Volume Discount Customization */
+.volume-discount-settings-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px;
+  background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 16%, transparent);
+  border-radius: 12px;
+}
+.volume-percent-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.volume-percent-input-group input[type="number"] {
+  width: 90px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+  text-align: right;
+}
+.volume-percent-input-group .percent-suffix {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.tier-quick-presets {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.preset-pill {
+  min-height: 36px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--duration-short);
+}
+.preset-pill:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.preset-pill.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+/* Strikethrough & discount badges on Product Page */
+.total-price-display {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.original-price-strike {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.volume-savings-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  background: color-mix(in srgb, #10b981 16%, transparent);
+  color: #059669;
+  border: 1px solid color-mix(in srgb, #10b981 30%, transparent);
+  margin-left: 8px;
 }
 
 /* Product Page: Bundle Cross-Sell Box */
@@ -2093,46 +2161,7 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
   color: var(--ink);
   font-weight: 600;
 }
-.shop-online-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #10b981;
-  background: rgba(16, 185, 129, 0.12);
-  padding: 2px 8px;
-  border-radius: 6px;
-}
-.online-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 6px #10b981;
-}
 
-.shop-hero-features-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 14px 0;
-}
-.shop-feature-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  font-size: 12px;
-  color: #e2e8f0;
-}
-.shop-feature-badge .badge-icon {
-  font-size: 13px;
-}
 
 .top-trust-badge {
   display: inline-flex;

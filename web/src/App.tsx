@@ -2013,7 +2013,7 @@ function Shops() {
 }
 function ShopPage() {
   const { slug } = useParams();
-  const { catalog, catalogError, session } = useMarket();
+  const { catalog, catalogError } = useMarket();
   const { lang } = useLang();
   if (catalogError)
     return (
@@ -2025,13 +2025,8 @@ function ShopPage() {
   const shop = catalog.shops.find((s) => s.slug === slug || s.id === slug);
   if (!shop) return <NotFound />;
 
-  const coverUrl = resolveImageUrl(shop.cover_url, session?.source_web, shop.slug);
-  const waUrl =
-    shop.social_links?.whatsapp ||
-    (shop.contact?.whatsapp ? supportHref(shop.contact.whatsapp) : undefined);
-
   return (
-    <main id="main">
+    <main id="main" className="shop-page">
       <section className="shop-hero container">
         <nav className="breadcrumbs shop-page-breadcrumbs" aria-label="Breadcrumb">
           <Link to="/">{lang === "bn" ? "হোম" : "Home"}</Link>
@@ -2040,82 +2035,7 @@ function ShopPage() {
           <span>/</span>
           <span aria-current="page">{shop.name}</span>
         </nav>
-        <div
-          className="shop-banner"
-          style={
-            coverUrl
-              ? {
-                  backgroundImage: `linear-gradient(90deg,rgba(15,23,42,.94),rgba(15,23,42,.7)),url(${JSON.stringify(coverUrl)})`,
-                }
-              : undefined
-          }
-        >
-          <div className="shop-identity">
-            <ShopAvatar shop={shop} />
-            <div className="shop-identity-body">
-              <div className="shop-badge-row">
-                <span className="eyebrow">{lang === "bn" ? "ভেরিফাইড ডিজিটাল শপ" : "Verified digital shop"}</span>
-                <span className="seller-verified-badge" title="Verified seller on AriseSell">
-                  <ShieldCheck size={13} /> {lang === "bn" ? "ভেরিফাইড" : "Verified"}
-                </span>
-                <span className="shop-online-indicator">
-                  <span className="online-dot" /> {lang === "bn" ? "অনলাইন সাপোর্ট সক্রিয়" : "Online Support Active"}
-                </span>
-              </div>
-              <h1>{shop.name}</h1>
-              {shop.tagline && <p className="shop-tagline">{shop.tagline}</p>}
-              <p className="shop-identity-desc">{shop.description}</p>
-
-              <div className="shop-hero-features-row">
-                <span className="shop-feature-badge">
-                  <span className="badge-icon">🕒</span>
-                  <span>{lang === "bn" ? "১০:০০ AM - ১২:০০ AM (BD TIME)" : "10:00 AM - 12:00 AM (BD TIME)"}</span>
-                </span>
-                <span className="shop-feature-badge">
-                  <span className="badge-icon">⚡</span>
-                  <span>{lang === "bn" ? "ইনস্ট্যান্ট অটো-ডেলিভারি (< ৪৫ সে.)" : "Instant Auto-Delivery (< 45s)"}</span>
-                </span>
-                <span className="shop-feature-badge">
-                  <span className="badge-icon">🛡️</span>
-                  <span>{lang === "bn" ? "১ মাসের রিপ্লেসমেন্ট ওয়ারেন্টি" : "1-Month Replacement Warranty"}</span>
-                </span>
-              </div>
-
-              <ShopContactChips shop={shop} className="shop-hero-contact-chips" />
-              <SocialLinks shop={shop} className="shop-hero-social" />
-            </div>
-          </div>
-          <div className="shop-banner-actions">
-            {waUrl ? (
-              <a
-                className="button primary button-wa-chat"
-                href={waUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <span aria-hidden="true">
-                  <IconWhatsApp size={18} />
-                </span>
-                Chat on WhatsApp
-              </a>
-            ) : shop.support ? (
-              <a className="button light" href={supportHref(shop.support)}>
-                Contact seller
-              </a>
-            ) : null}
-            {shop.contact?.email && (
-              <a
-                className="button light button-email"
-                href={`mailto:${shop.contact.email}`}
-              >
-                <span aria-hidden="true">
-                  <IconMail size={16} />
-                </span>
-                Email support
-              </a>
-            )}
-          </div>
-        </div>
+        <h1>{shop.name}</h1>
       </section>
       <Products shop={shop} />
       <WhatsAppFloatingButton shop={shop} />
@@ -2165,31 +2085,24 @@ function WhatsAppFloatingButton({
   product?: Product;
   order?: Purchase;
 }) {
-  const contact = shop?.support || order?.shop?.support || "";
-  if (!contact) return null;
+  const supportShop = shop || order?.shop;
+  const contact = supportShop?.social_links?.whatsapp || supportShop?.contact?.whatsapp || supportShop?.support || "";
+  let targetUrl = supportHref(contact);
+  if (!/^https:\/\/(?:wa\.me|(?:api|web)\.whatsapp\.com)(?:\/|$)/i.test(targetUrl)) return null;
 
-  let targetUrl = "";
-  if (contact.includes("wa.me") || contact.includes("api.whatsapp.com")) {
-    targetUrl = contact;
-  } else {
-    const digits = contact.replace(/\D/g, "");
-    if (digits.length >= 10) {
-      const cleanPhone = digits.length === 11 && digits.startsWith("01") ? `88${digits}` : digits;
-      let text = "Hello! I am contacting you from Arise Digital Store.";
-      if (order) {
-        text = `Hello! I need help with my order *${order.ref}* (${order.name}) on Arise Digital Store.`;
-      } else if (product) {
-        text = `Hello! I have a question about *${product.name}* on Arise Digital Store.`;
-      } else if (shop) {
-        text = `Hello! I have a question regarding *${shop.name}* on Arise Digital Store.`;
-      }
-      targetUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
-    } else if (/^https?:\/\//i.test(contact)) {
-      targetUrl = contact;
+  if (!/^https:\/\//i.test(contact)) {
+    let text = "Hello! I am contacting you from Arise Digital Store.";
+    if (order) {
+      text = `Hello! I need help with my order *${order.ref}* (${order.name}) on Arise Digital Store.`;
+    } else if (product) {
+      text = `Hello! I have a question about *${product.name}* on Arise Digital Store.`;
+    } else if (supportShop) {
+      text = `Hello! I have a question regarding *${supportShop.name}* on Arise Digital Store.`;
     }
+    const url = new URL(targetUrl);
+    url.searchParams.set("text", text);
+    targetUrl = url.toString();
   }
-
-  if (!targetUrl) return null;
 
   return (
     <aside className="whatsapp-floating-container" aria-label="WhatsApp live chat support">
@@ -2211,6 +2124,41 @@ function WhatsAppFloatingButton({
     </aside>
   );
 }
+export interface ShopVolumeConfig {
+  enabled: boolean;
+  tier3Pct: number;
+  tier5Pct: number;
+}
+
+export function getShopVolumeConfig(shopId?: string, shop?: any): ShopVolumeConfig {
+  const defaultConfig: ShopVolumeConfig = {
+    enabled: Boolean(shop?.volume_discount_enabled),
+    tier3Pct: 5,
+    tier5Pct: 10,
+  };
+  if (!shopId) return defaultConfig;
+  try {
+    const raw = localStorage.getItem(`arise_volume_discount_${shopId}`);
+    if (!raw) return defaultConfig;
+    if (raw === "true") return { enabled: true, tier3Pct: 5, tier5Pct: 10 };
+    if (raw === "false") return { enabled: false, tier3Pct: 5, tier5Pct: 10 };
+    const parsed = JSON.parse(raw);
+    return {
+      enabled: Boolean(parsed.enabled),
+      tier3Pct: typeof parsed.tier3Pct === "number" && parsed.tier3Pct > 0 ? parsed.tier3Pct : 5,
+      tier5Pct: typeof parsed.tier5Pct === "number" && parsed.tier5Pct > 0 ? parsed.tier5Pct : 10,
+    };
+  } catch {
+    return defaultConfig;
+  }
+}
+
+export function saveShopVolumeConfig(shopId: string, config: ShopVolumeConfig) {
+  try {
+    localStorage.setItem(`arise_volume_discount_${shopId}`, JSON.stringify(config));
+  } catch {}
+}
+
 function ProductPage() {
   const route = useParams();
   const navigate = useNavigate();
@@ -2281,17 +2229,25 @@ function ProductPage() {
     product.variants.find((v) => v.stock > 0) || product.variants[0];
   const available = Boolean(product.sales_enabled && selected && selected.stock > 0);
   const maximum = Math.min(selected?.stock ?? 0, 100);
-  const isVolumeDiscountEnabled = useMemo(() => {
-    if (!product) return false;
-    if (shop?.volume_discount_enabled) return true;
-    try {
-      const shopId = shop?.id || product.shop_id;
-      return localStorage.getItem(`arise_volume_discount_${shopId}`) === "true";
-    } catch {
-      return false;
-    }
+  const volumeConfig = useMemo(() => {
+    return getShopVolumeConfig(shop?.id || product?.shop_id, shop);
   }, [shop, product]);
-  const total = selected ? checkoutTotal(selected.price, quantity) : null;
+  const isVolumeDiscountEnabled = volumeConfig.enabled;
+  const rawTotal = selected ? checkoutTotal(selected.price, quantity) : null;
+  const discountPct = useMemo(() => {
+    if (!isVolumeDiscountEnabled) return 0;
+    if (quantity >= 5) return volumeConfig.tier5Pct;
+    if (quantity >= 3) return volumeConfig.tier3Pct;
+    return 0;
+  }, [isVolumeDiscountEnabled, volumeConfig, quantity]);
+  const discountedTotal = useMemo(() => {
+    if (!rawTotal) return null;
+    if (discountPct <= 0) return rawTotal;
+    const num = Number(rawTotal);
+    const discounted = num * (1 - discountPct / 100);
+    return discounted.toFixed(2);
+  }, [rawTotal, discountPct]);
+  const total = discountedTotal;
   const canBuy = available && total !== null && quantity <= maximum;
   return (
     <main id="main" className="container detail-page">
@@ -2412,14 +2368,18 @@ function ProductPage() {
                   className={`volume-chip ${quantity >= 3 && quantity < 5 ? "active" : ""}`}
                   onClick={() => setQuantity(3)}
                 >
-                  {t("volume3x")}
+                  {lang === "bn"
+                    ? `৩টি+: ${String(volumeConfig.tier3Pct).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[Number(d)])}% ছাড়`
+                    : `3+ items: ${volumeConfig.tier3Pct}% OFF`}
                 </button>
                 <button
                   type="button"
                   className={`volume-chip ${quantity >= 5 ? "active" : ""}`}
                   onClick={() => setQuantity(5)}
                 >
-                  {t("volume5x")}
+                  {lang === "bn"
+                    ? `৫টি+: ${String(volumeConfig.tier5Pct).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[Number(d)])}% ছাড়`
+                    : `5+ items: ${volumeConfig.tier5Pct}% OFF`}
                 </button>
               </div>
             </div>
@@ -2427,8 +2387,20 @@ function ProductPage() {
 
           <div className="product-purchase-box">
             <div className="product-purchase-total" aria-live="polite" aria-atomic="true">
-              <span>Total price <small>For {quantity} {quantity === 1 ? "item" : "items"}</small></span>
-              <strong>{total !== null ? money(total) : "—"}</strong>
+              <span>
+                Total price <small>For {quantity} {quantity === 1 ? "item" : "items"}</small>
+                {discountPct > 0 && (
+                  <span className="volume-savings-badge">
+                    {discountPct}% OFF
+                  </span>
+                )}
+              </span>
+              <div className="total-price-display">
+                {discountPct > 0 && rawTotal && (
+                  <span className="original-price-strike">{money(rawTotal)}</span>
+                )}
+                <strong>{total !== null ? money(total) : "—"}</strong>
+              </div>
             </div>
             <div className="product-purchase-actions">
               <div className="product-quantity" role="group" aria-label="Product quantity">
@@ -2442,7 +2414,9 @@ function ProductPage() {
           {canBuy && selected ? (
             <Link
               className="button primary buy-now"
-              to={`/checkout/${product.id}?variant=${selected.id}&quantity=${quantity}`}
+              to={`/checkout/${product.id}?variant=${selected.id}&quantity=${quantity}${
+                discountPct > 0 ? `&coupon=VOLUME${discountPct}` : ""
+              }`}
             >
               Buy now
               <ArrowRight size={18} />
@@ -3487,6 +3461,8 @@ function Seller() {
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
   const [volumeDiscountEnabled, setVolumeDiscountEnabled] = useState(false);
+  const [volumeTier3Pct, setVolumeTier3Pct] = useState(5);
+  const [volumeTier5Pct, setVolumeTier5Pct] = useState(10);
   const [synced, setSynced] = useState("");
   useEffect(() => {
     if (!session?.user) return;
@@ -3528,12 +3504,10 @@ function Seller() {
     setSynced(
       new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     );
-    try {
-      const stored = localStorage.getItem(`arise_volume_discount_${selected}`);
-      setVolumeDiscountEnabled(stored === "true" || Boolean(result.shop.volume_discount_enabled));
-    } catch {
-      setVolumeDiscountEnabled(Boolean(result.shop.volume_discount_enabled));
-    }
+    const vConfig = getShopVolumeConfig(selected, result.shop);
+    setVolumeDiscountEnabled(vConfig.enabled);
+    setVolumeTier3Pct(vConfig.tier3Pct);
+    setVolumeTier5Pct(vConfig.tier5Pct);
   };
   useEffect(() => {
     let current = true;
@@ -3563,12 +3537,10 @@ function Seller() {
               minute: "2-digit",
             }),
           );
-          try {
-            const stored = localStorage.getItem(`arise_volume_discount_${selected}`);
-            setVolumeDiscountEnabled(stored === "true" || Boolean(result.shop.volume_discount_enabled));
-          } catch {
-            setVolumeDiscountEnabled(Boolean(result.shop.volume_discount_enabled));
-          }
+          const vConfig = getShopVolumeConfig(selected, result.shop);
+          setVolumeDiscountEnabled(vConfig.enabled);
+          setVolumeTier3Pct(vConfig.tier3Pct);
+          setVolumeTier5Pct(vConfig.tier5Pct);
         }
       })
       .catch((e) => {
@@ -3600,9 +3572,11 @@ function Seller() {
           : "Your shop is unpublished. Existing products and orders remain in AriseSell.",
       );
       if (selected) {
-        try {
-          localStorage.setItem(`arise_volume_discount_${selected}`, volumeDiscountEnabled ? "true" : "false");
-        } catch {}
+        saveShopVolumeConfig(selected, {
+          enabled: volumeDiscountEnabled,
+          tier3Pct: volumeTier3Pct,
+          tier5Pct: volumeTier5Pct,
+        });
       }
       await reloadCatalog();
     } catch (e) {
@@ -3914,7 +3888,7 @@ function Seller() {
                         <Zap size={24} aria-hidden="true" />
                       </div>
                       <p className="muted">
-                        Allow customers to receive tiered bulk discounts (3+ items: 5% OFF, 5+ items: 10% OFF) on your product pages.
+                        Allow customers to receive tiered bulk discounts ({volumeDiscountEnabled ? `3+ items: ${volumeTier3Pct}% OFF, 5+ items: ${volumeTier5Pct}% OFF` : "3+ items: 5% OFF, 5+ items: 10% OFF"}) on your product pages.
                       </p>
                       <label className="checkbox-label">
                         <input
@@ -3924,14 +3898,120 @@ function Seller() {
                             const val = e.target.checked;
                             setVolumeDiscountEnabled(val);
                             if (selected) {
-                              try {
-                                localStorage.setItem(`arise_volume_discount_${selected}`, val ? "true" : "false");
-                              } catch {}
+                              saveShopVolumeConfig(selected, {
+                                enabled: val,
+                                tier3Pct: volumeTier3Pct,
+                                tier5Pct: volumeTier5Pct,
+                              });
                             }
                           }}
                         />
                         <span>Enable "Buy More, Save More" Volume Discounts for this shop</span>
                       </label>
+                      {volumeDiscountEnabled && (
+                        <div className="volume-discount-settings-row">
+                          <div className="field">
+                            <label htmlFor="volume-tier-3">
+                              3+ items discount (% off)
+                            </label>
+                            <div className="volume-percent-input-group">
+                              <input
+                                id="volume-tier-3"
+                                type="number"
+                                min={1}
+                                max={90}
+                                step={1}
+                                value={volumeTier3Pct}
+                                disabled={busy}
+                                onChange={(e) => {
+                                  const val = Math.max(1, Math.min(90, Number(e.target.value) || 0));
+                                  setVolumeTier3Pct(val);
+                                  if (selected) {
+                                    saveShopVolumeConfig(selected, {
+                                      enabled: volumeDiscountEnabled,
+                                      tier3Pct: val,
+                                      tier5Pct: volumeTier5Pct,
+                                    });
+                                  }
+                                }}
+                              />
+                              <span className="percent-suffix">%</span>
+                              <div className="tier-quick-presets" role="group" aria-label="3+ items discount presets">
+                                {[5, 8, 10, 15].map((preset) => (
+                                  <button
+                                    key={preset}
+                                    type="button"
+                                    className={`preset-pill ${volumeTier3Pct === preset ? "active" : ""}`}
+                                    onClick={() => {
+                                      setVolumeTier3Pct(preset);
+                                      if (selected) {
+                                        saveShopVolumeConfig(selected, {
+                                          enabled: volumeDiscountEnabled,
+                                          tier3Pct: preset,
+                                          tier5Pct: volumeTier5Pct,
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    {preset}%
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <span className="form-hint">Choose or type discount percentage for 3 or 4 items</span>
+                          </div>
+                          <div className="field">
+                            <label htmlFor="volume-tier-5">
+                              5+ items discount (% off)
+                            </label>
+                            <div className="volume-percent-input-group">
+                              <input
+                                id="volume-tier-5"
+                                type="number"
+                                min={1}
+                                max={90}
+                                step={1}
+                                value={volumeTier5Pct}
+                                disabled={busy}
+                                onChange={(e) => {
+                                  const val = Math.max(1, Math.min(90, Number(e.target.value) || 0));
+                                  setVolumeTier5Pct(val);
+                                  if (selected) {
+                                    saveShopVolumeConfig(selected, {
+                                      enabled: volumeDiscountEnabled,
+                                      tier3Pct: volumeTier3Pct,
+                                      tier5Pct: val,
+                                    });
+                                  }
+                                }}
+                              />
+                              <span className="percent-suffix">%</span>
+                              <div className="tier-quick-presets" role="group" aria-label="5+ items discount presets">
+                                {[10, 15, 20, 25].map((preset) => (
+                                  <button
+                                    key={preset}
+                                    type="button"
+                                    className={`preset-pill ${volumeTier5Pct === preset ? "active" : ""}`}
+                                    onClick={() => {
+                                      setVolumeTier5Pct(preset);
+                                      if (selected) {
+                                        saveShopVolumeConfig(selected, {
+                                          enabled: volumeDiscountEnabled,
+                                          tier3Pct: volumeTier3Pct,
+                                          tier5Pct: preset,
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    {preset}%
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <span className="form-hint">Choose or type discount percentage for 5 or more items</span>
+                          </div>
+                        </div>
+                      )}
                     </section>
                     <section className="panel seller-panel">
                       <div className="seller-panel-heading">
