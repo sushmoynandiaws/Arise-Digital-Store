@@ -245,7 +245,7 @@ test("Top bar and footer dynamically isolate shop contact and marketplace info w
   // Marketplace footer provides platform shortcuts
   assert.ok(appCode.includes('to="/seller" className="dark-social-pill"'));
   assert.ok(appCode.includes('to="/shops" className="dark-social-pill"'));
-  assert.ok(appCode.includes("MARKETPLACE & PLATFORM"));
+  assert.ok(appCode.includes("Marketplace & platform"));
 
   // Shop footer dynamically consumes shop.contact and shop.social_links
   assert.ok(appCode.includes("shop?.social_links?.facebook"));

@@ -229,18 +229,18 @@ function Stats({ values }: { values: [string, number][] }) {
 }
 
 const sections = [
-  ["", "Overview", "catalog", LayoutGrid],
-  ["shops", "Shops", "catalog", Store],
-  ["products", "Products", "catalog", Package],
-  ["orders", "Orders", "orders", Package],
-  ["payments", "Payment issues", "orders", Clock],
-  ["support", "Support & reports", "reports", Flag],
-  ["reviews", "Reviews", "reviews", ShieldCheck],
-  ["campaigns", "Campaigns", "campaigns", Plus],
-  ["content", "Website content", "content", LayoutGrid],
-  ["activity", "Activity log", "activity", Clock],
-  ["access", "Team access", "access", LockKeyhole],
-  ["health", "System health", "health", RefreshCw],
+  ["", "Overview", "catalog", LayoutGrid, "Review what needs attention and keep your marketplace running."],
+  ["shops", "Shops", "catalog", Store, "Review storefront visibility and seller information."],
+  ["products", "Products", "catalog", Package, "Review source listings and manage marketplace visibility."],
+  ["orders", "Orders", "orders", Package, "Find orders and inspect their payment and delivery evidence."],
+  ["payments", "Payment issues", "orders", Clock, "Review payments that need attention and open the related order."],
+  ["support", "Support & reports", "reports", Flag, "Review customer reports and record the resolution."],
+  ["reviews", "Reviews", "reviews", ShieldCheck, "Moderate customer reviews with a recorded reason."],
+  ["campaigns", "Campaigns", "campaigns", Plus, "Schedule and manage sponsored placements across the marketplace."],
+  ["content", "Website content", "content", LayoutGrid, "Edit announcements, homepage text and marketplace information pages."],
+  ["activity", "Activity log", "activity", Clock, "Review the recorded history of administrator actions."],
+  ["access", "Team access", "access", LockKeyhole, "Review marketplace roles for existing AriseSell administrators."],
+  ["health", "System health", "health", RefreshCw, "Check the availability of connected marketplace services."],
 ] as const;
 
 export default function Admin({
@@ -308,7 +308,7 @@ export default function Admin({
             arise<strong>Marketplace admin</strong>
           </div>
         </Link>
-        <div className="admin-sidebar-label">WORKSPACE</div>
+        <div className="admin-sidebar-label">Workspace</div>
         <nav id="admin-nav" aria-label="Administration">
           {sections
             .filter((section) => allowed(section[2]))
@@ -370,12 +370,10 @@ export default function Admin({
         </header>
         <div className="admin-page-title">
           <div>
-            <p className="eyebrow">MARKETPLACE OPERATIONS</p>
+            <p className="eyebrow">Marketplace operations</p>
             <h1>{item?.[1] || "Page unavailable"}</h1>
             <p>
-              {path === ""
-                ? "Review what needs attention and keep your marketplace running."
-                : "Manage marketplace information with a recorded history of changes."}
+              {item?.[4] || "Choose an available workspace from the navigation."}
             </p>
           </div>
           <button className="button secondary" onClick={base.reload}>
@@ -451,7 +449,7 @@ function Overview({ data }: { data: Base }) {
       <section className="admin-panel admin-attention">
         <div className="admin-panel-heading">
           <div>
-            <span className="admin-kicker">ATTENTION QUEUE</span>
+            <span className="admin-kicker">Attention queue</span>
             <h2>Start with the exceptions</h2>
           </div>
           <span className="admin-count">{open.length + out.length}</span>

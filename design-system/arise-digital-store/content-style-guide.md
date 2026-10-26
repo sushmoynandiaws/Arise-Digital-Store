@@ -65,7 +65,7 @@ Refund messages take priority over cancellation; cancellation takes priority ove
 
 ## Typography
 
-Use the semantic CSS tokens documented in [MASTER.md](MASTER.md). Preserve Urbanist, Hind Siliguri fallback and the brand palette. Status headings are 32px desktop / 26px mobile, body instructions are 16px, and mobile input/select/textarea text is always at least 16px. Do not shrink essential instructions into metadata.
+Use the semantic CSS tokens documented in [MASTER.md](MASTER.md). Use native system typography for English body text, Urbanist for headings and Hind Siliguri for Bangla; use the shared brand and semantic color tokens. Status headings are 32px desktop / 26px mobile, body instructions are 16px, and mobile input/select/textarea text is always at least 16px. Do not shrink essential instructions into metadata.
 
 ## Examples
 

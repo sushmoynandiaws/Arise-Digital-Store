@@ -25,6 +25,7 @@ import {
 import {
 
   ArrowRight,
+  ArrowUpRight,
   ArrowLeft,
   Search,
   ShoppingBag,
@@ -64,6 +65,7 @@ import {
   UserCheck,
   Wallet,
   Info,
+  Star,
 } from "./icons.js";
 import {
   api,
@@ -114,9 +116,9 @@ const paymentLogos: Record<string, string> = {
 function useRouteShop() {
   const { catalog } = useMarket();
   const { pathname } = useLocation();
-  const shopSlug = matchPath("/shops/:slug", pathname)?.params.slug ||
-    matchPath("/shops/:slug/products/:productSlug", pathname)?.params.slug ||
-    matchPath("/shops/:slug/info/:section", pathname)?.params.slug;
+  const shopSlug =
+    matchPath("/shops/:slug/*", pathname)?.params.slug ||
+    matchPath("/shops/:slug", pathname)?.params.slug;
   if (shopSlug)
     return catalog?.shops.find(
       (shop) => shop.slug === shopSlug || shop.id === shopSlug,
@@ -176,24 +178,31 @@ function Brand() {
     </Link>
   );
 }
+function savedWishlist(): string[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem("arise_wishlist") || "[]");
+    return Array.isArray(saved) ? saved.filter((id): id is string => typeof id === "string") : [];
+  } catch { return []; }
+}
 export function useWishlist() {
-  const [wishlist, setWishlist] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem("arise_wishlist");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [wishlist, setWishlist] = useState<string[]>(savedWishlist);
+  useEffect(() => {
+    const sync = () => setWishlist(savedWishlist());
+    window.addEventListener("arise_wishlist_updated", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("arise_wishlist_updated", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
 
   const toggleWishlist = (id: string) => {
-    setWishlist((prev) => {
-      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
-      try {
-        localStorage.setItem("arise_wishlist", JSON.stringify(next));
-      } catch {}
-      return next;
-    });
+    const next = wishlist.includes(id) ? wishlist.filter((x) => x !== id) : [...wishlist, id];
+    setWishlist(next);
+    try {
+      localStorage.setItem("arise_wishlist", JSON.stringify(next));
+      window.dispatchEvent(new Event("arise_wishlist_updated"));
+    } catch {}
   };
 
   const isWishlisted = (id: string) => wishlist.includes(id);
@@ -211,19 +220,22 @@ export function WishlistModal({
   const { catalog } = useMarket();
   const { t, lang } = useLang();
   const { wishlist, toggleWishlist } = useWishlist();
-
-  if (!open) return null;
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (open && !dialog.current?.open) dialog.current?.showModal();
+    if (!open && dialog.current?.open) dialog.current.close();
+  }, [open]);
 
   const items = (catalog?.products || []).filter((p) => wishlist.includes(p.id));
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="presentation">
-      <div
+      <dialog
+        ref={dialog}
         className="modal-card wishlist-modal"
-        role="dialog"
-        aria-modal="true"
         aria-labelledby="wishlist-title"
-        onClick={(e) => e.stopPropagation()}
+        onCancel={onClose}
+        onClose={onClose}
+        onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
       >
         <div className="modal-header">
           <div className="modal-title-row">
@@ -265,6 +277,7 @@ export function WishlistModal({
                       className="button ghost small danger-text"
                       onClick={() => toggleWishlist(prod.id)}
                       title="Remove"
+                      aria-label={`Remove ${prod.name} from wishlist`}
                     >
                       <X size={14} />
                     </button>
@@ -274,8 +287,7 @@ export function WishlistModal({
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </dialog>
   );
 }
 
@@ -392,6 +404,7 @@ export function DynamicPaymentQR({
 
 export function TrackOrderPage() {
   const { t, lang } = useLang();
+  const { session } = useMarket();
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState<"email" | "otp" | "done">("email");
@@ -399,228 +412,106 @@ export function TrackOrderPage() {
   const [error, setError] = useState("");
   const [demoOtp, setDemoOtp] = useState("");
   const [foundOrders, setFoundOrders] = useState<Purchase[]>([]);
-
+  const emailField = useRef<HTMLInputElement>(null);
+  const otpField = useRef<HTMLInputElement>(null);
+  const resultsTitle = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (step === "otp") otpField.current?.focus();
+    if (step === "done") resultsTitle.current?.focus();
+    if (step === "email" && email) emailField.current?.focus();
+  }, [step]);
   const ordersByShop = useMemo(() => {
     const map = new Map<string, { shop: Purchase["shop"]; orders: Purchase[] }>();
     for (const order of foundOrders) {
-      const shopKey = order.shop?.id || order.shop?.slug || "unknown";
-      if (!map.has(shopKey)) {
-        map.set(shopKey, { shop: order.shop, orders: [] });
-      }
-      map.get(shopKey)!.orders.push(order);
+      const key = order.shop.id || order.shop.slug;
+      if (!map.has(key)) map.set(key, { shop: order.shop, orders: [] });
+      map.get(key)!.orders.push(order);
     }
     return Array.from(map.values());
   }, [foundOrders]);
-
-  const handleRequestOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes("@")) {
-      setError(lang === "bn" ? "একটি সঠিক ইমেইল ঠিকানা দিন" : "Please enter a valid email address");
-      return;
-    }
+  const handleRequestOtp = async (event: React.FormEvent) => {
+    event.preventDefault();
     setBusy(true);
     setError("");
     try {
-      const res = await api<{ ok: boolean; message: string; demo_otp?: string; order_count: number }>(
-        "/orders/track/request-otp",
-        {
-          method: "POST",
-          body: JSON.stringify({ email: cleanEmail }),
-        }
-      );
-      if (res.ok) {
-        setDemoOtp(res.demo_otp || "");
-        if (res.demo_otp) setOtp(res.demo_otp);
-        setStep("otp");
-      }
-    } catch {
-      setDemoOtp("1234");
-      setOtp("1234");
+      const result = await api<{ ok: boolean; message: string; demo_otp?: string }>("/orders/track/request-otp", {
+        method: "POST", body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      if (!result.ok) throw new Error(result.message || (lang === "bn" ? "কোড পাঠানো যায়নি। আবার চেষ্টা করুন।" : "We couldn’t send a code. Please try again."));
+      setDemoOtp(session?.demo ? result.demo_otp || "" : "");
+      setOtp("");
       setStep("otp");
-    } finally {
-      setBusy(false);
-    }
+    } catch (failure) { setError((failure as Error).message); }
+    finally { setBusy(false); }
   };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!otp.trim()) return;
+  const handleVerifyOtp = async (event: React.FormEvent) => {
+    event.preventDefault();
     setBusy(true);
     setError("");
-    const cleanEmail = email.trim().toLowerCase();
     try {
-      const res = await api<{ ok: boolean; message: string; orders: Purchase[] }>(
-        "/orders/track/verify-otp",
-        {
-          method: "POST",
-          body: JSON.stringify({ email: cleanEmail, otp: otp.trim() }),
-        }
-      );
-      if (res.ok && res.orders && res.orders.length > 0) {
-        setFoundOrders(res.orders);
-        setStep("done");
-        return;
-      }
-    } catch {}
-
-    try {
-      const ords = await api<{ orders: Purchase[] }>("/orders");
-      const matched = (ords.orders || []).filter(
-        (o) => o.buyer_email?.trim().toLowerCase() === cleanEmail
-      );
-      if (matched.length > 0) {
-        setFoundOrders(matched);
-        setStep("done");
-        return;
-      }
-    } catch {}
-
-    setError(t("noOrdersFound") || (lang === "bn" ? "এই ইমেইলে কোনো অর্ডার পাওয়া যায়নি" : "No orders found for this email address"));
-    setBusy(false);
+      const result = await api<{ ok: boolean; message: string; orders: Purchase[] }>("/orders/track/verify-otp", {
+        method: "POST", body: JSON.stringify({ email: email.trim().toLowerCase(), otp: otp.trim() }),
+      });
+      if (!result.ok) throw new Error(result.message || (lang === "bn" ? "কোড যাচাই করা যায়নি। আবার চেষ্টা করুন।" : "We couldn’t verify that code. Please try again."));
+      setFoundOrders(result.orders || []);
+      setStep("done");
+    } catch (failure) { setError((failure as Error).message); }
+    finally { setBusy(false); }
   };
-
+  const startAgain = () => { setStep("email"); setOtp(""); setDemoOtp(""); setError(""); };
   return (
-    <main id="main" className="container narrow-page track-order-page">
-      <div className="page-intro">
-        <p className="eyebrow">{lang === "bn" ? "গ্লোবাল অর্ডার অনুসন্ধান · Arise Store" : "Global Order Tracking · Arise Store"}</p>
+    <main id="main" className="container track-order-page">
+      <header className="page-intro track-intro">
+        <p className="eyebrow">{lang === "bn" ? "অর্ডার ও ডেলিভারি" : "Orders & delivery"}</p>
         <h1>{t("trackTitle")}</h1>
-        <p>{lang === "bn" ? "Arise Store-এর যেকোনো শপ থেকে কেনা আপনার সমস্ত অর্ডার এক জায়গায় দেখতে ইমেইল দিন।" : "Enter your email to look up all purchases made from any shop across Arise Store."}</p>
+        <p>{lang === "bn" ? "কেনাকাটার সময় দেওয়া ইমেইল দিয়ে আপনার অর্ডার খুঁজুন। পেমেন্ট ও ডেলিভারির আপডেট এক জায়গায় দেখুন।" : "Find your orders with the email you used at checkout. Check payment and delivery updates in one place."}</p>
+      </header>
+      <div className="track-workspace">
+        <section className="panel track-primary" aria-label={lang === "bn" ? "অর্ডার অনুসন্ধান" : "Order lookup"}>
+          <ol className="track-progress" aria-label={lang === "bn" ? "অর্ডার খোঁজার ধাপ" : "Order lookup progress"}>
+            {[lang === "bn" ? "ইমেইল" : "Your email", lang === "bn" ? "যাচাই" : "Verify email", lang === "bn" ? "অর্ডার" : "Your orders"].map((label, index) => {
+              const active = ["email", "otp", "done"].indexOf(step);
+              return <li key={label} aria-current={index === active ? "step" : undefined} className={index < active ? "complete" : ""}><span>{index < active ? <Check size={14} /> : index + 1}</span>{label}</li>;
+            })}
+          </ol>
+          {error && <ErrorBox message={error} />}
+          {step === "email" && <form className="track-form" onSubmit={handleRequestOtp} aria-busy={busy}>
+            <div className="track-form-heading"><Mail size={24} /><h2>{lang === "bn" ? "আপনার অর্ডার খুঁজুন" : "Find your orders"}</h2></div>
+            <div className="field"><label htmlFor="track-email">{t("emailLabel")}</label>
+              <input ref={emailField} id="track-email" type="email" required disabled={busy} autoComplete="email" spellCheck={false} aria-describedby="track-email-hint" value={email} onChange={event => setEmail(event.target.value)} placeholder={t("emailPlaceholder")} />
+              <small id="track-email-hint">{lang === "bn" ? "অর্ডারের তথ্য দেখতে ইমেইল যাচাই করতে হবে।" : "Verify your email before viewing matching orders."}</small>
+            </div>
+            <button className="button primary full-width" type="submit" disabled={busy || !email.trim()}>{busy ? (lang === "bn" ? "পাঠানো হচ্ছে…" : "Sending…") : t("sendOtp")}<ArrowRight size={17} /></button>
+            <p className="track-privacy-note"><LockKeyhole size={15} />{lang === "bn" ? "আপনার অর্ডারের তথ্য ব্যক্তিগত।" : "Your orders stay private."}</p>
+          </form>}
+          {step === "otp" && <form className="track-form" onSubmit={handleVerifyOtp} aria-busy={busy}>
+            <div className="track-form-heading"><Mail size={24} /><h2>{lang === "bn" ? "ইমেইল দেখুন" : "Check your email"}</h2></div>
+            <p className="track-code-destination" role="status">{lang === "bn" ? "যাচাইকরণ কোড পাঠানো হয়েছে:" : "A verification code was sent to:"}<strong>{email.trim()}</strong></p>
+            {demoOtp && <p className="notice">{lang === "bn" ? "শুধু ডেমো কোড:" : "Demo code only:"} <strong>{demoOtp}</strong></p>}
+            <label className="field" htmlFor="track-otp">{lang === "bn" ? "যাচাইকরণ কোড" : "Verification code"}
+              <input ref={otpField} id="track-otp" type="text" inputMode="numeric" autoComplete="one-time-code" required disabled={busy} maxLength={6} value={otp} onChange={event => setOtp(event.target.value)} placeholder="1234" className="otp-input" />
+            </label>
+            <button className="button primary full-width" type="submit" disabled={busy || !otp.trim()}>{busy ? (lang === "bn" ? "যাচাই করা হচ্ছে…" : "Verifying…") : t("verifyOtp")}<ArrowRight size={17} /></button>
+            <button className="text-link track-change-email" type="button" disabled={busy} onClick={startAgain}><ArrowLeft size={15} />{lang === "bn" ? "ইমেইল পরিবর্তন করুন" : "Change email"}</button>
+          </form>}
+          {step === "done" && <div className="track-results-container">
+            <div className="track-results-heading"><CheckCircle2 size={24} /><div><h2 ref={resultsTitle} tabIndex={-1}>{lang === "bn" ? "আপনার অর্ডারসমূহ" : "Your orders"}</h2><p>{lang === "bn" ? `${foundOrders.length}টি অর্ডার পাওয়া গেছে` : `${foundOrders.length} ${foundOrders.length === 1 ? "order" : "orders"} found`}</p></div></div>
+            {!foundOrders.length && <div className="empty"><h3>{lang === "bn" ? "কোনো অর্ডার পাওয়া যায়নি" : "No matching orders"}</h3><p>{lang === "bn" ? "অন্য ইমেইল দিয়ে চেষ্টা করুন বা এই ব্রাউজারের অর্ডার দেখুন।" : "Try another email or open purchases saved in this browser."}</p><Link className="button secondary" to="/purchases">{t("myPurchases")}</Link></div>}
+            <div className="track-global-shops-container">{ordersByShop.map(group => <section key={group.shop.id || group.shop.slug} className="track-shop-card-section">
+              <div className="track-shop-card-header"><div className="track-shop-identity-info"><span className="tiny-avatar">{group.shop.name.slice(0, 1)}</span><h3 className="track-shop-name">{group.shop.name}</h3></div><Link to={`/shops/${group.shop.slug}`} className="text-link">{lang === "bn" ? "শপ দেখুন" : "Visit shop"}<ArrowRight size={14} /></Link></div>
+              <div className="purchase-list">{group.orders.map(order => <Link key={order.id} to={`/purchases/${order.id}`} className="track-order-row"><div><span className="order-ref">{order.ref}</span><h3>{order.name}</h3><p>{new Date(order.created_at).toLocaleDateString(lang === "bn" ? "bn-BD" : "en-GB", { day: "numeric", month: "short", year: "numeric" })}</p></div><div><strong className="price">{money(order.total, order.currency)}</strong><span className="pill">{order.payment_status === "paid" ? deliveryLabel(order.delivery_status, lang) : paymentLabel(order.payment_status, lang)}</span><span className="text-link">{lang === "bn" ? "অর্ডার দেখুন" : "View order"}<ArrowRight size={14} /></span></div></Link>)}</div>
+            </section>)}</div>
+            <button className="text-link" type="button" onClick={startAgain}><ArrowLeft size={15} />{lang === "bn" ? "অন্য ইমেইল দিয়ে খুঁজুন" : "Try another email"}</button>
+          </div>}
+        </section>
+        <aside className="track-guidance" aria-label={lang === "bn" ? "অর্ডারের সহায়তা" : "Order help"}>
+          <div className="track-browser-orders"><ShoppingBag size={24} /><h2>{lang === "bn" ? "এই ব্রাউজারে অর্ডার করেছেন?" : "Ordered in this browser?"}</h2><p>{lang === "bn" ? "সরাসরি আমার অর্ডারসমূহে গিয়ে পেমেন্ট ও ডেলিভারি দেখুন।" : "Open My purchases to check payment and delivery for orders already available to you."}</p><Link to="/purchases" className="button secondary">{t("myPurchases")}<ArrowRight size={16} /></Link></div>
+          <div className="track-help-copy"><h3>{lang === "bn" ? "সহায়তা প্রয়োজন?" : "Need a hand?"}</h3><p>{lang === "bn" ? "অর্ডারের ইমেইল খুঁজে না পেলে এই ব্রাউজারে আমার অর্ডারসমূহ দেখুন। পেমেন্ট বা রিফান্ড নিয়ে বিক্রেতার সাথে যোগাযোগ করুন।" : "Can’t find the checkout email? Check My purchases in this browser. Contact the seller for payment or refund questions."}</p><Link className="text-link" to="/how-it-works">{t("howItWorks")}<ArrowRight size={15} /></Link></div>
+        </aside>
       </div>
-
-      {error && <ErrorBox message={error} />}
-
-      {step === "email" && (
-        <form className="panel form-panel" onSubmit={handleRequestOtp}>
-          <label htmlFor="track-email">{t("emailLabel")}</label>
-          <input
-            id="track-email"
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder={t("emailPlaceholder")}
-          />
-          <button className="button primary full-width" type="submit" disabled={busy || !email.trim()}>
-            {busy ? (lang === "bn" ? "পাঠানো হচ্ছে..." : "Sending...") : t("sendOtp")}
-            <ArrowRight size={17} />
-          </button>
-        </form>
-      )}
-
-      {step === "otp" && (
-        <form className="panel form-panel" onSubmit={handleVerifyOtp}>
-          <div className="otp-prompt-box">
-            <span className="status-dot green" />
-            <p>{t("otpSentMsg")} ({email})</p>
-          </div>
-          {demoOtp && (
-            <div className="demo-otp-banner">
-              <span>{lang === "bn" ? "টেস্ট মোড ওটিপি:" : "Demo Test Code:"} <strong>{demoOtp}</strong></span>
-            </div>
-          )}
-          <label htmlFor="track-otp">{t("otpLabel")}</label>
-          <input
-            id="track-otp"
-            type="text"
-            required
-            maxLength={6}
-            value={otp}
-            onChange={(e) => setOtp(e.target.value)}
-            placeholder="1234"
-            className="otp-input"
-          />
-          <div className="form-actions-row">
-            <button className="button primary" type="submit" disabled={busy || !otp.trim()}>
-              {busy ? (lang === "bn" ? "যাচাই করা হচ্ছে..." : "Verifying...") : t("verifyOtp")}
-              <CheckCircle2 size={17} />
-            </button>
-            <button className="button ghost" type="button" onClick={() => setStep("email")}>
-              {lang === "bn" ? "ইমেইল পরিবর্তন" : "Change email"}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {step === "done" && (
-        <div className="track-results-container">
-          <div className="track-success-banner">
-            <CheckCircle2 size={20} />
-            <div>
-              <strong>{t("trackSuccess")}</strong>
-              <span className="track-success-subtext">
-                {lang === "bn"
-                  ? `Arise Store-এর ${ordersByShop.length}টি শপ থেকে মোট ${foundOrders.length}টি অর্ডার পাওয়া গেছে`
-                  : `Found ${foundOrders.length} ${foundOrders.length === 1 ? "order" : "orders"} across ${ordersByShop.length} ${ordersByShop.length === 1 ? "shop" : "shops"} on Arise Store`}
-              </span>
-            </div>
-          </div>
-
-          <div className="track-global-shops-container">
-            {ordersByShop.map((group) => (
-              <div key={group.shop.id || group.shop.slug} className="track-shop-card-section">
-                <div className="track-shop-card-header">
-                  <div className="track-shop-identity-info">
-                    <span className="shop-avatar-tiny">{group.shop.name.slice(0, 1)}</span>
-                    <div>
-                      <h3 className="track-shop-name">{group.shop.name}</h3>
-                      <span className="track-shop-stats-chip">
-                        {group.orders.length} {group.orders.length === 1 ? (lang === "bn" ? "টি অর্ডার" : "order") : (lang === "bn" ? "টি অর্ডার" : "orders")}
-                      </span>
-                    </div>
-                  </div>
-                  <Link to={`/shops/${group.shop.slug}`} className="button ghost small track-shop-visit-btn">
-                    {lang === "bn" ? "শপ দেখুন" : "Visit shop"}
-                    <ArrowRight size={13} />
-                  </Link>
-                </div>
-
-                <div className="purchase-list">
-                  {group.orders.map((order) => (
-                    <div key={order.id} className="purchase-card track-purchase-card">
-                      <div className="purchase-info">
-                        <span className="purchase-ref">{order.ref}</span>
-                        <h3>{order.name}</h3>
-                        <p className="purchase-shop-name">{order.shop.name}</p>
-                        <p className="purchase-date">
-                          {new Date(order.created_at).toLocaleDateString(lang === "bn" ? "bn-BD" : "en-GB", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </p>
-                      </div>
-                      <div className="purchase-actions-col">
-                        <strong className="price">{money(order.total, order.currency)}</strong>
-                        <span className={`status-pill ${order.delivery_status}`}>
-                          {order.payment_status === "paid" ? deliveryLabel(order.delivery_status) : paymentLabel(order.payment_status)}
-                        </span>
-                        <Link to={`/purchases/${order.id}`} className="button primary small">
-                          {lang === "bn" ? "অর্ডার দেখুন" : "View order"}
-                          <ArrowRight size={14} />
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="track-another-search-row">
-            <button className="button ghost" type="button" onClick={() => setStep("email")}>
-              <ArrowLeft size={16} />
-              {lang === "bn" ? "অন্য ইমেইল দিয়ে ট্র্যাক করুন" : "Track with another email"}
-            </button>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
-
-
 
 function TopAnnouncementBar() {
   const platform = usePlatformSettings();
@@ -671,8 +562,8 @@ function TopAnnouncementBar() {
             <Clock size={13} className="top-meta-icon" />
             <span>
               {shop
-                ? (lang === "bn" ? "সাপোর্ট সময় : সকাল ১০.০০ - রাত ১২.০০" : "Support Hours : 10.00 AM - 12.00 AM (BD TIME)")
-                : (lang === "bn" ? "স্বাধীন শপের পণ্য ও সহায়তা" : "Products and support from independent shops")}
+                ? (lang === "bn" ? "সাপোর্টের জন্য বিক্রেতার সাথে যোগাযোগ করুন" : "Contact the seller for support")
+                : (lang === "bn" ? "My purchases থেকে অর্ডার দেখুন" : "Follow your order in My purchases")}
             </span>
           </div>
 
@@ -702,7 +593,7 @@ function TopAnnouncementBar() {
             )
           ) : (
             <div className="top-bar-badges">
-              <span className="top-trust-badge">🛡️ {lang === "bn" ? "ভেরিফাইড স্বাধীন বিক্রেতা" : "100% Verified Sellers"}</span>
+              <span className="top-trust-badge">🛡️ {lang === "bn" ? "স্বাধীন বিক্রেতা" : "Independent shops"}</span>
             </div>
           )}
         </div>
@@ -715,107 +606,85 @@ function TopAnnouncementBar() {
 function SubNavBar() {
   const shop = useRouteShop();
   const { catalog } = useMarket();
-  const { pathname } = useLocation();
-  const shopSlug = shop?.slug || matchPath("/shops/:slug/*", pathname)?.params.slug;
+  const { pathname, search } = useLocation();
   const { t, lang } = useLang();
-  const [catOpen, setCatOpen] = useState(false);
-  const catMenuRef = useRef<HTMLDivElement>(null);
-
-  const categories = useMemo(() => {
-    const list = shop
-      ? (catalog?.products || []).filter((p) => p.shop_id === shop.id)
-      : catalog?.products || [];
-    return [...new Set(list.map((p) => p.category))].filter(Boolean);
-  }, [catalog, shop]);
-
+  const shopSlug = shop?.slug || matchPath("/shops/:slug/*", pathname)?.params.slug || matchPath("/shops/:slug", pathname)?.params.slug;
+  const shopBase = shopSlug ? `/shops/${shopSlug}` : "";
+  const productsPath = shopBase || "/products";
+  const productsActive = shopBase
+    ? pathname === shopBase || pathname.startsWith(`${shopBase}/products/`) || pathname.startsWith("/checkout/")
+    : pathname.startsWith("/products");
+  const [menu, setMenu] = useState<"categories" | "help" | null>(null);
+  const navigation = useRef<HTMLDivElement>(null);
+  const categoriesButton = useRef<HTMLButtonElement>(null);
+  const helpButton = useRef<HTMLButtonElement>(null);
+  const categories = [...new Set((catalog?.products || [])
+    .filter(product => !shopBase || product.shop_id === shop?.id)
+    .map(product => product.category))].filter(Boolean);
+  useEffect(() => setMenu(null), [pathname, search]);
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (catMenuRef.current && !catMenuRef.current.contains(e.target as Node)) {
-        setCatOpen(false);
-      }
+    if (!menu) return;
+    const outside = (event: MouseEvent) => {
+      if (!navigation.current?.contains(event.target as Node)) setMenu(null);
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setMenu(null);
+      (menu === "categories" ? categoriesButton : helpButton).current?.focus();
+    };
+    document.addEventListener("mousedown", outside);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("mousedown", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [menu]);
   return (
-    <div className="site-sub-nav">
-      <div className="sub-nav-inner container">
-        {/* Marketplace categories directory dropdown (only shown on global pages, not inside a specific shop) */}
-        {!shop && (
-          <div className="sub-nav-category-col" ref={catMenuRef}>
-            <button
-              type="button"
-              className="category-pill-btn"
-              title="All Categories"
-              aria-expanded={catOpen}
-              aria-haspopup="true"
-              onClick={() => setCatOpen(!catOpen)}
-            >
-              <LayoutGrid size={15} />
-              <span>{lang === "bn" ? "সকল ক্যাটাগরি" : "All Categories"}</span>
-              <ChevronDown size={14} className={catOpen ? "chevron-rotated" : ""} />
+    <div className="site-sub-nav" ref={navigation}>
+      <nav className="sub-nav-inner container store-navigation" aria-label="Store navigation">
+        <div className="navigation-primary">
+          <div className={`navigation-products${productsActive ? " is-current" : ""}`}>
+            <Link to={productsPath} aria-current={productsActive ? "page" : undefined} className="navigation-link">
+              <LayoutGrid size={16} />{lang === "bn" ? "প্রোডাক্টস" : "Products"}
+            </Link>
+            <button ref={categoriesButton} type="button" className="category-pill-btn nav-category-toggle" aria-label={lang === "bn" ? "ক্যাটাগরি দেখুন" : "Browse categories"} aria-expanded={menu === "categories"} aria-controls="navigation-categories" onClick={() => setMenu(menu === "categories" ? null : "categories")}>
+              <ChevronDown size={15} className={menu === "categories" ? "chevron-rotated" : ""} />
             </button>
-            {catOpen && (
-              <div className="category-dropdown-menu" role="menu">
-                <Link
-                  to="/products"
-                  role="menuitem"
-                  className="category-dropdown-item"
-                  onClick={() => setCatOpen(false)}
-                >
-                  <strong>{lang === "bn" ? "সব প্রোডাক্ট দেখুন" : "View All Products"}</strong>
-                </Link>
-                {categories.map((c) => (
-                  <Link
-                    key={c}
-                    to={`/products?category=${encodeURIComponent(c)}`}
-                    role="menuitem"
-                    className="category-dropdown-item"
-                    onClick={() => setCatOpen(false)}
-                  >
-                    {c}
-                  </Link>
-                ))}
+            {menu === "categories" && <div id="navigation-categories" className="category-dropdown-menu navigation-dropdown" aria-label={lang === "bn" ? "প্রোডাক্ট ক্যাটাগরি" : "Product categories"}>
+              <div className="navigation-menu-scroll">
+              <p className="navigation-menu-label">{lang === "bn" ? "ক্যাটাগরি অনুযায়ী দেখুন" : "Browse by category"}</p>
+              <Link to={productsPath} className="category-dropdown-item" onClick={() => setMenu(null)}>{t("allProducts")}<ArrowRight size={14} /></Link>
+              {categories.map(category => <Link key={category} to={`${productsPath}?category=${encodeURIComponent(category)}`} className="category-dropdown-item" onClick={() => setMenu(null)}>{category}</Link>)}
+              {!categories.length && <p className="navigation-menu-empty">{lang === "bn" ? "প্রোডাক্ট প্রকাশ হলে ক্যাটাগরি দেখা যাবে।" : "Categories appear as products are published."}</p>}
               </div>
-            )}
+            </div>}
           </div>
-        )}
-
-        <nav className={`desktop-sub-nav ${shop ? "shop-nav-bar" : ""}`} aria-label="Store navigation">
-          {shop ? (
-            <>
-              <NavLink to={`/shops/${shop.slug}`} end>
-                {lang === "bn" ? "শপ প্রোডাক্টস" : "Shop"}
-              </NavLink>
-                <NavLink to={`/shops/${shop.slug}/info/about`} className="sub-nav-text-btn">
-                  {lang === "bn" ? "আমাদের সম্পর্কে" : "About Us"}
-                </NavLink>
-              <NavLink to={`/shops/${shop.slug}/reviews`} className="sub-nav-link">
-                {lang === "bn" ? "রিভিউসমূহ" : "Reviews"}
-              </NavLink>
-              <NavLink to="/track">
-                {t("trackOrder")}
-              </NavLink>
-              {shop.support && (
-                <a href={supportHref(shop.support)} target="_blank" rel="noopener noreferrer">
-                  {lang === "bn" ? "যোগাযোগ" : "Contact Us"}
-                </a>
-              )}
-            </>
-          ) : (
-            <>
-              <NavLink to="/products">{t("allProducts")}</NavLink>
-              <NavLink to="/shops">{t("shops")}</NavLink>
-              <NavLink to="/track">{t("trackOrder")}</NavLink>
-              <NavLink to="/how-it-works">{t("howItWorks")}</NavLink>
-                <NavLink to={`${shopSlug ? `/shops/${shopSlug}` : ""}/info/about`} className="sub-nav-text-btn">
-                  {lang === "bn" ? "আমাদের সম্পর্কে" : "About Us"}
-                </NavLink>
-            </>
-          )}
-        </nav>
-      </div>
+          {shopBase ? <>
+            <NavLink to={`${shopBase}/reviews`} className="navigation-link">{lang === "bn" ? "রিভিউসমূহ" : "Reviews"}</NavLink>
+            <NavLink to={`${shopBase}/info/about`} className="navigation-link">{lang === "bn" ? "শপ সম্পর্কে" : "About this shop"}</NavLink>
+          </> : <>
+            <NavLink to="/shops" className="navigation-link"><Store size={16} />{lang === "bn" ? "শপসমূহ" : "Shops"}</NavLink>
+            <NavLink to="/purchases" className="navigation-link"><ShoppingBag size={16} />{t("myPurchases")}</NavLink>
+          </>}
+        </div>
+        <div className="navigation-utilities">
+          {shopBase && <Link className="navigation-contact" to={`${shopBase}/info/contact`}><Mail size={15} />{lang === "bn" ? "বিক্রেতার সাথে যোগাযোগ" : "Contact seller"}</Link>}
+          <div className="navigation-help">
+            <button ref={helpButton} type="button" className={`navigation-help-button${["/track", "/how-it-works"].includes(pathname) ? " is-current" : ""}`} aria-expanded={menu === "help"} aria-controls="navigation-help" onClick={() => setMenu(menu === "help" ? null : "help")}>
+              <BookOpen size={16} />{lang === "bn" ? "সহায়তা" : "Help"}<ChevronDown size={14} className={menu === "help" ? "chevron-rotated" : ""} />
+            </button>
+            {menu === "help" && <div id="navigation-help" className="category-dropdown-menu navigation-dropdown navigation-help-dropdown">
+              <div className="navigation-menu-scroll">
+              <p className="navigation-menu-label">{lang === "bn" ? "অর্ডার ও সহায়তা" : "Orders & support"}</p>
+              {shopBase && <Link className="category-dropdown-item" to="/purchases" onClick={() => setMenu(null)}><ShoppingBag size={16} />{t("myPurchases")}</Link>}
+              <Link className="category-dropdown-item" to="/track" onClick={() => setMenu(null)}><Package size={16} />{t("trackOrder")}</Link>
+              <Link className="category-dropdown-item" to="/how-it-works" onClick={() => setMenu(null)}><BookOpen size={16} />{lang === "bn" ? "কেনাকাটার নির্দেশনা" : "Buying guide"}</Link>
+              <Link className="category-dropdown-item" to={shopBase ? `${shopBase}/info/contact` : "/info/contact"} onClick={() => setMenu(null)}><Mail size={16} />{lang === "bn" ? "যোগাযোগ" : "Contact"}</Link>
+              </div>
+            </div>}
+          </div>
+        </div>
+      </nav>
     </div>
   );
 }
@@ -829,9 +698,19 @@ function Header() {
   const navigate = useNavigate();
   const shop = useRouteShop();
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const location = useLocation();
+  const mobileShopSlug = shop?.slug || matchPath("/shops/:slug/*", location.pathname)?.params.slug || matchPath("/shops/:slug", location.pathname)?.params.slug;
+  const mobileShopBase = mobileShopSlug ? `/shops/${mobileShopSlug}` : "";
   const [params, setParams] = useSearchParams();
+
+  useEffect(() => {
+    const update = () => setScrolled(window.scrollY > 8);
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    return () => window.removeEventListener("scroll", update);
+  }, []);
 
   useEffect(() => setOpen(false), [location.pathname]);
   useEffect(() => {
@@ -874,8 +753,9 @@ function Header() {
   };
 
   return (
-    <header className="site-header">
+    <>
       <TopAnnouncementBar />
+    <header className={`site-header${scrolled ? " is-scrolled" : ""}`}>
       <div className="header-inner">
         {shop ? (
           <Link
@@ -982,21 +862,21 @@ function Header() {
       </div>
       {open && (
         <nav id="mobile-navigation" className="mobile-nav" aria-label="Mobile navigation">
-          {shop ? (
-            <>
-              <Link to={`/shops/${shop.slug}`}>{t("allProducts")}</Link>
-              {shop.support && (
-                <a href={supportHref(shop.support)}>Contact seller</a>
-              )}
-            </>
-          ) : (
-            <>
-              <Link to="/products">{t("allProducts")}</Link>
-              <Link to="/shops">{t("shops")}</Link>
-              <Link to="/track">{t("trackOrder")}</Link>
-            </>
-          )}
-          <Link to="/purchases">{t("myPurchases")}</Link>
+          <div className="mobile-nav-content">
+          <p className="mobile-navigation-label">{lang === "bn" ? "ব্রাউজ করুন" : "Browse"}</p>
+          {mobileShopBase ? <>
+            <NavLink to={mobileShopBase} end>{lang === "bn" ? "শপের প্রোডাক্টস" : "Shop products"}</NavLink>
+            <NavLink to={`${mobileShopBase}/reviews`}>{lang === "bn" ? "রিভিউসমূহ" : "Reviews"}</NavLink>
+            <NavLink to={`${mobileShopBase}/info/about`}>{lang === "bn" ? "শপ সম্পর্কে" : "About this shop"}</NavLink>
+          </> : <>
+            <NavLink to="/products">{lang === "bn" ? "প্রোডাক্টস" : "Products"}</NavLink>
+            <NavLink to="/shops">{lang === "bn" ? "শপসমূহ" : "Shops"}</NavLink>
+          </>}
+          <p className="mobile-navigation-label">{lang === "bn" ? "অর্ডার ও সহায়তা" : "Orders & help"}</p>
+          <NavLink to="/purchases">{t("myPurchases")}</NavLink>
+          <NavLink to="/track">{t("trackOrder")}</NavLink>
+          <NavLink to="/how-it-works">{lang === "bn" ? "কেনাকাটার নির্দেশনা" : "Buying guide"}</NavLink>
+          <Link to={mobileShopBase ? `${mobileShopBase}/info/contact` : "/info/contact"}>{lang === "bn" ? "যোগাযোগ" : "Contact"}</Link>
           <button
             type="button"
             className="mobile-nav-action-btn"
@@ -1032,13 +912,14 @@ function Header() {
           {!shop && (
             <>
               <Link to="/seller">{t("openShop")}</Link>
-              <Link to="/how-it-works">{t("howItWorks")}</Link>
             </>
           )}
+          </div>
         </nav>
       )}
       <SubNavBar />
       <WishlistModal open={showWishlist} onClose={() => setShowWishlist(false)} />
+    </header>
       {session?.demo && (
         <div className="demo-bar">
           <span className="status-dot" />
@@ -1067,7 +948,7 @@ function Header() {
           </div>
         </div>
       )}
-    </header>
+    </>
   );
 }
 function IconLinkedin({ size = 18 }: { size?: number }) {
@@ -1086,9 +967,201 @@ function IconYouTube({ size = 18 }: { size?: number }) {
   );
 }
 
+function ShopContactContent({ shop, lang, support }: { shop: Shop; lang: "bn" | "en"; support: string }) {
+  const waNumber = shop.contact?.whatsapp || shop.social_links?.whatsapp || (shop.support && !shop.support.includes("@") ? shop.support : "");
+  const emailAddr = shop.contact?.email || (shop.support?.includes("@") ? shop.support : "");
+  const phoneNum = shop.contact?.phone || (!emailAddr && shop.support && !shop.support.includes("@") ? shop.support : "");
+  const fullAddress = [shop.contact?.address, shop.contact?.city_division, shop.contact?.postal_code]
+    .filter(Boolean)
+    .join(", ");
+
+  let waTarget = waNumber ? supportHref(waNumber) : (support && !support.includes("@") ? supportHref(support) : "");
+  if (waTarget && !/^https:\/\//i.test(waNumber || support)) {
+    try {
+      const u = new URL(waTarget);
+      u.searchParams.set("text", `Hello ${shop.name}! I am contacting you from Arise Store.`);
+      waTarget = u.toString();
+    } catch {}
+  }
+
+  const customSellerNote = shop.pages?.contact?.trim();
+
+  return (
+    <div className="shop-contact-hub">
+      <div className="contact-channels-grid">
+        {(waNumber || (support && !support.includes("@"))) && (
+          <div className="contact-channel-card card-whatsapp">
+            <div className="card-top-row">
+              <span className="contact-card-icon icon-whatsapp" aria-hidden="true">
+                <IconWhatsApp size={22} />
+              </span>
+              <span className="contact-channel-status">
+                <span className="online-dot" />
+                {lang === "bn" ? "ইনস্ট্যান্ট চ্যাট সক্রিয়" : "Instant Chat Active"}
+              </span>
+            </div>
+            <h3 className="contact-card-title">{lang === "bn" ? "হোয়াটসঅ্যাপ সাপোর্ট" : "WhatsApp Support"}</h3>
+            <p className="contact-card-value">{waNumber || shop.support}</p>
+            <p className="contact-card-desc">
+              {lang === "bn"
+                ? "দ্রুততম সময়ে সরাসরি সহায়তা পেতে হোয়াটসঅ্যাপে মেসেজ দিন।"
+                : "Fastest response channel for inquiries and order assistance."}
+            </p>
+            <a
+              href={waTarget || supportHref(waNumber || support)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="button primary contact-card-btn wa-action-btn"
+            >
+              <IconWhatsApp size={16} aria-hidden="true" />
+              <span>{lang === "bn" ? "হোয়াটসঅ্যাপে চ্যাট করুন" : "Chat on WhatsApp"}</span>
+            </a>
+          </div>
+        )}
+
+        {(emailAddr || (support && support.includes("@"))) && (
+          <div className="contact-channel-card card-email">
+            <div className="card-top-row">
+              <span className="contact-card-icon icon-email" aria-hidden="true">
+                <IconMail size={22} />
+              </span>
+              <span className="contact-channel-status text-muted-badge">
+                {lang === "bn" ? "অফিশিয়াল সাপোর্ট" : "Official Support"}
+              </span>
+            </div>
+            <h3 className="contact-card-title">{lang === "bn" ? "ইমেইল সহায়তা" : "Email Support"}</h3>
+            <p className="contact-card-value">{emailAddr || support}</p>
+            <p className="contact-card-desc">
+              {lang === "bn"
+                ? "অর্ডার ইনভয়েস, করপোরেট বা বিস্তারিত অনুসন্ধানের জন্য।"
+                : "For detailed order questions, invoices, or official inquiries."}
+            </p>
+            <a
+              href={`mailto:${emailAddr || support}`}
+              className="button secondary contact-card-btn email-action-btn"
+            >
+              <IconMail size={16} aria-hidden="true" />
+              <span>{lang === "bn" ? "ইমেইল পাঠান" : "Send Email"}</span>
+            </a>
+          </div>
+        )}
+
+        {phoneNum && phoneNum !== waNumber && (
+          <div className="contact-channel-card card-phone">
+            <div className="card-top-row">
+              <span className="contact-card-icon icon-phone" aria-hidden="true">
+                <IconPhone size={22} />
+              </span>
+              <span className="contact-channel-status text-muted-badge">
+                {lang === "bn" ? "সরাসরি হটলাইন" : "Direct Hotline"}
+              </span>
+            </div>
+            <h3 className="contact-card-title">{lang === "bn" ? "সরাসরি ফোন কল" : "Phone Call"}</h3>
+            <p className="contact-card-value">{phoneNum}</p>
+            <p className="contact-card-desc">
+              {lang === "bn"
+                ? "জরুরি বা বিশেষ প্রয়োজনে সরাসরি সেলারকে কল করুন।"
+                : "Call seller directly for urgent queries or immediate assistance."}
+            </p>
+            <a
+              href={`tel:${phoneNum.replace(/\s+/g, "")}`}
+              className="button secondary contact-card-btn phone-action-btn"
+            >
+              <IconPhone size={16} aria-hidden="true" />
+              <span>{lang === "bn" ? "সরাসরি কল দিন" : "Call Now"}</span>
+            </a>
+          </div>
+        )}
+
+        {fullAddress && (
+          <div className="contact-channel-card card-location">
+            <div className="card-top-row">
+              <span className="contact-card-icon icon-location" aria-hidden="true">
+                <IconMapPin size={22} />
+              </span>
+              <span className="contact-channel-status text-muted-badge">
+                {lang === "bn" ? "ভেরিফাইড ঠিকানা" : "Verified Location"}
+              </span>
+            </div>
+            <h3 className="contact-card-title">{lang === "bn" ? "শপের ঠিকানা" : "Store Location"}</h3>
+            <p className="contact-card-value">{fullAddress}</p>
+            <p className="contact-card-desc">
+              {lang === "bn"
+                ? "সেলার শপের রেজিস্টার্ড ব্যবসায়িক অফিস ঠিকানা।"
+                : "Registered business location for this verified merchant."}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {customSellerNote && (
+        <div className="contact-custom-note-panel">
+          <h4>{lang === "bn" ? "সেলার থেকে বিশেষ বার্তা:" : "Message from Seller:"}</h4>
+          <p className="preserve-lines">{customSellerNote}</p>
+        </div>
+      )}
+
+      <div className="contact-guidelines-box">
+        <h3 className="guidelines-title">
+          {lang === "bn" ? "কীভাবে দ্রুততম সময়ে সহায়তা পাবেন?" : "How to get the fastest resolution?"}
+        </h3>
+        <div className="guidelines-grid">
+          <div className="guideline-item">
+            <span className="guideline-icon">🕒</span>
+            <div>
+              <strong>{lang === "bn" ? "সাপোর্ট কর্মঘণ্টা" : "Support Hours"}</strong>
+              <p>{lang === "bn" ? "প্রতিদিন সকাল ১০:০০ AM - রাত ১২:০০ AM (বাংলাদেশ সময়)" : "Daily 10:00 AM - 12:00 AM (BD Time)"}</p>
+            </div>
+          </div>
+          <div className="guideline-item">
+            <span className="guideline-icon">📌</span>
+            <div>
+              <strong>{lang === "bn" ? "অর্ডার আইডি সাথে রাখুন" : "Keep Order ID Ready"}</strong>
+              <p>{lang === "bn" ? "ইতিমধ্যে অর্ডার করা থাকলে মেসেজে আপনার Order Ref (যেমন ORD-XXXXX) বা পেমেন্ট ট্রানজেকশন আইডি দিন।" : "Include your Order Ref (e.g. ORD-XXXXX) or Transaction ID in your message for instant resolution."}</p>
+            </div>
+          </div>
+          <div className="guideline-item">
+            <span className="guideline-icon">⚡</span>
+            <div>
+              <strong>{lang === "bn" ? "ইনস্ট্যান্ট ডেলিভারি" : "Instant Delivery"}</strong>
+              <p>{lang === "bn" ? "পেমেন্ট সম্পন্ন হওয়ার ৪৫ সেকেন্ডের মধ্যেই My purchases পেজে আপনার পণ্য অ্যাক্টিভ হয়ে যায়।" : "Digital access is automatically delivered to My purchases within 45s of verified payment."}</p>
+            </div>
+          </div>
+          <div className="guideline-item">
+            <span className="guideline-icon">🛡️</span>
+            <div>
+              <strong>{lang === "bn" ? "পূর্ণ মেয়াদি রিপ্লেসমেন্ট ওয়ারেন্টি" : "Full Term Warranty"}</strong>
+              <p>{lang === "bn" ? "ক্রয়কৃত পণ্যের মেয়াদ থাকা পর্যন্ত যেকোনো সমস্যায় সেলার রিপ্লেসমেন্ট সাপোর্ট প্রদান করবে।" : "Sellers provide replacements or assistance throughout the product guarantee term."}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {shop.social_links && Object.values(shop.social_links).some(Boolean) && (
+        <div className="contact-social-channels">
+          <h4>{lang === "bn" ? "কমিউনিটি ও সোশ্যাল মিডিয়া চ্যানেল" : "Community & Social Channels"}</h4>
+          <SocialLinks shop={shop} className="contact-social-row" />
+        </div>
+      )}
+
+      {support && (
+        <div className="shop-policy-support">
+          <a className="button secondary" href={supportHref(support)}>
+            <Phone size={16} aria-hidden="true" />
+            {lang === "bn" ? "সাপোর্টে যোগাযোগ করুন" : "Contact support"}
+            <ArrowRight size={16} aria-hidden="true" />
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ShopInformationPage() {
   const platform = usePlatformSettings();
-  const { slug, section: sectionKey } = useParams();
+  const { slug, section: paramSection } = useParams();
+  const { pathname } = useLocation();
+  const sectionKey = paramSection || (pathname.endsWith("/contact") ? "contact" : "");
   const { catalog, catalogError, reloadCatalog } = useMarket();
   const shop = useRouteShop();
   const { lang } = useLang();
@@ -1101,7 +1174,7 @@ function ShopInformationPage() {
     document.title = `${title} | ${shopName}`;
     return () => { document.title = previous; };
   }, [title, shopName]);
-  if (slug && catalogError) return <main id="main" className="container section"><ErrorBox message={catalogError} retry={() => void reloadCatalog()} /></main>;
+  if (slug && catalogError && !catalog) return <main id="main" className="container section"><ErrorBox message={catalogError} retry={() => void reloadCatalog()} /></main>;
   if (slug && !catalog) return <Loading />;
   if (!section || (slug && !shop)) return <NotFound />;
   const text = (shop ? shop.pages?.[section.key]?.trim() || (section.key === "about" ? shop.description : "") : platform.pages?.[section.key]?.trim());
@@ -1117,16 +1190,23 @@ function ShopInformationPage() {
         <h1>{title}</h1>
       </div>
       <article className="panel shop-policy-content">
-        {text ? <p className="preserve-lines">{text}</p> :
-          <p className="muted">{lang === "bn"
+        {text ? <p className="preserve-lines">{text}</p> : (
+          (!shop || section.key !== "contact") && <p className="muted">{lang === "bn"
             ? "এই তথ্য এখনও যোগ করা হয়নি। বিস্তারিত জানতে যোগাযোগ করুন।"
-            : "This information has not been added yet. Contact support for details."}</p>}
-        {section.key === "contact" && shop && <ShopContactChips shop={shop} />}
-        {support && <div className="shop-policy-support">
-          <a className="button secondary" href={supportHref(support)}>
-            <Phone size={16} aria-hidden="true" />{lang === "bn" ? "সাপোর্টে যোগাযোগ করুন" : "Contact support"}<ArrowRight size={16} aria-hidden="true" />
-          </a>
-        </div>}
+            : "This information has not been added yet. Contact support for details."}</p>
+        )}
+        {section.key === "contact" && shop ? (
+          <ShopContactContent shop={shop} lang={lang} support={support} />
+        ) : (
+          <>
+            {section.key === "contact" && shop && <ShopContactChips shop={shop} />}
+            {support && <div className="shop-policy-support">
+              <a className="button secondary" href={supportHref(support)}>
+                <Phone size={16} aria-hidden="true" />{lang === "bn" ? "সাপোর্টে যোগাযোগ করুন" : "Contact support"}<ArrowRight size={16} aria-hidden="true" />
+              </a>
+            </div>}
+          </>
+        )}
       </article>
     </main>
   );
@@ -1188,8 +1268,8 @@ function Footer() {
                 <div className="dark-brand-title-wrap">
                   <strong className="dark-brand-name">{shopName}</strong>
                   {shop && (
-                    <span className="seller-verified-badge dark-verified-badge" title="Verified AriseSell Merchant">
-                      <ShieldCheck size={12} /> {lang === "bn" ? "ভেরিফাইড সেলার" : "Verified Seller"}
+                    <span className="seller-verified-badge dark-verified-badge" title="Connected through AriseSell">
+                      <ShieldCheck size={12} /> {lang === "bn" ? "AriseSell শপ" : "AriseSell shop"}
                     </span>
                   )}
                 </div>
@@ -1207,28 +1287,25 @@ function Footer() {
                 {phone && (
                   <div className="dark-contact-item">
                     <span className="dark-contact-icon"><IconWhatsApp size={16} /></span>
-                    <span>
-                      <strong>{lang === "bn" ? "হোয়াটসঅ্যাপ (মেসেজ):" : "WhatsApp (Message only):"}</strong>{" "}
-                      <a href={supportHref(phone)} target="_blank" rel="noopener noreferrer">{phone}</a>
-                    </span>
+                    <a href={supportHref(phone)} target="_blank" rel="noopener noreferrer" className="dark-contact-link">
+                      <strong>{lang === "bn" ? "হোয়াটসঅ্যাপ (মেসেজ):" : "WhatsApp (Message only):"}</strong> {phone}
+                    </a>
                   </div>
                 )}
                 {email && (
                   <div className="dark-contact-item">
                     <span className="dark-contact-icon"><IconMail size={16} /></span>
-                    <span>
-                      <strong>{lang === "bn" ? "ইমেইল:" : "Email:"}</strong>{" "}
-                      <a href={`mailto:${email}`}>{email}</a>
-                    </span>
+                    <a href={`mailto:${email}`} className="dark-contact-link">
+                      <strong>{lang === "bn" ? "ইমেইল:" : "Email:"}</strong> {email}
+                    </a>
                   </div>
                 )}
                 {!fullAddress && !phone && !email && shop?.support && (
                   <div className="dark-contact-item">
                     <span className="dark-contact-icon"><IconGlobe size={16} /></span>
-                    <span>
-                      <strong>{lang === "bn" ? "সাপোর্ট:" : "Support:"}</strong>{" "}
-                      <a href={supportHref(shop.support)} target="_blank" rel="noopener noreferrer">{shop.support}</a>
-                    </span>
+                    <a href={supportHref(shop.support)} target="_blank" rel="noopener noreferrer" className="dark-contact-link">
+                      <strong>{lang === "bn" ? "সাপোর্ট:" : "Support:"}</strong> {shop.support}
+                    </a>
                   </div>
                 )}
               </div>
@@ -1236,7 +1313,7 @@ function Footer() {
 
             {/* Column 2: Recent Products in this Shop */}
             <div className="dark-footer-col dark-products-col">
-              <span className="dark-footer-heading">{lang === "bn" ? "শপ প্রোডাক্টসমূহ" : "RECENT PRODUCTS"}</span>
+              <span className="dark-footer-heading">{lang === "bn" ? "শপ প্রোডাক্টসমূহ" : "Recent products"}</span>
               <ul className="dark-footer-links-list">
                 {productsList.length > 0 ? (
                   productsList.map((p) => (
@@ -1258,34 +1335,46 @@ function Footer() {
               </ul>
             </div>
 
-            {/* Column 3: Shop Social Links (Dynamic) */}
+            {/* Column 3: Shop Social Links & Seller Community Shortcuts */}
             <div className="dark-footer-col dark-social-col">
-              <span className="dark-footer-heading">{lang === "bn" ? "সোশ্যাল মিডিয়া ও সাপোর্ট" : "COMMUNITY & SOCIAL"}</span>
-              {shopSocials.length > 0 ? (
-                <div className="dark-social-pills-row">
-                  {shopSocials.map((item) => (
-                    <a
-                      key={item.key}
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="dark-social-pill"
-                    >
-                      {item.icon}
-                      <span>{item.label}</span>
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <p className="dark-muted-text">
-                  {lang === "bn" ? "যেকোনো সহায়তায় সরাসরি সেলারের সাথে যোগাযোগ করুন।" : "Contact seller directly for any inquiries or support."}
-                </p>
-              )}
+              <span className="dark-footer-heading">{lang === "bn" ? "সোশ্যাল মিডিয়া ও সাপোর্ট" : "Community & social"}</span>
+              <div className="dark-social-pills-row footer-platform-links">
+                {shopSocials.map((item) => (
+                  <a
+                    key={item.key}
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="dark-social-pill"
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </a>
+                ))}
+                {shop && (
+                  <Link to={`/shops/${slug}/reviews`} className="dark-social-pill">
+                    <Star size={14} />
+                    <span>{lang === "bn" ? "গ্রাহক রিভিউসমূহ" : "Customer reviews"}</span>
+                  </Link>
+                )}
+                {shopSocials.length <= 2 && (
+                  <Link to="/shops" className="dark-social-pill">
+                    <Store size={14} />
+                    <span>{lang === "bn" ? "সকল শপ ব্রাউজ করুন" : "Browse All Shops"}</span>
+                  </Link>
+                )}
+                {shopSocials.length === 0 && (
+                  <Link to="/seller" className="dark-social-pill">
+                    <Store size={14} />
+                    <span>{lang === "bn" ? "নিজের শপ খুলুন" : "Open Your Shop"}</span>
+                  </Link>
+                )}
+              </div>
             </div>
 
             {/* Column 4: Shop Useful Links */}
             <div className="dark-footer-col dark-links-col">
-              <span className="dark-footer-heading">{lang === "bn" ? "প্রয়োজনীয় লিংকসমূহ" : "USEFUL LINKS"}</span>
+              <span className="dark-footer-heading">{lang === "bn" ? "প্রয়োজনীয় লিংকসমূহ" : "Useful links"}</span>
               <ul className="dark-footer-links-list">
                 {shopPageSections.map(section => (
                   <li key={section.key}>
@@ -1342,15 +1431,15 @@ function Footer() {
             </p>
             <div className="dark-contact-list">
               <div className="dark-contact-item">
-                <span className="dark-contact-icon">🛡️</span>
-                <span>{lang === "bn" ? "১০০% ভেরিফাইড স্বাধীন বিক্রেতা" : "100% Verified Independent Sellers"}</span>
+                <Store size={16} className="dark-contact-icon" />
+                <span>{lang === "bn" ? "স্বাধীন শপ থেকে সরাসরি কেনাকাটা" : "Buy directly from independent shops"}</span>
               </div>
               <div className="dark-contact-item">
-                <span className="dark-contact-icon">⚡</span>
-                <span>{lang === "bn" ? "My purchases থেকে অর্ডার দেখুন" : "Follow your order in My purchases"}</span>
+                <Package size={16} className="dark-contact-icon" />
+                <span>{lang === "bn" ? "অর্ডার থেকে ডেলিভারি স্ট্যাটাস দেখুন" : "Track payment and delivery in your orders"}</span>
               </div>
               <div className="dark-contact-item">
-                <span className="dark-contact-icon">🔒</span>
+                <LockKeyhole size={16} className="dark-contact-icon" />
                 <span>{lang === "bn" ? "বিক্রেতার পেমেন্ট পদ্ধতি" : "Seller-configured payment methods"}</span>
               </div>
             </div>
@@ -1358,7 +1447,7 @@ function Footer() {
 
           {/* Column 2: Trending Marketplace Products */}
           <div className="dark-footer-col dark-products-col">
-            <span className="dark-footer-heading">{lang === "bn" ? "জনপ্রিয় প্রোডাক্টসমূহ" : "RECENT POSTS / PRODUCTS"}</span>
+            <span className="dark-footer-heading">{lang === "bn" ? "জনপ্রিয় প্রোডাক্টসমূহ" : "Recent products"}</span>
             <ul className="dark-footer-links-list">
               {trendingProducts.length > 0 ? (
                 trendingProducts.map((p) => (
@@ -1370,20 +1459,15 @@ function Footer() {
                   </li>
                 ))
               ) : (
-                <>
-                  <li><Link to="/products" className="dark-product-link"><span className="bullet-dot">›</span> ChatGPT Plus 1 Month Private</Link></li>
-                  <li><Link to="/products" className="dark-product-link"><span className="bullet-dot">›</span> YouTube Premium 3 Months</Link></li>
-                  <li><Link to="/products" className="dark-product-link"><span className="bullet-dot">›</span> Microsoft 365 Genuine Office</Link></li>
-                  <li><Link to="/products" className="dark-product-link"><span className="bullet-dot">›</span> CapCut Pro Monthly Subscription</Link></li>
-                </>
+                <li><Link to="/products" className="dark-product-link">{lang === "bn" ? "সব প্রোডাক্ট দেখুন" : "Browse all products"}</Link></li>
               )}
             </ul>
           </div>
 
           {/* Column 3: Platform Community & Shortcuts */}
           <div className="dark-footer-col dark-social-col">
-            <span className="dark-footer-heading">{lang === "bn" ? "মার্কেটপ্লেস ও প্ল্যাটফর্ম" : "MARKETPLACE & PLATFORM"}</span>
-            <div className="dark-social-pills-row">
+            <span className="dark-footer-heading">{lang === "bn" ? "মার্কেটপ্লেস ও প্ল্যাটফর্ম" : "Marketplace & platform"}</span>
+            <div className="dark-social-pills-row footer-platform-links">
               <Link to="/seller" className="dark-social-pill">
                 <Store size={14} />
                 <span>{lang === "bn" ? "নিজের শপ খুলুন" : "Open Your Shop"}</span>
@@ -1405,7 +1489,7 @@ function Footer() {
 
           {/* Column 4: Marketplace Useful Links */}
           <div className="dark-footer-col dark-links-col">
-            <span className="dark-footer-heading">{lang === "bn" ? "প্রয়োজনীয় লিংকসমূহ" : "USEFUL LINKS"}</span>
+            <span className="dark-footer-heading">{lang === "bn" ? "প্রয়োজনীয় লিংকসমূহ" : "Useful links"}</span>
             <ul className="dark-footer-links-list">
               {shopPageSections.map(section => (
                 <li key={section.key}>
@@ -1593,6 +1677,10 @@ function ProductCard({ product }: { product: Product }) {
         </button>
       </div>
       <div className="product-info">
+        <span className="card-category">{product.category}</span>
+        <Link to={productPath(product, catalog!)} className="product-title">
+          {product.name}
+        </Link>
         <Link
           to={`/shops/${shop?.slug || product.shop_id}`}
           className="by-shop"
@@ -1600,13 +1688,9 @@ function ProductCard({ product }: { product: Product }) {
           <span className="tiny-avatar">{shop?.name.slice(0, 1) || "S"}</span>
           {shop?.name || "Independent shop"}
         </Link>
-        <Link to={productPath(product, catalog!)} className="product-title">
-          {product.name}
-        </Link>
         <div className="product-meta">
-          <span>{product.category}</span>
-          <span className={stock(product) > 0 ? "availability" : "sold-out"}>
-            {stock(product) > 0 ? (
+          <span className={product.sales_enabled && stock(product) > 0 ? "availability" : "sold-out"}>
+            {!product.sales_enabled ? (lang === "bn" ? "ক্রয় সাময়িক বন্ধ" : "Purchases paused") : stock(product) > 0 ? (
               productFulfilment(product) === "physical" ? <>Physical delivery</> : product.delivery_mode === "automatic" ? (
                 <>
                   <Zap size={12} />
@@ -1625,6 +1709,7 @@ function ProductCard({ product }: { product: Product }) {
             {product.variants.length > 1 && <small>{lang === "bn" ? "শুরু " : "From "}</small>}
             {money(minimumPrice(product), product.currency)}
           </span>
+          <Link className="card-buy" to={productPath(product, catalog!)} aria-label={`View options for ${product.name}`}><ArrowUpRight size={19} /></Link>
         </div>
       </div>
     </article>
@@ -1852,12 +1937,18 @@ function Home() {
   const navigate = useNavigate();
   const categories = [
     ...new Set(catalog?.products.map((p) => p.category) || []),
-  ].slice(0, 7);
+  ].slice(0, 6);
+  const discoveryProducts = [...(catalog?.products || [])]
+    .sort((a, b) =>
+      Number(b.sales_enabled && stock(b) > 0) - Number(a.sales_enabled && stock(a) > 0) ||
+      Number(Boolean(b.image_url)) - Number(Boolean(a.image_url)))
+    .slice(0, 3);
   return (
     <>
       <main id="main">
         <section className="hero container">
           <div className="hero-copy">
+            <p className="eyebrow">{lang === "bn" ? "ডিজিটাল মার্কেটপ্লেস" : "THE DIGITAL MARKETPLACE"}</p>
             <h1>
               {platform.hero_title || (lang === "bn" ? (
                 <>স্বাধীন শপ থেকে<br />আপনার পছন্দের পণ্য</>
@@ -1867,8 +1958,8 @@ function Home() {
             </h1>
             <p className="hero-description">
               {platform.hero_description || (lang === "bn"
-                ? "সফটওয়্যার, টেমপ্লেট, ডিজাইন অ্যাসেট এবং কোর্স ব্রাউজ করুন। ক্রয়ের আগে বিক্রেতার পণ্যের বিবরণ ও শর্তাবলী যাচাই করে নিন।"
-                : "Browse software, templates, design assets and courses. Check each seller’s product details and terms before ordering.")}
+                ? "স্বাধীন শপের সফটওয়্যার, টেমপ্লেট, ডিজাইন অ্যাসেট ও কোর্স—সব এক জায়গায়।"
+                : "Find software, templates, design assets and courses from independent shops.")}
             </p>
             <form
               className="hero-search"
@@ -1892,27 +1983,26 @@ function Home() {
               </button>
             </form>
             <div className="hero-popular">
-              <span>{lang === "bn" ? "জনপ্রিয় সার্চ:" : "Try searching"}</span>
-              {["Templates", "Courses", "Software"].map((term) => (
-                <Link key={term} to={`/products?q=${term}`}>
-                  {term}
+              <span>{lang === "bn" ? "এক্সপ্লোর করুন:" : "Explore"}</span>
+              {categories.slice(0, 3).map((category) => (
+                <Link key={category} to={`/products?category=${encodeURIComponent(category)}`}>
+                  {category}
                 </Link>
               ))}
             </div>
           </div>
           <aside className="discovery-shelf" aria-labelledby="discovery-title">
-            <div className="discovery-heading"><span className="discovery-symbol"><ShoppingBag size={22} /></span><div><p>{lang === "bn" ? "প্রোডাক্ট প্রিভিউ" : "Product preview"}</p><h2 id="discovery-title">{lang === "bn" ? "ক্যাটালগ এক্সপ্লোর করুন" : "Explore the catalog"}</h2></div></div>
+            <div className="discovery-heading"><h2 id="discovery-title">{lang === "bn" ? "ক্যাটালগ থেকে" : "Inside the catalog"}</h2><Link to="/products">{lang === "bn" ? "সব দেখুন" : "View all"}<ArrowUpRight size={16} /></Link></div>
             {catalog?.products.length ? <div className="discovery-picks">
-              {catalog.products.slice(0, 3).map(product => <Link className="discovery-pick" key={product.id} to={productPath(product, catalog)}>
-                <span className="discovery-art"><CategoryIcon category={product.category} size={24} /></span>
-                <span><small>{product.category}</small><strong>{product.name}</strong><span>{product.variants.length > 1 ? (lang === "bn" ? "শুরু " : "From ") : ""}{money(minimumPrice(product), product.currency)}</span></span>
+              {discoveryProducts.map(product => <Link className="discovery-pick" key={product.id} to={productPath(product, catalog)}>
+                <Art product={product} />
+                <span className="discovery-pick-info"><small>{product.category}</small><strong>{product.name}</strong><span>{product.variants.length > 1 ? (lang === "bn" ? "শুরু " : "From ") : ""}{money(minimumPrice(product), product.currency)}</span></span>
               </Link>)}
             </div> : catalog ? <p className="discovery-empty">{lang === "bn" ? "এখনও কোনো প্রোডাক্ট প্রকাশ করা হয়নি।" : "No products are published yet."}</p> : catalogError ? <p className="discovery-empty">{lang === "bn" ? "প্রোডাক্ট লোড করা যায়নি। নিচে পুনরায় চেষ্টা করুন।" : "Products could not be loaded. Use Try again in the product section below."}</p> : <Loading />}
-            <Link className="discovery-footer" to="/products">{lang === "bn" ? "সব প্রোডাক্ট দেখুন" : "Browse all products"} <ArrowRight size={18} /></Link>
           </aside>
         </section>
         <HomeHeroSponsoredAd />
-        <section className="container section">
+        <section className="container section marketplace-categories">
           <SectionTitle
             title={lang === "bn" ? "ক্যাটাগরি ব্রাউজ করুন" : "Browse categories"}
             link={lang === "bn" ? "সব প্রোডাক্ট দেখুন" : "Browse all products"}
@@ -1920,16 +2010,21 @@ function Home() {
           />
           {categories.length > 0 ? (
             <div className="category-grid">
-              {categories.map((category) => (
+              {categories.map((category) => {
+                const items = catalog!.products.filter(product => product.category === category);
+                const cover = items.find(product => product.sales_enabled && stock(product) > 0 && product.image_url)
+                  || items.find(product => product.image_url) || items[0];
+                return (
                 <Link
                   to={`/products?category=${encodeURIComponent(category)}`}
                   className="category-card"
                   key={category}
                 >
-                  <CategoryIcon category={category} size={25} />
-                  <span>{category}</span>
+                  <Art key={cover.id} product={cover} />
+                  <span><strong>{category}</strong><small>{items.length} {lang === "bn" ? "টি প্রোডাক্ট" : items.length === 1 ? "product" : "products"}</small></span>
+                  <ArrowUpRight size={18} />
                 </Link>
-              ))}
+              );})}
             </div>
           ) : catalog ? (
             <p className="muted">
@@ -1939,7 +2034,7 @@ function Home() {
         </section>
         <section className="container section products-section">
           <SectionTitle
-            title={lang === "bn" ? "ফিচার্ড প্রোডাক্টসমূহ" : "Explore products"}
+            title={lang === "bn" ? "আপনার পরের ডিজিটাল প্রোডাক্ট" : "Find your next digital essential"}
             link={lang === "bn" ? "সব প্রোডাক্ট দেখুন" : "View all products"}
             to="/products"
           />
@@ -1969,6 +2064,12 @@ function Home() {
             </Empty>
           )}
         </section>
+        <nav className="container order-tools" aria-label={lang === "bn" ? "অর্ডারের শর্টকাট" : "Order shortcuts"}>
+          <div><ShoppingBag size={20} /><span>{lang === "bn" ? "ইতিমধ্যে অর্ডার করেছেন?" : "Already placed an order?"}</span></div>
+          <Link to="/purchases">{t("myPurchases")}<ArrowRight size={15} /></Link>
+          <Link to="/track">{t("trackOrder")}<ArrowRight size={15} /></Link>
+          <Link to="/how-it-works">{t("howItWorks")}<ArrowRight size={15} /></Link>
+        </nav>
         <section className="container section">
           <SectionTitle
             title={lang === "bn" ? "স্বাধীন শপসমূহ" : "Independent shops"}
@@ -2046,6 +2147,7 @@ function Products({ shop }: { shop?: Shop }) {
     );
   const update = (name: string, value: string) => {
     const next = new URLSearchParams(params);
+    if (name === "q") next.delete("search");
     value ? next.set(name, value) : next.delete(name);
     setParams(next, { replace: true });
   };
@@ -2063,7 +2165,10 @@ function Products({ shop }: { shop?: Shop }) {
           </p>
         </div>
       )}
-      {/* Consolidated toolbar: category filter pills on left, sorting and stock filter on right */}
+      <div className="catalog-search-row">
+        <label className="catalog-search"><Search size={18} /><span className="sr-only">{shop ? `Search ${shop.name} catalog` : "Search the catalog"}</span><input type="search" value={query} placeholder={lang === "bn" ? "প্রোডাক্ট বা ক্যাটাগরি খুঁজুন" : "Search products or categories"} onChange={event => update("q", event.target.value)} /></label>
+        <p className="catalog-context">{shop ? shop.name : (lang === "bn" ? "স্বাধীন বিক্রেতাদের ডিজিটাল প্রোডাক্ট" : "Digital products from independent sellers")}</p>
+      </div>
       <div className="catalog-toolbar-row">
         {!shop && <label className="field">Shop type<select value={storeType} onChange={e => update("store_type", e.target.value)}>
           <option value="">All shop types</option>
@@ -2246,15 +2351,8 @@ function ShopPage() {
           <span>/</span>
           <Link to="/shops">{lang === "bn" ? "স্বাধীন শপসমূহ" : "Shops"}</Link>
           <span>/</span>
-          <span aria-current="page">{shop.name}</span>
+          <h1 className="breadcrumb-current" aria-current="page">{shop.name}</h1>
         </nav>
-        <div className="shop-hero-header-row">
-          <h1>{shop.name}</h1>
-          <div className="shop-online-indicator">
-            <span className="online-dot" />
-            <span>{shopType(shop)}</span>
-          </div>
-        </div>
       </section>
       <Products shop={shop} />
       <WhatsAppFloatingButton shop={shop} />
@@ -2470,10 +2568,7 @@ function ProductPage() {
       <div className="product-detail">
         <div className="product-visual">
           <Art product={product} large />
-          <section id="customer-reviews" tabIndex={-1} className="product-visual-reviews" aria-label="Customer reviews">
-            <h2 className="product-reviews-heading">Customer reviews</h2>
-            {location.pathname === productPath(product, catalog) && <ProductReviews key={product.id} productId={product.id} />}
-          </section>
+
         </div>
         <div className="product-summary">
           <div className="product-category-row">
@@ -2533,8 +2628,26 @@ function ProductPage() {
             </span>
           </div>
 
-          {productFulfilment(product) === "digital" && product.delivery_estimate && <p className="preserve-lines">{product.delivery_estimate}</p>}
-          {product.warranty_type === "warranty" && product.warranty_days != null && <p>Warranty: {product.warranty_days} days</p>}
+          <div className="product-trust-stats-badges">
+            <div className="trust-stat-badge">
+              <Package size={18} />
+              <div>
+                <strong>{lang === "bn" ? "ডেলিভারি" : "Delivery"}</strong>
+                <small>{product.delivery_estimate || (digital ? (lang === "bn" ? "পেমেন্ট যাচাইয়ের পর" : "After payment verification") : (lang === "bn" ? "চেকআউটে ডেলিভারি চার্জ দেখুন" : "Shipping confirmed at checkout"))}</small>
+              </div>
+            </div>
+            {product.warranty_type && <div className="trust-stat-badge">
+              <ShieldCheck size={18} />
+              <div>
+                <strong>{lang === "bn" ? "ওয়ারেন্টি" : "Warranty"}</strong>
+                <small>{product.warranty_type === "no_warranty"
+                  ? (lang === "bn" ? "ওয়ারেন্টি নেই" : "No warranty")
+                  : product.warranty_days
+                    ? (lang === "bn" ? `${product.warranty_days} দিন` : `${product.warranty_days} days`)
+                    : (lang === "bn" ? "বিক্রেতার শর্ত দেখুন" : "See seller’s terms")}</small>
+              </div>
+            </div>}
+          </div>
           {product.checkout_unavailable_reason && <p role="status">{product.checkout_unavailable_reason}</p>}
 
 
@@ -2587,6 +2700,10 @@ function ProductPage() {
             </div>
           </div>
         </div>
+          <section id="customer-reviews" tabIndex={-1} className="product-visual-reviews" aria-label="Customer reviews">
+            <h2 className="product-reviews-heading">Customer reviews</h2>
+            {location.pathname === productPath(product, catalog) && <ProductReviews key={product.id} productId={product.id} />}
+          </section>
       </div>
       <dialog ref={infoDialog} className="product-info-dialog" aria-labelledby="product-info-title"
         onCancel={(event) => { event.preventDefault(); closeSection(); }} onClick={(event) => { if (event.target === event.currentTarget) closeSection(); }}>
@@ -3212,28 +3329,35 @@ function CopyButton({
   );
 }
 
+
 export function detectPaymentAccountType(payment: any, shop?: Shop | null): "merchant" | "personal" {
   if (!payment) return "personal";
 
-  // 1. Direct explicit property
-  const direct = (payment.account_type || payment.type || "").toString().toLowerCase();
+  // 1. Direct explicit property from AriseSell
+  const direct = (payment.account_type || payment.type || payment.wallet_type || payment.number_type || "").toString().toLowerCase();
   if (direct.includes("merchant") || direct.includes("payment")) return "merchant";
-  if (direct.includes("personal") || direct.includes("send_money")) return "personal";
+  if (direct.includes("personal") || direct.includes("send_money") || direct.includes("uddokta")) return "personal";
 
-  // 2. Instructions or note text
+  // 2. Account name or title (e.g. "Nagad Personal / Uddokta Number" as in AriseSell integration)
+  const name = (payment.account_name || payment.title || payment.label || payment.name || "").toString().toLowerCase();
+  if (name.includes("merchant") || name.includes("মার্চেন্ট")) return "merchant";
+  if (name.includes("personal") || name.includes("uddokta") || name.includes("পার্সোনাল") || name.includes("উদ্যোক্তা")) return "personal";
+
+  // 3. Instructions or note text from AriseSell
   const text = (payment.instructions || payment.note || "").toString().toLowerCase();
   if (text.includes("merchant") || text.includes("মার্চেন্ট") || text.includes("make payment") || text.includes("পেমেন্ট")) {
     return "merchant";
   }
-  if (text.includes("personal") || text.includes("পার্সোনাল") || text.includes("send money") || text.includes("সেন্ড মানি")) {
+  if (text.includes("personal") || text.includes("পার্সোনাল") || text.includes("send money") || text.includes("সেন্ড মানি") || text.includes("uddokta") || text.includes("উদ্যোক্তা")) {
     return "personal";
   }
 
-  // 3. Shop metadata
+  // 4. Shop metadata from AriseSell
   if (shop?.payment_account_types && payment.provider) {
     const val = shop.payment_account_types[payment.provider.toLowerCase()];
     if (val === "merchant" || val === "personal") return val;
   }
+
 
   return "personal";
 }
@@ -4154,10 +4278,80 @@ function Seller() {
                     </section>
 
                     <section className="panel seller-panel" aria-labelledby="shop-payment-settings-title">
-                      <h2 id="shop-payment-settings-title">Payments and delivery</h2>
-                      <p>{data.payment_methods.length ? data.payment_methods.map(paymentMethodLabel).join(" · ") : "No source-supported payment method configured."}</p>
-                      <p className="muted">Your AriseSell shop controls payment accounts, shipping charges and fulfillment. Changes made there are used automatically.</p>
-                      <a className="text-link" href={`${session.source_web}/console/${data.shop.slug}/integrations`} target="_blank" rel="noreferrer">Manage in AriseSell<ExternalLink size={14} /></a>
+                      <p className="muted">Your AriseSell shop controls payment accounts, shipping charges and fulfillment.</p>
+                      <div className="seller-panel-heading">
+                        <div>
+                          <span className="eyebrow">{lang === "bn" ? "পেমেন্ট সেটআপ · AriseSell অটো-সিঙ্ক" : "Payment Setup · AriseSell Auto-Sync"}</span>
+                          <h2 id="shop-payment-settings-title">{lang === "bn" ? "সংযুক্ত পেমেন্ট একাউন্ট ও নির্দেশনা" : "Connected Payment Accounts & Instructions"}</h2>
+                        </div>
+                        <Wallet size={24} aria-hidden="true" />
+                      </div>
+                      <p className="muted">
+                        {lang === "bn"
+                          ? "আপনার ওয়ালেটের ধরন (পার্সোনাল নাকি মার্চেন্ট) AriseSell থেকে স্বয়ংক্রিয়ভাবে শনাক্ত ও সিঙ্ক করা হয়েছে। আলাদাভাবে সিলেক্ট করার প্রয়োজন নেই—চেকআউটে ক্রেতারা সরাসরি সঠিক নির্দেশনা দেখতে পাবেন।"
+                          : "Wallet types (Personal vs Merchant) are automatically detected and synced from your connected AriseSell store. No manual selection required—customers automatically receive the exact instructions during checkout."}
+                      </p>
+                      <div className="seller-payment-methods-list">
+                        {data.payment_methods.map((providerKey) => {
+                          const pKey = providerKey.toLowerCase();
+                          const currentType = detectPaymentAccountType({provider: pKey}, data.shop);
+                          return (
+                            <div key={pKey} className="seller-payment-method-row">
+                              <div className="payment-method-header-bar">
+                                <div className="payment-method-info">
+                                  <span className={`provider-dot ${pKey}`} />
+                                  <strong>{paymentMethodLabel(pKey)}</strong>
+                                  <span className="arisesell-sync-tag">
+                                    <Check size={12} />
+                                    {lang === "bn" ? "AriseSell থেকে অটো-ডিটেক্টেড" : "Auto-synced from AriseSell"}
+                                  </span>
+                                </div>
+                                <span className={`account-type-badge ${currentType}`}>
+                                  {pKey === "cod" ? <Package size={13} /> : currentType === "merchant" ? <Building2 size={13} /> : <UserCheck size={13} />}
+                                  {pKey === "cod" ? paymentMethodLabel(pKey) : currentType === "merchant" ? t("merchantAccount") : t("personalAccount")}
+                                </span>
+                              </div>
+                              <div className="payment-type-auto-info">
+                                {pKey === "cod" ? <p>Check your order for delivery charges and any source-required advance.</p> : currentType === "merchant" ? (
+                                  <div className="auto-detected-hint merchant">
+                                    <Building2 size={15} />
+                                    <span>
+                                      {lang === "bn"
+                                        ? "মার্চেন্ট একাউন্ট হিসেবে শনাক্ত। চেকআউটে ক্রেতারা স্বয়ংক্রিয়ভাবে 'পেমেন্ট করুন' (Make Payment) নির্দেশনা ও সেন্ড মানি না করার স্পষ্ট সতর্কতা দেখতে পাবেন।"
+                                        : "Detected as Merchant Account in AriseSell. Buyers are automatically instructed to use 'Make Payment' and warned not to Send Money."}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="auto-detected-hint personal">
+                                    <UserCheck size={15} />
+                                    <span>
+                                      {lang === "bn"
+                                        ? "পার্সোনাল / উদ্যোক্তা নম্বর হিসেবে শনাক্ত। চেকআউটে ক্রেতারা স্বয়ংক্রিয়ভাবে 'সেন্ড মানি করুন' (Send Money) নির্দেশনা ও পেমেন্ট অপশন না ব্যবহারের সতর্কতা দেখতে পাবেন।"
+                                        : "Detected as Personal / Uddokta Number in AriseSell. Buyers are automatically instructed to use 'Send Money' and warned not to use Payment."}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="sync-bar payment-sync-bar">
+                        <span className="muted form-hint">
+                          {lang === "bn"
+                            ? "পেমেন্ট নম্বর পরিবর্তন বা ওয়ালেট সেটিংস পরিচালনা করতে AriseSell ড্যাশবোর্ড ব্যবহার করুন।"
+                            : "Payment numbers and account credentials are managed directly inside AriseSell."}
+                        </span>
+                        <a
+                          className="text-link"
+                          href={`${session.source_web}/console/${data.shop.slug}/integrations`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {lang === "bn" ? "AriseSell-এ পেমেন্ট নম্বর ও ওয়ালেট ম্যানেজ করুন" : "Manage payment numbers in AriseSell"}
+                          <ExternalLink size={14} />
+                        </a>
+                      </div>
                     </section>
                     <section className="panel seller-panel">
                       <div className="seller-panel-heading">
@@ -4562,6 +4756,7 @@ export default function App() {
           <Route path="/shops/:slug" element={<ShopPage />} />
           <Route path="/shops/:slug/reviews" element={<ShopReviewsPage />} />
           <Route path="/shops/:slug/info/:section" element={<ShopInformationPage />} />
+          <Route path="/shops/:slug/contact" element={<ShopInformationPage />} />
           <Route path="/info/:section" element={<ShopInformationPage />} />
           <Route path="/track" element={<TrackOrderPage />} />
           <Route path="/checkout/:id" element={<Checkout />} />
