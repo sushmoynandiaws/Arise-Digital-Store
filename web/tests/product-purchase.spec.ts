@@ -81,6 +81,8 @@ test("product options, quantity and total stay consistent through checkout", asy
   await page.goto("/shops/test-shop/products/digital-course#product-terms");
   await expect(popup).toHaveAccessibleName("Purchase terms");
   await page.getByRole("button", { name: "Close product details" }).click();
+  await expect(popup).toHaveCount(0);
+  await expect(page).toHaveURL("/shops/test-shop/products/digital-course");
   await quantity.fill("6");
   await expect(buy).toHaveAttribute("href", "/checkout/product-test?variant=available&quantity=6");
   await buy.click();
