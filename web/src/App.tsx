@@ -2676,7 +2676,7 @@ function ProductPage() {
         </div>
       </div>
       <dialog ref={infoDialog} className="product-info-dialog" aria-labelledby="product-info-title"
-        onClose={closeSection} onClick={(event) => { if (event.target === event.currentTarget) closeSection(); }}>
+        onCancel={(event) => { event.preventDefault(); closeSection(); }} onClick={(event) => { if (event.target === event.currentTarget) closeSection(); }}>
         <div className="product-info-header">
           <h2 id="product-info-title">{section === "overview" ? (lang === "bn" ? "পণ্যের বিবরণ" : "Product description") : section === "delivery" ? (lang === "bn" ? "ডেলিভারি বিবরণ" : "Delivery details") : section === "reviews" ? (lang === "bn" ? "গ্রাহক রিভিউ" : "Customer reviews") : (lang === "bn" ? "ক্রয়ের শর্তাবলী" : "Purchase terms")}</h2>
           <button type="button" className="icon-button" aria-label="Close product details" onClick={closeSection}><X size={20} /></button>

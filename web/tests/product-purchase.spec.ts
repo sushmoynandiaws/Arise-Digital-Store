@@ -50,6 +50,15 @@ test("product options, quantity and total stay consistent through checkout", asy
   const popup = page.getByRole("dialog");
   await expect(popup).toHaveAccessibleName("Purchase terms");
   await expect(popup).toContainText(product.purchase_terms);
+  // A queued close event from the previous opening must not clear the new section.
+  await popup.evaluate(element => new Promise<void>(resolve => {
+    element.addEventListener("close", () => resolve(), { once: true });
+    const dialog = element as HTMLDialogElement;
+    dialog.close();
+    dialog.showModal();
+  }));
+  await expect(popup).toHaveAccessibleName("Purchase terms");
+  await expect(page).toHaveURL(/#product-terms$/);
   await expect(page.getByRole("button", { name: "Close product details" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(popup).toHaveCount(0);
