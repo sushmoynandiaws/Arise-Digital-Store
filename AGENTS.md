@@ -1,6 +1,6 @@
 ## Visual language
 
-The current storefront uses the tokens in `web/src/styles.css`: violet `--primary`, dark slate `--ink`, muted slate `--muted`, white `--surface`, and a pale violet canvas. Urbanist headings and body text use Hind Siliguri for Bangla fallback. Use the existing tokens and 44px minimum touch targets; keep mobile inputs at 16px.
+The current storefront uses the tokens in `web/src/styles.css`: violet `--primary`, neutral ink `--ink`, muted grey `--muted`, white `--surface`, and a cool grey canvas. Use the premium surface and motion rules in the design-system master: glass only on navigation/overlays, unified panels for related information, restrained violet actions. English body text uses the native system font, headings use Urbanist, and Bangla uses Hind Siliguri. The document language tracks the language switcher; never apply negative tracking to Bangla headings. Use the existing tokens and 44px minimum touch targets; keep mobile inputs at 16px.
 
 For all UI copy, follow `design-system/arise-digital-store/content-style-guide.md`. Use the semantic typography scale in `design-system/arise-digital-store/MASTER.md`; status headings are 32px desktop / 26px mobile, and essential instructions use 16px body text. Keep order wording tied to actual payment, delivery, expiry and refund states; reuse `purchaseMessage` for the order-page message.
 

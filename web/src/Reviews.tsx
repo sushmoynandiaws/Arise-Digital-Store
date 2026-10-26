@@ -178,12 +178,9 @@ export function ShopReviews({
     <section id="customer-reviews" className="shop-reviews-section" aria-label="Shop customer reviews">
       <div className="section-header shop-reviews-header">
         <div>
-          <span className="eyebrow">
-            {lang === "bn" ? "ভেরিফাইড কাস্টমার ফিডব্যাক" : "Verified Customer Feedback"}
-          </span>
-          <h2>
+          <h1>
             {lang === "bn" ? `${shop.name}-এর গ্রাহক রিভিউসমূহ` : `Customer reviews for ${shop.name}`}
-          </h2>
+          </h1>
           <p className="muted">
             {lang === "bn"
               ? "এই শপের প্রোডাক্টগুলোর আসল ক্রেতাদের দেওয়া ভেরিফাইড রিভিউ।"

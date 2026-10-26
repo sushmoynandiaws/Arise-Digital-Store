@@ -77,7 +77,7 @@ test("seller sets up all five pages, saves, reloads and customers read the same 
     await page.goBack();
     await expect(page).toHaveURL("/shops/test-shop");
   }
-  await page.getByRole("navigation", { name: "Store navigation" }).getByRole("link", { name: "About Us", exact: true }).click();
+  await page.getByRole("navigation", { name: "Store navigation" }).getByRole("link", { name: "About this shop", exact: true }).click();
   await expect(page).toHaveURL("/shops/test-shop/info/about");
   await expect(page.getByRole("heading", { name: "About us", level: 1, exact: true })).toBeVisible();
 });
@@ -158,7 +158,7 @@ test("shop information links stay scoped before the catalog loads", async ({ pag
     for (const [key, title] of sections) {
       await expect(page.locator("footer").getByRole("link", { name: title, exact: true })).toHaveAttribute("href", `/shops/test-shop/info/${key}`);
     }
-    await expect(page.getByRole("navigation", { name: "Store navigation" }).getByRole("link", { name: "About Us", exact: true })).toHaveAttribute("href", "/shops/test-shop/info/about");
+    await expect(page.getByRole("navigation", { name: "Store navigation" }).getByRole("link", { name: "About this shop", exact: true })).toHaveAttribute("href", "/shops/test-shop/info/about");
     await page.locator("footer").getByRole("link", { name: "Privacy policy", exact: true }).click();
     await expect(page).toHaveURL("/shops/test-shop/info/privacy");
   } finally {

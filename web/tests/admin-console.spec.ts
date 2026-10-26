@@ -538,6 +538,20 @@ test("admin workspace is responsive and sign out removes privileged UI", async (
   await expect(page.locator(".admin-workspace")).toHaveCount(0);
 });
 
+test("all admin views keep navigation and content within mobile and desktop viewports", async ({ page }) => {
+  await preview(page);
+  for (const width of [320, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    for (const view of ["", "shops", "products", "orders", "payments", "support", "reviews", "campaigns", "content", "activity", "access", "health"]) {
+      await page.goto(`/admin${view ? `/${view}` : ""}`);
+      await expect(page.locator(".admin-page-title h1")).toBeVisible();
+      const overflow = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: innerWidth, elements: [...document.querySelectorAll<HTMLElement>("main *")].filter(element => !element.closest(".admin-table-wrap") && element.getBoundingClientRect().right > innerWidth + 1).map(element => `${element.className || element.tagName}: ${Math.round(element.getBoundingClientRect().right)}`) }));
+      expect(overflow.width, `${view || "overview"} at ${width}px: ${overflow.elements.join(", ")}`).toBeLessThanOrEqual(overflow.viewport);
+      if (width === 1440) await page.screenshot({ path: `../artifacts/premium-ui/admin-${view || "overview"}.png` });
+    }
+  }
+});
+
 test("a stale or forged administrator session cannot render cached console data", async ({
   page,
 }) => {
