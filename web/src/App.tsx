@@ -793,11 +793,9 @@ function SubNavBar() {
               <NavLink to="/track">
                 {t("trackOrder")}
               </NavLink>
-              {shop.support && (
-                <a href={supportHref(shop.support)} target="_blank" rel="noopener noreferrer">
-                  {lang === "bn" ? "যোগাযোগ" : "Contact Us"}
-                </a>
-              )}
+              <NavLink to={`/shops/${shop.slug}/info/contact`} className="sub-nav-link">
+                {lang === "bn" ? "যোগাযোগ" : "Contact Us"}
+              </NavLink>
             </>
           ) : (
             <>
@@ -1082,9 +1080,201 @@ function IconYouTube({ size = 18 }: { size?: number }) {
   );
 }
 
+function ShopContactContent({ shop, lang, support }: { shop: Shop; lang: "bn" | "en"; support: string }) {
+  const waNumber = shop.contact?.whatsapp || shop.social_links?.whatsapp || (shop.support && !shop.support.includes("@") ? shop.support : "");
+  const emailAddr = shop.contact?.email || (shop.support?.includes("@") ? shop.support : "");
+  const phoneNum = shop.contact?.phone || (!emailAddr && shop.support && !shop.support.includes("@") ? shop.support : "");
+  const fullAddress = [shop.contact?.address, shop.contact?.city_division, shop.contact?.postal_code]
+    .filter(Boolean)
+    .join(", ");
+
+  let waTarget = waNumber ? supportHref(waNumber) : (support && !support.includes("@") ? supportHref(support) : "");
+  if (waTarget && !/^https:\/\//i.test(waNumber || support)) {
+    try {
+      const u = new URL(waTarget);
+      u.searchParams.set("text", `Hello ${shop.name}! I am contacting you from Arise Digital Store.`);
+      waTarget = u.toString();
+    } catch {}
+  }
+
+  const customSellerNote = shop.pages?.contact?.trim();
+
+  return (
+    <div className="shop-contact-hub">
+      <div className="contact-channels-grid">
+        {(waNumber || (support && !support.includes("@"))) && (
+          <div className="contact-channel-card card-whatsapp">
+            <div className="card-top-row">
+              <span className="contact-card-icon icon-whatsapp" aria-hidden="true">
+                <IconWhatsApp size={22} />
+              </span>
+              <span className="contact-channel-status">
+                <span className="online-dot" />
+                {lang === "bn" ? "ইনস্ট্যান্ট চ্যাট সক্রিয়" : "Instant Chat Active"}
+              </span>
+            </div>
+            <h3 className="contact-card-title">{lang === "bn" ? "হোয়াটসঅ্যাপ সাপোর্ট" : "WhatsApp Support"}</h3>
+            <p className="contact-card-value">{waNumber || shop.support}</p>
+            <p className="contact-card-desc">
+              {lang === "bn"
+                ? "দ্রুততম সময়ে সরাসরি সহায়তা পেতে হোয়াটসঅ্যাপে মেসেজ দিন।"
+                : "Fastest response channel for inquiries and order assistance."}
+            </p>
+            <a
+              href={waTarget || supportHref(waNumber || support)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="button primary contact-card-btn wa-action-btn"
+            >
+              <IconWhatsApp size={16} aria-hidden="true" />
+              <span>{lang === "bn" ? "হোয়াটসঅ্যাপে চ্যাট করুন" : "Chat on WhatsApp"}</span>
+            </a>
+          </div>
+        )}
+
+        {(emailAddr || (support && support.includes("@"))) && (
+          <div className="contact-channel-card card-email">
+            <div className="card-top-row">
+              <span className="contact-card-icon icon-email" aria-hidden="true">
+                <IconMail size={22} />
+              </span>
+              <span className="contact-channel-status text-muted-badge">
+                {lang === "bn" ? "অফিশিয়াল সাপোর্ট" : "Official Support"}
+              </span>
+            </div>
+            <h3 className="contact-card-title">{lang === "bn" ? "ইমেইল সহায়তা" : "Email Support"}</h3>
+            <p className="contact-card-value">{emailAddr || support}</p>
+            <p className="contact-card-desc">
+              {lang === "bn"
+                ? "অর্ডার ইনভয়েস, করপোরেট বা বিস্তারিত অনুসন্ধানের জন্য।"
+                : "For detailed order questions, invoices, or official inquiries."}
+            </p>
+            <a
+              href={`mailto:${emailAddr || support}`}
+              className="button secondary contact-card-btn email-action-btn"
+            >
+              <IconMail size={16} aria-hidden="true" />
+              <span>{lang === "bn" ? "ইমেইল পাঠান" : "Send Email"}</span>
+            </a>
+          </div>
+        )}
+
+        {phoneNum && phoneNum !== waNumber && (
+          <div className="contact-channel-card card-phone">
+            <div className="card-top-row">
+              <span className="contact-card-icon icon-phone" aria-hidden="true">
+                <IconPhone size={22} />
+              </span>
+              <span className="contact-channel-status text-muted-badge">
+                {lang === "bn" ? "সরাসরি হটলাইন" : "Direct Hotline"}
+              </span>
+            </div>
+            <h3 className="contact-card-title">{lang === "bn" ? "সরাসরি ফোন কল" : "Phone Call"}</h3>
+            <p className="contact-card-value">{phoneNum}</p>
+            <p className="contact-card-desc">
+              {lang === "bn"
+                ? "জরুরি বা বিশেষ প্রয়োজনে সরাসরি সেলারকে কল করুন।"
+                : "Call seller directly for urgent queries or immediate assistance."}
+            </p>
+            <a
+              href={`tel:${phoneNum.replace(/\s+/g, "")}`}
+              className="button secondary contact-card-btn phone-action-btn"
+            >
+              <IconPhone size={16} aria-hidden="true" />
+              <span>{lang === "bn" ? "সরাসরি কল দিন" : "Call Now"}</span>
+            </a>
+          </div>
+        )}
+
+        {fullAddress && (
+          <div className="contact-channel-card card-location">
+            <div className="card-top-row">
+              <span className="contact-card-icon icon-location" aria-hidden="true">
+                <IconMapPin size={22} />
+              </span>
+              <span className="contact-channel-status text-muted-badge">
+                {lang === "bn" ? "ভেরিফাইড ঠিকানা" : "Verified Location"}
+              </span>
+            </div>
+            <h3 className="contact-card-title">{lang === "bn" ? "শপের ঠিকানা" : "Store Location"}</h3>
+            <p className="contact-card-value">{fullAddress}</p>
+            <p className="contact-card-desc">
+              {lang === "bn"
+                ? "সেলার শপের রেজিস্টার্ড ব্যবসায়িক অফিস ঠিকানা।"
+                : "Registered business location for this verified merchant."}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {customSellerNote && (
+        <div className="contact-custom-note-panel">
+          <h4>{lang === "bn" ? "সেলার থেকে বিশেষ বার্তা:" : "Message from Seller:"}</h4>
+          <p className="preserve-lines">{customSellerNote}</p>
+        </div>
+      )}
+
+      <div className="contact-guidelines-box">
+        <h3 className="guidelines-title">
+          {lang === "bn" ? "কীভাবে দ্রুততম সময়ে সহায়তা পাবেন?" : "How to get the fastest resolution?"}
+        </h3>
+        <div className="guidelines-grid">
+          <div className="guideline-item">
+            <span className="guideline-icon">🕒</span>
+            <div>
+              <strong>{lang === "bn" ? "সাপোর্ট কর্মঘণ্টা" : "Support Hours"}</strong>
+              <p>{lang === "bn" ? "প্রতিদিন সকাল ১০:০০ AM - রাত ১২:০০ AM (বাংলাদেশ সময়)" : "Daily 10:00 AM - 12:00 AM (BD Time)"}</p>
+            </div>
+          </div>
+          <div className="guideline-item">
+            <span className="guideline-icon">📌</span>
+            <div>
+              <strong>{lang === "bn" ? "অর্ডার আইডি সাথে রাখুন" : "Keep Order ID Ready"}</strong>
+              <p>{lang === "bn" ? "ইতিমধ্যে অর্ডার করা থাকলে মেসেজে আপনার Order Ref (যেমন ORD-XXXXX) বা পেমেন্ট ট্রানজেকশন আইডি দিন।" : "Include your Order Ref (e.g. ORD-XXXXX) or Transaction ID in your message for instant resolution."}</p>
+            </div>
+          </div>
+          <div className="guideline-item">
+            <span className="guideline-icon">⚡</span>
+            <div>
+              <strong>{lang === "bn" ? "ইনস্ট্যান্ট ডেলিভারি" : "Instant Delivery"}</strong>
+              <p>{lang === "bn" ? "পেমেন্ট সম্পন্ন হওয়ার ৪৫ সেকেন্ডের মধ্যেই My purchases পেজে আপনার পণ্য অ্যাক্টিভ হয়ে যায়।" : "Digital access is automatically delivered to My purchases within 45s of verified payment."}</p>
+            </div>
+          </div>
+          <div className="guideline-item">
+            <span className="guideline-icon">🛡️</span>
+            <div>
+              <strong>{lang === "bn" ? "পূর্ণ মেয়াদি রিপ্লেসমেন্ট ওয়ারেন্টি" : "Full Term Warranty"}</strong>
+              <p>{lang === "bn" ? "ক্রয়কৃত পণ্যের মেয়াদ থাকা পর্যন্ত যেকোনো সমস্যায় সেলার রিপ্লেসমেন্ট সাপোর্ট প্রদান করবে।" : "Sellers provide replacements or assistance throughout the product guarantee term."}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {shop.social_links && Object.values(shop.social_links).some(Boolean) && (
+        <div className="contact-social-channels">
+          <h4>{lang === "bn" ? "কমিউনিটি ও সোশ্যাল মিডিয়া চ্যানেল" : "Community & Social Channels"}</h4>
+          <SocialLinks shop={shop} className="contact-social-row" />
+        </div>
+      )}
+
+      {support && (
+        <div className="shop-policy-support">
+          <a className="button secondary" href={supportHref(support)}>
+            <Phone size={16} aria-hidden="true" />
+            {lang === "bn" ? "সাপোর্টে যোগাযোগ করুন" : "Contact support"}
+            <ArrowRight size={16} aria-hidden="true" />
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ShopInformationPage() {
   const platform = usePlatformSettings();
-  const { slug, section: sectionKey } = useParams();
+  const { slug, section: paramSection } = useParams();
+  const { pathname } = useLocation();
+  const sectionKey = paramSection || (pathname.endsWith("/contact") ? "contact" : "");
   const { catalog, catalogError, reloadCatalog } = useMarket();
   const shop = useRouteShop();
   const { lang } = useLang();
@@ -1097,7 +1287,7 @@ function ShopInformationPage() {
     document.title = `${title} | ${shopName}`;
     return () => { document.title = previous; };
   }, [title, shopName]);
-  if (slug && catalogError) return <main id="main" className="container section"><ErrorBox message={catalogError} retry={() => void reloadCatalog()} /></main>;
+  if (slug && catalogError && !catalog) return <main id="main" className="container section"><ErrorBox message={catalogError} retry={() => void reloadCatalog()} /></main>;
   if (slug && !catalog) return <Loading />;
   if (!section || (slug && !shop)) return <NotFound />;
   const text = (shop ? shop.pages?.[section.key]?.trim() || (section.key === "about" ? shop.description : "") : platform.pages?.[section.key]?.trim());
@@ -1113,16 +1303,23 @@ function ShopInformationPage() {
         <h1>{title}</h1>
       </div>
       <article className="panel shop-policy-content">
-        {text ? <p className="preserve-lines">{text}</p> :
-          <p className="muted">{lang === "bn"
+        {text ? <p className="preserve-lines">{text}</p> : (
+          (!shop || section.key !== "contact") && <p className="muted">{lang === "bn"
             ? "এই তথ্য এখনও যোগ করা হয়নি। বিস্তারিত জানতে যোগাযোগ করুন।"
-            : "This information has not been added yet. Contact support for details."}</p>}
-        {section.key === "contact" && shop && <ShopContactChips shop={shop} />}
-        {support && <div className="shop-policy-support">
-          <a className="button secondary" href={supportHref(support)}>
-            <Phone size={16} aria-hidden="true" />{lang === "bn" ? "সাপোর্টে যোগাযোগ করুন" : "Contact support"}<ArrowRight size={16} aria-hidden="true" />
-          </a>
-        </div>}
+            : "This information has not been added yet. Contact support for details."}</p>
+        )}
+        {section.key === "contact" && shop ? (
+          <ShopContactContent shop={shop} lang={lang} support={support} />
+        ) : (
+          <>
+            {section.key === "contact" && shop && <ShopContactChips shop={shop} />}
+            {support && <div className="shop-policy-support">
+              <a className="button secondary" href={supportHref(support)}>
+                <Phone size={16} aria-hidden="true" />{lang === "bn" ? "সাপোর্টে যোগাযোগ করুন" : "Contact support"}<ArrowRight size={16} aria-hidden="true" />
+              </a>
+            </div>}
+          </>
+        )}
       </article>
     </main>
   );
@@ -4897,6 +5094,7 @@ export default function App() {
           <Route path="/shops/:slug" element={<ShopPage />} />
           <Route path="/shops/:slug/reviews" element={<ShopReviewsPage />} />
           <Route path="/shops/:slug/info/:section" element={<ShopInformationPage />} />
+          <Route path="/shops/:slug/contact" element={<ShopInformationPage />} />
           <Route path="/info/:section" element={<ShopInformationPage />} />
           <Route path="/track" element={<TrackOrderPage />} />
           <Route path="/checkout/:id" element={<Checkout />} />

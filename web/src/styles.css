@@ -3547,3 +3547,186 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
   background: var(--primary);
   border-radius: 2px;
 }
+
+/* Shop Contact Hub Styles */
+.shop-contact-hub {
+  margin-top: 24px;
+}
+.contact-channels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-bottom: 28px;
+}
+.contact-channel-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--duration-short), box-shadow var(--duration-short);
+}
+.contact-channel-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.06);
+}
+.card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.contact-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+.contact-card-icon.icon-whatsapp {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+.contact-card-icon.icon-email {
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--primary);
+}
+.contact-card-icon.icon-phone {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0284c7;
+}
+.contact-card-icon.icon-location {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+.contact-channel-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+}
+.contact-channel-status.text-muted-badge {
+  color: var(--muted);
+  background: rgba(100, 116, 139, 0.08);
+}
+.contact-card-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+.contact-card-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  margin: 0 0 8px;
+}
+.contact-card-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0 0 18px;
+  flex-grow: 1;
+}
+.contact-card-btn {
+  width: 100%;
+  justify-content: center;
+  min-height: 44px;
+  font-size: 14px;
+}
+.contact-card-btn.wa-action-btn {
+  background: #10b981;
+  border-color: #10b981;
+  color: #fff;
+}
+.contact-card-btn.wa-action-btn:hover {
+  background: #059669;
+  border-color: #059669;
+}
+.contact-custom-note-panel {
+  background: rgba(99, 102, 241, 0.04);
+  border: 1px solid rgba(99, 102, 241, 0.16);
+  border-radius: var(--radius-card);
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+.contact-custom-note-panel h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.contact-custom-note-panel p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.6;
+}
+.contact-guidelines-box {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 28px;
+  margin-bottom: 24px;
+}
+.guidelines-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 20px;
+}
+.guidelines-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+.guideline-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.guideline-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+.guideline-item strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.guideline-item p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.contact-social-channels {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+.contact-social-channels h4 {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.contact-social-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
