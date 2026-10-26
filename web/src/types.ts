@@ -61,7 +61,7 @@ export type Shop = {
   payment_account_types?: Record<string, "merchant" | "personal">;
 };
 export type Catalog = { shops: Shop[]; products: Product[]; synced_at: string };
-export type User = { id: string; name: string; email: string; admin: boolean };
+export type User = { id: string; name: string; email: string; admin: boolean; admin_role?: string; admin_permissions?: string[] };
 export type Session = {
   user: User | null;
   csrf: string;

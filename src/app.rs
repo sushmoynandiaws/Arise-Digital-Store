@@ -52,6 +52,7 @@ fn build_router(state: AppState, serve_web: bool) -> Router {
             "/health",
             get(|| async { Json(json!({"status":"ok","service":"arise-digital-store"})) }),
         )
+        .merge(crate::admin::routes())
         .route("/api/session", get(session))
         .route("/api/auth/start", get(auth_start))
         .route("/api/auth/callback", get(auth_callback))
@@ -194,12 +195,12 @@ async fn access(state: &AppState, headers: &HeaderMap) -> Result<Option<String>>
         .access_token(cookie(headers, "arise_session").as_deref())
         .await
 }
-async fn required_access(state: &AppState, headers: &HeaderMap) -> Result<String> {
+pub(crate) async fn required_access(state: &AppState, headers: &HeaderMap) -> Result<String> {
     access(state, headers)
         .await?
         .ok_or_else(AppError::unauthorized)
 }
-fn buyer(headers: &HeaderMap) -> Result<String> {
+pub(crate) fn buyer(headers: &HeaderMap) -> Result<String> {
     cookie(headers, "arise_buyer").ok_or_else(|| {
         AppError::new(
             StatusCode::BAD_REQUEST,
@@ -207,7 +208,7 @@ fn buyer(headers: &HeaderMap) -> Result<String> {
         )
     })
 }
-fn uuid(value: &str) -> Result<()> {
+pub(crate) fn uuid(value: &str) -> Result<()> {
     uuid::Uuid::parse_str(value)
         .map(|_| ())
         .map_err(|_| AppError::new(StatusCode::BAD_REQUEST, "Invalid item identifier."))
@@ -216,15 +217,42 @@ async fn session(State(state): State<AppState>, headers: HeaderMap) -> Result<Re
     let mut guest = cookie(&headers, "arise_buyer").unwrap_or_else(token);
     let mut revoked = false;
     let mut response = if let Some(access) = access(&state, &headers).await? {
-        match state.source(reqwest::Method::GET,"/marketplace/me",Some(&access),None,None).await {
-            Ok(me)=>Json(json!({"user":me["user"],"csrf":digest(&guest),"demo":state.config.demo,"source_web":state.config.source_web})).into_response(),
-            Err(error) if matches!(error.0,StatusCode::UNAUTHORIZED|StatusCode::FORBIDDEN)=>{
-                if let Some(session)=cookie(&headers,"arise_session") {sqlx::query("DELETE FROM sessions WHERE token_hash=$1").bind(digest(&session)).execute(&state.db).await.map_err(|_|AppError::internal())?;}
-                revoked=true;
-                guest=token();
+        match state
+            .source(
+                reqwest::Method::GET,
+                "/marketplace/me",
+                Some(&access),
+                None,
+                None,
+            )
+            .await
+        {
+            Ok(mut me) => {
+                if me["user"]["admin"] == true {
+                    let role = crate::admin::role(
+                        &state,
+                        me["user"]["id"].as_str().ok_or_else(AppError::internal)?,
+                    )
+                    .await?;
+                    me["user"]["admin"] = json!(role != "blocked");
+                    me["user"]["admin_role"] = json!(role);
+                    me["user"]["admin_permissions"] = json!(crate::admin::permissions(&role));
+                }
+                Json(json!({"user":me["user"],"csrf":digest(&guest),"demo":state.config.demo,"source_web":state.config.source_web})).into_response()
+            }
+            Err(error) if matches!(error.0, StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN) => {
+                if let Some(session) = cookie(&headers, "arise_session") {
+                    sqlx::query("DELETE FROM sessions WHERE token_hash=$1")
+                        .bind(digest(&session))
+                        .execute(&state.db)
+                        .await
+                        .map_err(|_| AppError::internal())?;
+                }
+                revoked = true;
+                guest = token();
                 Json(json!({"user":null,"csrf":digest(&guest),"demo":state.config.demo,"source_web":state.config.source_web})).into_response()
-            },
-            Err(error)=>return Err(error),
+            }
+            Err(error) => return Err(error),
         }
     } else {
         Json(json!({"user":null,"csrf":digest(&guest),"demo":state.config.demo,"source_web":state.config.source_web})).into_response()
@@ -252,6 +280,7 @@ async fn auth_start(
     let return_path = match query.return_to.as_deref() {
         None | Some("/seller") => "/seller",
         Some("/purchases") => "/purchases",
+        Some("/admin") => "/admin",
         _ => {
             return Err(AppError::new(
                 StatusCode::BAD_REQUEST,
@@ -330,6 +359,8 @@ async fn auth_callback(
     let verifier = stored["verifier"].as_str().ok_or_else(AppError::internal)?;
     let return_path = if stored["return_path"] == "/purchases" {
         "/purchases"
+    } else if stored["return_path"] == "/admin" {
+        "/admin"
     } else {
         "/seller"
     };
@@ -662,11 +693,12 @@ async fn product_reviews(
     {
         return Err(AppError::new(StatusCode::NOT_FOUND, "Product not found."));
     }
-    let summary = sqlx::query("SELECT COUNT(*) AS count,CAST(COALESCE(SUM(rating),0) AS BIGINT) AS total FROM reviews WHERE product_id=$1")
+    let admin_ready = crate::admin::schema_ready(&state).await?;
+    let summary = sqlx::query(if admin_ready {"SELECT COUNT(*) AS count,CAST(COALESCE(SUM(rating),0) AS BIGINT) AS total FROM reviews WHERE product_id=$1 AND id NOT IN (SELECT review_id FROM review_moderation WHERE hidden=1)"} else {"SELECT COUNT(*) AS count,CAST(COALESCE(SUM(rating),0) AS BIGINT) AS total FROM reviews WHERE product_id=$1"})
         .bind(&id).fetch_one(&state.db).await.map_err(|_| AppError::internal())?;
     let count: i64 = summary.try_get("count").map_err(|_| AppError::internal())?;
     let total: i64 = summary.try_get("total").map_err(|_| AppError::internal())?;
-    let reviews = sqlx::query("SELECT id,CAST(rating AS BIGINT) AS rating,display_name,comment,created_at FROM reviews WHERE product_id=$1 ORDER BY created_at DESC,id DESC LIMIT 20 OFFSET $2")
+    let reviews = sqlx::query(if admin_ready {"SELECT id,CAST(rating AS BIGINT) AS rating,display_name,comment,created_at FROM reviews WHERE product_id=$1 AND id NOT IN (SELECT review_id FROM review_moderation WHERE hidden=1) ORDER BY created_at DESC,id DESC LIMIT 20 OFFSET $2"} else {"SELECT id,CAST(rating AS BIGINT) AS rating,display_name,comment,created_at FROM reviews WHERE product_id=$1 ORDER BY created_at DESC,id DESC LIMIT 20 OFFSET $2"})
         .bind(id).bind(i64::from(page.offset)).fetch_all(&state.db).await.map_err(|_| AppError::internal())?
         .into_iter().map(public_review).collect::<Result<Vec<_>>>()?;
     Ok(Json(
@@ -805,29 +837,12 @@ async fn report(
     Ok(Json(json!({"ok":true})))
 }
 async fn require_admin(state: &AppState, headers: &HeaderMap) -> Result<String> {
-    let access = required_access(state, headers).await?;
-    let me = state
-        .source(
-            reqwest::Method::GET,
-            "/marketplace/me",
-            Some(&access),
-            None,
-            None,
-        )
-        .await?;
-    if me["user"]["admin"] != true {
-        return Err(AppError::new(
-            StatusCode::FORBIDDEN,
-            "Marketplace administrator access is required.",
-        ));
-    }
-    Ok(me["user"]["id"]
-        .as_str()
-        .ok_or_else(AppError::internal)?
-        .to_owned())
+    Ok(crate::admin::authorize(state, headers, "moderate")
+        .await?
+        .actor)
 }
 async fn admin(State(state): State<AppState>, headers: HeaderMap) -> Result<Json<Value>> {
-    require_admin(&state, &headers).await?;
+    let identity = crate::admin::authorize(&state, &headers, "catalog").await?;
     let catalog = state
         .source(reqwest::Method::GET, "/marketplace/feed", None, None, None)
         .await?;
@@ -838,7 +853,7 @@ async fn admin(State(state): State<AppState>, headers: HeaderMap) -> Result<Json
         Ok(json!({"kind":row.try_get::<String,_>("kind")?,"target_id":row.try_get::<String,_>("target_id")?,"hidden":row.try_get::<i64,_>("hidden")? != 0,"reason":row.try_get::<String,_>("reason")?}))
     }).collect::<std::result::Result<Vec<Value>,sqlx::Error>>().map_err(|_|AppError::internal())?;
     Ok(Json(
-        json!({"catalog":catalog,"reports":reports,"moderation":moderation}),
+        json!({"catalog":catalog,"reports":reports,"moderation":moderation,"role":identity.role,"permissions":crate::admin::permissions(&identity.role),"checked_at":now()}),
     ))
 }
 #[derive(Deserialize)]
@@ -864,7 +879,21 @@ async fn moderate(
             "Choose a shop or product and provide a reason.",
         ));
     }
-    sqlx::query("INSERT INTO moderation VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(kind,target_id) DO UPDATE SET hidden=excluded.hidden,reason=excluded.reason,actor=excluded.actor,updated_at=excluded.updated_at").bind(body.kind).bind(body.target_id).bind(i64::from(body.hidden)).bind(body.reason.trim()).bind(actor).bind(now()).execute(&state.db).await.map_err(|_|AppError::internal())?;
+    let mut tx = state.db.begin().await.map_err(|_| AppError::internal())?;
+    sqlx::query("INSERT INTO moderation VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(kind,target_id) DO UPDATE SET hidden=excluded.hidden,reason=excluded.reason,actor=excluded.actor,updated_at=excluded.updated_at").bind(&body.kind).bind(&body.target_id).bind(i64::from(body.hidden)).bind(body.reason.trim()).bind(&actor).bind(now()).execute(&mut *tx).await.map_err(|_|AppError::internal())?;
+    crate::admin::audit(
+        &mut tx,
+        &actor,
+        if body.hidden {
+            "listing.hidden"
+        } else {
+            "listing.restored"
+        },
+        &body.target_id,
+        body.reason.trim(),
+    )
+    .await?;
+    tx.commit().await.map_err(|_| AppError::internal())?;
     Ok(Json(json!({"ok":true})))
 }
 async fn resolve_report(
@@ -872,16 +901,26 @@ async fn resolve_report(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<Json<Value>> {
-    require_admin(&state, &headers).await?;
+    let identity = crate::admin::authorize(&state, &headers, "reports").await?;
     uuid(&id)?;
+    let mut tx = state.db.begin().await.map_err(|_| AppError::internal())?;
     let count = sqlx::query("UPDATE reports SET resolved=1 WHERE id=$1")
-        .bind(id)
-        .execute(&state.db)
+        .bind(&id)
+        .execute(&mut *tx)
         .await
         .map_err(|_| AppError::internal())?
         .rows_affected();
     if count == 0 {
         return Err(AppError::new(StatusCode::NOT_FOUND, "Report not found."));
     }
+    crate::admin::audit(
+        &mut tx,
+        &identity.actor,
+        "report.resolved",
+        &id,
+        "Resolved customer report",
+    )
+    .await?;
+    tx.commit().await.map_err(|_| AppError::internal())?;
     Ok(Json(json!({"ok":true})))
 }

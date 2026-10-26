@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("arise_lang", "en"));
+});
+
 test("checkout updates totals, rejects invalid quantities and uses the seller quote at review", async ({ page }) => {
   const product = {
     id: "checkout-test", shop_id: "shop-test", name: "Digital course", category: "Education",
@@ -10,6 +14,7 @@ test("checkout updates totals, rejects invalid quantities and uses the seller qu
   };
   let quoteBody: Record<string, unknown> | undefined;
   await page.route("**/api/**", async route => {
+    if (new URL(route.request().url()).pathname === "/api/promotions") return route.fulfill({ json: { ads: [], settings: {} } });
     const endpoint = new URL(route.request().url()).pathname;
     if (endpoint === "/api/session") return route.fulfill({ json: { user: null, csrf: "test-csrf", demo: false, source_web: "" } });
     if (endpoint === "/api/catalog") return route.fulfill({ json: {

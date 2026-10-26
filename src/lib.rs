@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod app;
 pub mod db;
 pub mod source;

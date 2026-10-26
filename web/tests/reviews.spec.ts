@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("arise_lang", "en"));
+});
+
 const product = { id: "product-test", shop_id: "shop-test", name: "Digital course", category: "Education", description: "Course materials", image_url: "", currency: "BDT", delivery_mode: "automatic", delivery_note: "Private delivery", purchase_terms: "Seller terms", required_buyer_fields: [], sales_enabled: true, variants: [{ id: "variant-test", name: "Standard", price: "10.00", stock: 9 }] };
 const shop = { id: "shop-test", slug: "test-shop", name: "Test shop", support: "", payment_methods: ["bkash"] };
 
@@ -9,6 +13,7 @@ test("verified customers can publish and edit one review, and products show real
   let failReviews = false;
   let submissions = 0;
   await page.route("**/api/**", route => {
+    if (new URL(route.request().url()).pathname === "/api/promotions") return route.fulfill({ json: { ads: [], settings: {} } });
     const endpoint = new URL(route.request().url()).pathname;
     if (endpoint === "/api/session") return route.fulfill({ json: { user: null, csrf: "test-csrf", demo: false, source_web: "" } });
     if (endpoint === "/api/catalog") return route.fulfill({ json: { products: [product], shops: [shop], synced_at: new Date().toISOString() } });
@@ -75,6 +80,7 @@ test("many reviews scroll within a bounded keyboard-accessible list and paginati
   const reviews = Array.from({ length: 12 }, (_, index) => ({ id: `review-${index}`, rating: 5, display_name: `Customer ${index + 1}`, comment: `Review ${index + 1}: The digital course was helpful and easy to follow.`, created_at: 1792886400 }));
   const offsets: number[] = [];
   await page.route("**/api/**", route => {
+    if (new URL(route.request().url()).pathname === "/api/promotions") return route.fulfill({ json: { ads: [], settings: {} } });
     const url = new URL(route.request().url());
     if (url.pathname === "/api/session") return route.fulfill({ json: { user: null, csrf: "test-csrf", demo: false, source_web: "" } });
     if (url.pathname === "/api/catalog") return route.fulfill({ json: { products: [product], shops: [shop], synced_at: new Date().toISOString() } });
