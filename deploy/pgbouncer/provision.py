@@ -33,6 +33,7 @@ assert len(password)==64 and all(c in '0123456789abcdef' for c in password)
 sql(Path('/opt/arise-digital-store/migrations/002_postgres.sql').read_text())
 sql(Path('/opt/arise-digital-store/migrations/003_reviews.sql').read_text())
 sql(Path('/opt/arise-digital-store/migrations/004_shop_pages.sql').read_text())
+sql(Path('/opt/arise-digital-store/migrations/005_admin_console.sql').read_text())
 sql("""BEGIN;
 DO $$ BEGIN
 IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='arise_marketplace_runtime') THEN

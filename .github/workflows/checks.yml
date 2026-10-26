@@ -35,7 +35,7 @@ jobs:
           key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
       - name: Prepare isolated PostgreSQL metadata
         run: |
-          psql "$PG_ADMIN_URL" -v ON_ERROR_STOP=1 -f migrations/002_postgres.sql -f migrations/003_reviews.sql -f migrations/004_shop_pages.sql
+          psql "$PG_ADMIN_URL" -v ON_ERROR_STOP=1 -f migrations/002_postgres.sql -f migrations/003_reviews.sql -f migrations/004_shop_pages.sql -f migrations/005_admin_console.sql
           psql "$PG_ADMIN_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE marketplace_test LOGIN PASSWORD 'local-test-only'; GRANT USAGE ON SCHEMA arise_marketplace TO marketplace_test; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA arise_marketplace TO marketplace_test; CREATE TABLE public.commerce_sentinel(id integer);"
       - run: cargo fmt --check && cargo test --locked && cargo test --locked -- --ignored --test-threads=1
       - uses: actions/setup-node@v4

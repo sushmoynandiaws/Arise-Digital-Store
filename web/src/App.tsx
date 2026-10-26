@@ -1,5 +1,7 @@
 import {
   createContext,
+  lazy,
+  Suspense,
   useContext,
   useEffect,
   useMemo,
@@ -81,7 +83,8 @@ import { productForRoute, productPath, productSection, type ProductSection } fro
 import { ProductReviews, PurchaseReview, ShopReviews } from "./Reviews";
 import { shopPageSections } from "./shopPages";
 import {
-  AdminSponsoredAdsManager,
+  PromotionsProvider,
+  usePlatformSettings,
   HomeHeroSponsoredAd,
   TopFlashSponsoredAd,
   SponsoredProductCard,
@@ -616,6 +619,7 @@ export function TrackOrderPage() {
 
 
 function TopAnnouncementBar() {
+  const platform = usePlatformSettings();
   const shop = useRouteShop();
   const { lang } = useLang();
 
@@ -647,14 +651,12 @@ function TopAnnouncementBar() {
       <div className="site-top-bar" aria-label="Announcement & seller contact">
       <div className="site-top-bar-inner container">
         <div className="top-bar-announcement">
-          <Link to={shop ? `/shops/${shop.slug}` : "/products"} className="announcement-pill-link">
+          <Link to={shop ? `/shops/${shop.slug}` : (platform.announcement_url || "/products")} className="announcement-pill-link">
             <span className="announcement-flash">⚡</span>
             <span>
               {shop
                 ? (shop.tagline || (lang === "bn" ? `${shop.name}-এর স্টকে থাকা ডিজিটাল প্রোডাক্ট দেখুন` : `${shop.name} · Verified Digital Products In Stock`))
-                : (lang === "bn"
-                  ? "ইউটিউব প্রিমিয়াম, চ্যাটজিপিটি ও অফিস এখন স্টকে! এখনই কিনুন"
-                  : "YouTube Premium, ChatGPT, Office In Stock Now!! Buy Now")}
+                : (platform.announcement || (lang === "bn" ? "ডিজিটাল পণ্য ও সাবস্ক্রিপশন দেখুন" : "Browse digital products and subscriptions"))}
             </span>
             <span className="announcement-arrow">→</span>
           </Link>
@@ -735,45 +737,48 @@ function SubNavBar() {
   return (
     <div className="site-sub-nav">
       <div className="sub-nav-inner container">
-        <div className="sub-nav-category-col" ref={catMenuRef}>
-          <button
-            type="button"
-            className="category-pill-btn"
-            title="All Categories"
-            aria-expanded={catOpen}
-            aria-haspopup="true"
-            onClick={() => setCatOpen(!catOpen)}
-          >
-            <LayoutGrid size={15} />
-            <span>{lang === "bn" ? "সকল ক্যাটাগরি" : "All Categories"}</span>
-            <ChevronDown size={14} className={catOpen ? "chevron-rotated" : ""} />
-          </button>
-          {catOpen && (
-            <div className="category-dropdown-menu" role="menu">
-              <Link
-                to={shop ? `/shops/${shop.slug}` : "/products"}
-                role="menuitem"
-                className="category-dropdown-item"
-                onClick={() => setCatOpen(false)}
-              >
-                <strong>{lang === "bn" ? "সব প্রোডাক্ট দেখুন" : "View All Products"}</strong>
-              </Link>
-              {categories.map((c) => (
+        {/* Marketplace categories directory dropdown (only shown on global pages, not inside a specific shop) */}
+        {!shop && (
+          <div className="sub-nav-category-col" ref={catMenuRef}>
+            <button
+              type="button"
+              className="category-pill-btn"
+              title="All Categories"
+              aria-expanded={catOpen}
+              aria-haspopup="true"
+              onClick={() => setCatOpen(!catOpen)}
+            >
+              <LayoutGrid size={15} />
+              <span>{lang === "bn" ? "সকল ক্যাটাগরি" : "All Categories"}</span>
+              <ChevronDown size={14} className={catOpen ? "chevron-rotated" : ""} />
+            </button>
+            {catOpen && (
+              <div className="category-dropdown-menu" role="menu">
                 <Link
-                  key={c}
-                  to={shop ? `/shops/${shop.slug}?category=${encodeURIComponent(c)}` : `/products?category=${encodeURIComponent(c)}`}
+                  to="/products"
                   role="menuitem"
                   className="category-dropdown-item"
                   onClick={() => setCatOpen(false)}
                 >
-                  {c}
+                  <strong>{lang === "bn" ? "সব প্রোডাক্ট দেখুন" : "View All Products"}</strong>
                 </Link>
-              ))}
-            </div>
-          )}
-        </div>
+                {categories.map((c) => (
+                  <Link
+                    key={c}
+                    to={`/products?category=${encodeURIComponent(c)}`}
+                    role="menuitem"
+                    className="category-dropdown-item"
+                    onClick={() => setCatOpen(false)}
+                  >
+                    {c}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-        <nav className="desktop-sub-nav" aria-label="Store navigation">
+        <nav className={`desktop-sub-nav ${shop ? "shop-nav-bar" : ""}`} aria-label="Store navigation">
           {shop ? (
             <>
               <NavLink to={`/shops/${shop.slug}`} end>
@@ -822,6 +827,8 @@ function Header() {
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const location = useLocation();
+  const [params, setParams] = useSearchParams();
+
   useEffect(() => setOpen(false), [location.pathname]);
   useEffect(() => {
     if (!open) return;
@@ -831,6 +838,37 @@ function Header() {
     document.addEventListener("keydown", close);
     return () => document.removeEventListener("keydown", close);
   }, [open]);
+
+  useEffect(() => {
+    const q = params.get("q") || params.get("search") || "";
+    setHeaderSearch(q);
+  }, [params]);
+
+  const onSearchChange = (val: string) => {
+    setHeaderSearch(val);
+    const isCatalogPage = location.pathname === "/products" || (shop && location.pathname === `/shops/${shop.slug}`);
+    if (isCatalogPage) {
+      const next = new URLSearchParams(params);
+      if (val.trim()) {
+        next.set("q", val.trim());
+      } else {
+        next.delete("q");
+        next.delete("search");
+      }
+      setParams(next, { replace: true });
+    }
+  };
+
+  const onSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = headerSearch.trim();
+    if (shop) {
+      navigate(`/shops/${shop.slug}${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+    } else {
+      navigate(`/products${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+    }
+  };
+
   return (
     <header className="site-header">
       <TopAnnouncementBar />
@@ -854,22 +892,30 @@ function Header() {
         <form
           className="header-center-search"
           role="search"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const q = headerSearch.trim();
-            if (q) {
-              navigate(shop ? `/shops/${shop.slug}?search=${encodeURIComponent(q)}` : `/products?search=${encodeURIComponent(q)}`);
-            }
-          }}
+          onSubmit={onSearchSubmit}
         >
           <Search size={16} className="header-search-icon" />
           <input
             type="search"
-            placeholder={lang === "bn" ? "প্রোডাক্ট বা টুলস সার্চ করুন..." : "Search Tools, Subscriptions..."}
+            placeholder={
+              shop
+                ? (lang === "bn" ? `${shop.name}-এর প্রোডাক্ট খুঁজুন...` : `Search in ${shop.name}...`)
+                : (lang === "bn" ? "প্রোডাক্ট, শপ বা ক্যাটাগরি খুঁজুন..." : "Search Tools, Subscriptions, Shops...")
+            }
             value={headerSearch}
-            onChange={(e) => setHeaderSearch(e.target.value)}
-            aria-label="Search tools"
+            onChange={(e) => onSearchChange(e.target.value)}
+            aria-label={shop ? `Search ${shop.name} products` : "Search tools"}
           />
+          {headerSearch && (
+            <button
+              type="button"
+              className="header-search-clear-btn"
+              aria-label="Clear search"
+              onClick={() => onSearchChange("")}
+            >
+              <X size={15} />
+            </button>
+          )}
         </form>
 
         <div className="header-actions">
@@ -1012,6 +1058,7 @@ function IconYouTube({ size = 18 }: { size?: number }) {
 }
 
 function ShopInformationPage() {
+  const platform = usePlatformSettings();
   const { slug, section: sectionKey } = useParams();
   const { catalog, catalogError, reloadCatalog } = useMarket();
   const shop = useRouteShop();
@@ -1028,8 +1075,8 @@ function ShopInformationPage() {
   if (slug && catalogError) return <main id="main" className="container section"><ErrorBox message={catalogError} retry={() => void reloadCatalog()} /></main>;
   if (slug && !catalog) return <Loading />;
   if (!section || (slug && !shop)) return <NotFound />;
-  const text = shop?.pages?.[section.key]?.trim() || (section.key === "about" ? shop?.description : "");
-  const support = shop?.support || (!shop ? "support@arisesell.com" : "");
+  const text = (shop ? shop.pages?.[section.key]?.trim() || (section.key === "about" ? shop.description : "") : platform.pages?.[section.key]?.trim());
+  const support = shop?.support || (!shop ? platform.support_email || "" : "");
   return (
     <main id="main" className="container narrow-page shop-policy-page">
       <Link className="text-link" to={shop ? `/shops/${shop.slug}` : "/"}>
@@ -1767,6 +1814,7 @@ function SectionTitle({
   );
 }
 function Home() {
+  const platform = usePlatformSettings();
   const { catalog, catalogError, reloadCatalog } = useMarket();
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
@@ -1779,12 +1827,10 @@ function Home() {
         <section className="hero container">
           <div className="hero-copy">
             <h1>
-              Digital products
-              <br />
-              from independent shops
+              {platform.hero_title || <>Digital products<br />from independent shops</>}
             </h1>
             <p className="hero-description">
-              Browse software, templates, design assets and courses. Check each seller’s product details and terms before ordering.
+              {platform.hero_description || "Browse software, templates, design assets and courses. Check each seller’s product details and terms before ordering."}
             </p>
             <form
               className="hero-search"
@@ -1926,8 +1972,9 @@ function Home() {
 }
 function Products({ shop }: { shop?: Shop }) {
   const { catalog, catalogError, reloadCatalog } = useMarket();
+  const { lang } = useLang();
   const [params, setParams] = useSearchParams();
-  const query = params.get("q") || "",
+  const query = params.get("q") || params.get("search") || "",
     category = params.get("category") || "";
   const [sort, setSort] = useState("recommended"),
     [inStock, setInStock] = useState(false);
@@ -1968,50 +2015,15 @@ function Products({ shop }: { shop?: Shop }) {
           </p>
         </div>
       )}
-      <div className="catalog-controls">
-        <div className="catalog-search">
-          <Search size={19} />
-          <label className="sr-only" htmlFor="catalog-search">
-            Search products
-          </label>
-          <input
-            id="catalog-search"
-            value={query}
-            onChange={(e) => update("q", e.target.value)}
-            placeholder={
-              shop
-                ? `Search ${shop.name} products…`
-                : "Search products, shops, and categories…"
-            }
-          />
-          {query && (
-            <button
-              className="icon-button"
-              aria-label="Clear search"
-              onClick={() => update("q", "")}
-            >
-              <X size={16} />
-            </button>
-          )}
-        </div>
-        <label className="sort-select">
-          <SlidersHorizontal size={17} />
-          <span className="sr-only">Sort products</span>
-          <select value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="recommended">Default order</option>
-            <option value="low">Price: low to high</option>
-            <option value="high">Price: high to low</option>
-          </select>
-        </label>
-      </div>
-      <div className="filter-row">
+      {/* Consolidated toolbar: category filter pills on left, sorting and stock filter on right */}
+      <div className="catalog-toolbar-row">
         <div className="filter-chips">
           <button
             className={!category ? "chip selected" : "chip"}
             aria-pressed={!category}
             onClick={() => update("category", "")}
           >
-            All products
+            {lang === "bn" ? "সকল প্রোডাক্ট" : "All products"}
           </button>
           {categories.map((c) => (
             <button
@@ -2024,15 +2036,43 @@ function Products({ shop }: { shop?: Shop }) {
             </button>
           ))}
         </div>
-        <label className="stock-filter">
-          <input
-            type="checkbox"
-            checked={inStock}
-            onChange={(e) => setInStock(e.target.checked)}
-          />
-          In stock only
-        </label>
+        <div className="catalog-controls-right">
+          <label className="sort-select">
+            <SlidersHorizontal size={16} />
+            <span className="sr-only">Sort products</span>
+            <select value={sort} onChange={(e) => setSort(e.target.value)}>
+              <option value="recommended">{lang === "bn" ? "ডিফল্ট ক্রম" : "Default order"}</option>
+              <option value="low">{lang === "bn" ? "দাম: কম থেকে বেশি" : "Price: low to high"}</option>
+              <option value="high">{lang === "bn" ? "দাম: বেশি থেকে কম" : "Price: high to low"}</option>
+            </select>
+          </label>
+          <label className="stock-filter">
+            <input
+              type="checkbox"
+              checked={inStock}
+              onChange={(e) => setInStock(e.target.checked)}
+            />
+            <span>{lang === "bn" ? "শুধুমাত্র স্টকে আছে" : "In stock only"}</span>
+          </label>
+        </div>
       </div>
+
+      {query && (
+        <div className="active-filter-banner">
+          <span>
+            {lang === "bn" ? `খোঁজা হচ্ছে: "${query}"` : `Showing results for: "${query}"`}
+            <span className="active-count"> ({products.length} {products.length === 1 ? (lang === "bn" ? "টি প্রোডাক্ট পাওয়া গেছে" : "product found") : (lang === "bn" ? "টি প্রোডাক্ট পাওয়া গেছে" : "products found")})</span>
+          </span>
+          <button
+            type="button"
+            className="clear-search-pill"
+            onClick={() => update("q", "")}
+          >
+            <X size={14} />
+            <span>{lang === "bn" ? "মুছুন" : "Clear"}</span>
+          </button>
+        </div>
+      )}
       <p className="results-count" role="status">
         {products.length} {products.length === 1 ? "product" : "products"}
         {query && <> for “{query}”</>}
@@ -2150,7 +2190,13 @@ function ShopPage() {
           <span>/</span>
           <span aria-current="page">{shop.name}</span>
         </nav>
-        <h1>{shop.name}</h1>
+        <div className="shop-hero-header-row">
+          <h1>{shop.name}</h1>
+          <div className="shop-online-indicator">
+            <span className="online-dot" />
+            <span>{lang === "bn" ? "ভেরিফাইড ডিজিটাল শপ" : "Verified Digital Shop"}</span>
+          </div>
+        </div>
       </section>
       <Products shop={shop} />
       <WhatsAppFloatingButton shop={shop} />
@@ -3943,28 +3989,6 @@ function Seller() {
           </a>
         </div>
       )}
-      {session?.user?.admin && (
-        <section className="panel admin-seller-highlight-card">
-          <div className="admin-seller-header">
-            <div className="admin-badge-icon">
-              <ShieldCheck size={24} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <span className="eyebrow">Platform Administration</span>
-              <h2>AriseSell Administrator Dashboard</h2>
-              <p className="muted">
-                {lang === "bn"
-                  ? "আপনি একজন অনুমোদিত AriseSell অ্যাডমিনিস্ট্রেটর হিসেবে লগইন করেছেন। আপনি সরাসরি এখান থেকেই মার্কেটপ্লেস স্পন্সরড অ্যাড ও ক্যাম্পেইন পরিচালনা করতে পারবেন।"
-                  : "Signed in with an authorized AriseSell administrator account. You have full control over marketplace sponsored ads, earnings, and monetization directly here."}
-              </p>
-            </div>
-            <Link to="/admin" className="button secondary small">
-              {lang === "bn" ? "সম্পূর্ণ অ্যাডমিন পেজ →" : "Full Admin Page →"}
-            </Link>
-          </div>
-          <AdminSponsoredAdsManager />
-        </section>
-      )}
       <div className="seller-layout">
         <div>
           {!session ? (
@@ -4726,237 +4750,12 @@ function HowItWorks() {
     </main>
   );
 }
-type AdminData = {
-  catalog: Catalog;
-  reports: {
-    id: string;
-    product_id: string;
-    reason: string;
-    resolved: boolean;
-    created_at: number;
-  }[];
-  moderation: {
-    kind: string;
-    target_id: string;
-    hidden: boolean;
-    reason: string;
-  }[];
-};
-function Admin() {
-  const { session, reloadCatalog } = useMarket();
-  const [data, setData] = useState<AdminData | null>(null),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [reason, setReason] = useState(""),
-    [target, setTarget] = useState<{
-      kind: string;
-      id: string;
-      name: string;
-      hidden: boolean;
-    } | null>(null);
-  const moderationDialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    if (!target) return;
-    const dialog = moderationDialog.current;
-    dialog?.showModal();
-    dialog?.querySelector("textarea")?.focus();
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = overflow; };
-  }, [target]);
-  const load = () =>
-    api<AdminData>("/admin")
-      .then(setData)
-      .catch((e) => setError(e.message));
-  useEffect(() => {
-    if (session?.user) void load();
-  }, [session?.user?.id]);
-  if (!session) return <Loading />;
-  if (!session.user?.admin)
-    return (
-      <main id="main" className="container section">
-        <Empty title="Administrator access required" heading="h1">
-          <p>Continue with an authorized AriseSell administrator account.</p>
-          <a className="button primary" href="/api/auth/start">
-            Continue with AriseSell
-          </a>
-        </Empty>
-      </main>
-    );
-  return (
-    <main id="main" className="container listing-page">
-      <div className="page-intro">
-        <h1>Marketplace administration</h1>
-        <p>Review published shops, product listings, and customer reports.</p>
-      </div>
-      {error && !target && <ErrorBox message={error} retry={() => void load()} />}
-      <div role="status">{busy && <p>Saving moderation changes…</p>}</div>
-      <AdminSponsoredAdsManager />
-      {data ? (
-        <>
-          <section className="panel admin-panel">
-            <h2>Published shops</h2>
-            {data.catalog.shops.map((shop) => {
-              const hidden = data.moderation.some(
-                (m) => m.kind === "shop" && m.target_id === shop.id && m.hidden,
-              );
-              return (
-                <div className="admin-row" key={shop.id}>
-                  <div>
-                    <strong>{shop.name}</strong>
-                    <p>{shop.description}</p>
-                  </div>
-                  <span className="pill">{hidden ? "Hidden" : "Visible"}</span>
-                  <button
-                    className="button secondary small"
-                    onClick={() => {
-                      setReason("");
-                      setTarget({
-                        kind: "shop",
-                        id: shop.id,
-                        name: shop.name,
-                        hidden: !hidden,
-                      });
-                    }}
-                  >
-                    {hidden ? "Restore" : "Hide shop"}
-                  </button>
-                </div>
-              );
-            })}
-          </section>
-          <section className="panel admin-panel">
-            <h2>Product listings</h2>
-            {data.catalog.products.map((product) => {
-              const hidden = data.moderation.some(
-                (m) =>
-                  m.kind === "product" &&
-                  m.target_id === product.id &&
-                  m.hidden,
-              );
-              return (
-                <div className="admin-row" key={product.id}>
-                  <strong>{product.name}</strong>
-                  <span className="pill">{hidden ? "Hidden" : "Visible"}</span>
-                  <button
-                    className="button secondary small"
-                    onClick={() => {
-                      setReason("");
-                      setTarget({
-                        kind: "product",
-                        id: product.id,
-                        name: product.name,
-                        hidden: !hidden,
-                      });
-                    }}
-                  >
-                    {hidden ? "Restore" : "Hide listing"}
-                  </button>
-                </div>
-              );
-            })}
-          </section>
-          <section className="panel admin-panel">
-            <h2>Customer reports</h2>
-            {!data.reports.length ? (
-              <p>No reports have been submitted.</p>
-            ) : (
-              data.reports.map((report) => (
-                <div className="admin-row" key={report.id}>
-                  <div>
-                    <strong>
-                      {data.catalog.products.find(
-                        (p) => p.id === report.product_id,
-                      )?.name || report.product_id}
-                    </strong>
-                    <p>{report.reason}</p>
-                  </div>
-                  <button
-                    className="button secondary small"
-                    disabled={report.resolved || busy}
-                    onClick={async () => {
-                      setBusy(true);
-                      try {
-                        await api(`/admin/reports/${report.id}/resolve`, {
-                          method: "POST",
-                        });
-                        await load();
-                      } catch (e) {
-                        setError((e as Error).message);
-                      } finally {
-                        setBusy(false);
-                      }
-                    }}
-                  >
-                    {report.resolved ? "Resolved" : "Resolve report"}
-                  </button>
-                </div>
-              ))
-            )}
-          </section>
-        </>
-      ) : (
-        <Loading />
-      )}
-      {target && (
-        <dialog ref={moderationDialog} className="moderation-form" aria-labelledby="moderation-title" onClose={() => setTarget(null)} onClick={event => { if (!busy && event.target === event.currentTarget) moderationDialog.current?.close(); }} onCancel={event => { if (busy) event.preventDefault(); }}>
-          <div className="product-info-header"><h2 id="moderation-title">
-            {target.hidden ? "Hide" : "Restore"} {target.name}
-          </h2><button className="icon-button" type="button" aria-label="Close moderation" disabled={busy} onClick={() => moderationDialog.current?.close()}><X size={20} /></button></div>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setBusy(true);
-              setError("");
-              try {
-                await api("/admin/moderation", {
-                  method: "PUT",
-                  body: JSON.stringify({
-                    kind: target.kind,
-                    target_id: target.id,
-                    hidden: target.hidden,
-                    reason,
-                  }),
-                });
-                moderationDialog.current?.close();
-                await Promise.all([load(), reloadCatalog()]);
-              } catch (e) {
-                setError((e as Error).message);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            <p className="moderation-description">{target.hidden ? `This hides the ${target.kind === "shop" ? "shop and its listings" : "listing"} from the marketplace. Existing orders and inventory are not deleted.` : "This removes the marketplace restriction. The seller’s publication and availability settings still apply."}</p>
-            <label className="field">
-              Reason for this action
-              <textarea
-                minLength={5}
-                maxLength={1000}
-                required
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-              />
-            </label>
-            {error && <ErrorBox message={error} />}
-            <div className="button-row">
-              <button className="button primary" disabled={busy}>
-                {busy ? "Saving…" : target.hidden ? (target.kind === "shop" ? "Hide shop" : "Hide listing") : "Restore"}
-              </button>
-              <button
-                className="button secondary"
-                type="button"
-                disabled={busy}
-                onClick={() => moderationDialog.current?.close()}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </dialog>
-      )}
-    </main>
-  );
+const AdminConsole = lazy(() => import("./Admin"));
+function AdminEntry() {
+  const { session, sessionError, refreshSession, reloadCatalog } = useMarket();
+  if (!session) return <main id="main" className="container section">{sessionError ? <ErrorBox message={sessionError} retry={() => void refreshSession()} /> : <Loading />}</main>;
+  if (!session.user?.admin) return <main id="main" className="container section"><Empty title="Administrator access required" heading="h1"><p>Continue with an authorized AriseSell administrator account.</p><a className="button primary" href="/api/auth/start?return_to=/admin">Continue with AriseSell</a><Link className="text-link" to="/">Return to marketplace</Link></Empty></main>;
+  return <Suspense fallback={<Loading />}><AdminConsole key={session.user.id} user={session.user} sourceWeb={session.source_web} reloadCatalog={reloadCatalog} onSignOut={async () => { await api("/auth/logout", { method: "POST" }); await refreshSession(); }} /></Suspense>;
 }
 function NotFound() {
   return (
@@ -4983,6 +4782,7 @@ function ScrollToTop() {
   return null;
 }
 export default function App() {
+  const adminRoute = /^\/admin(?:\/|$)/.test(useLocation().pathname);
   const [catalog, setCatalog] = useState<Catalog | null>(null),
     [catalogError, setCatalogError] = useState("");
   const [session, setSession] = useState<Session | null>(null),
@@ -5036,6 +4836,7 @@ export default function App() {
   }, []);
   return (
     <LangProvider>
+      <PromotionsProvider>
       <Context.Provider
         value={{
           catalog,
@@ -5050,8 +4851,8 @@ export default function App() {
           Skip to content
         </a>
         <ScrollToTop />
-        <Header />
-        {sessionError && (
+        {!adminRoute && <Header />}
+        {!adminRoute && sessionError && (
           <div className="container">
             <ErrorBox
               message={sessionError}
@@ -5074,13 +4875,13 @@ export default function App() {
           <Route path="/purchases" element={<Purchases />} />
           <Route path="/purchases/:id" element={<PurchasePage />} />
           <Route path="/seller" element={<Seller />} />
-          <Route path="/admin" element={<Admin />} />
+          <Route path="/admin/*" element={<AdminEntry />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-        <Footer />
-        <StickyBottomSponsoredStrip />
+        {!adminRoute && <><Footer /><StickyBottomSponsoredStrip /></>}
       </Context.Provider>
+      </PromotionsProvider>
     </LangProvider>
   );
 }

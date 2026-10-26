@@ -46,6 +46,8 @@ async fn setup_with_pool(pool: sqlx::AnyPool) -> (AppState, Requests, tokio::tas
             if headers.get("authorization").and_then(|v|v.to_str().ok())==Some("Bearer revoked") {return (StatusCode::UNAUTHORIZED,Json(json!({"detail":"Session revoked"}))).into_response();}
             Json(json!({"user":{"id":"user-1","admin":headers.get("authorization").and_then(|v|v.to_str().ok())==Some("Bearer admin")},"shops":[]})).into_response()
         }))
+        .route("/api/v1/marketplace/admin/users",get(||async {Json(json!({"users":[{"id":"66666666-6666-4666-8666-666666666666","name":"Other administrator","email":"admin@example.test"}]}))}))
+        .route("/api/v1/marketplace/admin/orders",get(||async {Json(json!({"orders":[],"summary":{"total":0,"paid":0,"payment_issues":0,"delivery_issues":0},"has_more":false,"checked_at":"2026-10-26T12:00:00Z"}))}))
         .route("/api/v1/marketplace/orders/{id}", get(|axum::extract::Path(id): axum::extract::Path<String>, headers: axum::http::HeaderMap| async move {
             if headers.get("X-Marketplace-Buyer").and_then(|v|v.to_str().ok()) != Some(BUYER) {
                 return (StatusCode::NOT_FOUND, Json(json!({"detail":"Purchase not found"}))).into_response();
@@ -114,6 +116,102 @@ async fn sign_in(state: &AppState, access: &str) -> String {
         .await
         .unwrap();
     session
+}
+
+fn admin_request(method: &str, path: &str, session: &str, data: Value) -> Request<Body> {
+    let mut request=write(path,data);
+    *request.method_mut()=method.parse().unwrap();
+    request.headers_mut().insert("Cookie",format!("arise_buyer={BUYER}; arise_session={session}").parse().unwrap());
+    request
+}
+fn campaign() -> Value { json!({"id":"77777777-7777-4777-8777-777777777777","title":"Sample course access","advertiser_name":"Sample advertiser","target_url":"/products","banner_url":"","badge_text":"Sponsored","cta_text":"View details","placement":"home_hero","start_date":"2020-01-01","end_date":"2099-12-31","price_bdt":500,"status":"active","created_at":0}) }
+
+#[tokio::test]
+async fn admin_routes_reject_regular_accounts_even_with_forged_local_role() {
+    let (state,_,server)=setup().await;
+    let session=sign_in(&state,"seller-source-access").await;
+    sqlx::query("INSERT INTO admin_roles VALUES('user-1','owner')").execute(&state.db).await.unwrap();
+    let app=router(state.clone());
+    for path in ["/api/admin","/api/admin/orders","/api/admin/access","/api/admin/activity","/api/admin/reviews","/api/admin/notes","/api/admin/health","/api/admin/documents/settings","/api/admin/documents/campaigns"] {
+        assert_eq!(app.clone().oneshot(admin_request("GET",path,&session,json!({}))).await.unwrap().status(),StatusCode::FORBIDDEN,"{path}");
+    }
+    for (method,path,data) in [
+        ("PUT","/api/admin/documents/settings",json!({"revision":0,"content":{}})),
+        ("PUT","/api/admin/access/66666666-6666-4666-8666-666666666666",json!({"role":"owner"})),
+        ("POST","/api/admin/notes",json!({"target_type":"report","target_id":PRODUCT,"content":"forbidden"})),
+        ("PUT","/api/admin/reviews/66666666-6666-4666-8666-666666666666/visibility",json!({"hidden":true,"reason":"forbidden action"})),
+    ] {assert_eq!(app.clone().oneshot(admin_request(method,path,&session,data)).await.unwrap().status(),StatusCode::FORBIDDEN,"{path}");}
+    assert_eq!(sqlx::query_scalar::<_,i64>("SELECT COUNT(*) FROM admin_activity").fetch_one(&state.db).await.unwrap(),0);
+    let guest=app.oneshot(Request::builder().uri("/api/admin").body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(guest.status(),StatusCode::UNAUTHORIZED);
+    server.abort();
+}
+
+#[tokio::test]
+async fn campaigns_persist_validate_urls_detect_conflicts_and_count_real_deduplicated_events() {
+    let (state,_,server)=setup().await;let session=sign_in(&state,"admin").await;let app=router(state.clone());
+    let save=|revision,ads|admin_request("PUT","/api/admin/documents/campaigns",&session,json!({"revision":revision,"content":ads}));
+    assert_eq!(app.clone().oneshot(save(0,json!([campaign()]))).await.unwrap().status(),StatusCode::OK);
+    assert_eq!(app.clone().oneshot(save(0,json!([]))).await.unwrap().status(),StatusCode::CONFLICT);
+    let mut bad=campaign();bad["target_url"]=json!("javascript:alert(1)");
+    assert_eq!(app.clone().oneshot(save(1,json!([bad]))).await.unwrap().status(),StatusCode::UNPROCESSABLE_ENTITY);
+    let mut bad=campaign();bad["end_date"]=json!("2026-02-30");
+    assert_eq!(app.clone().oneshot(save(1,json!([bad]))).await.unwrap().status(),StatusCode::UNPROCESSABLE_ENTITY);
+    let public=body(app.clone().oneshot(Request::builder().uri("/api/promotions").body(Body::empty()).unwrap()).await.unwrap()).await;
+    assert_eq!(public["ads"][0]["title"],"Sample course access");assert!(public["ads"][0].get("price_bdt").is_none());
+    for _ in 0..2 {assert_eq!(app.clone().oneshot(admin_request("POST","/api/promotions/77777777-7777-4777-8777-777777777777/events",&session,json!({"kind":"impression"}))).await.unwrap().status(),StatusCode::OK);}
+    let doc=body(app.clone().oneshot(admin_request("GET","/api/admin/documents/campaigns",&session,json!({}))).await.unwrap()).await;
+    assert_eq!(doc["content"][0]["impressions"],1);assert_eq!(doc["content"][0]["clicks"],0);assert_eq!(doc["revision"],1);
+    assert_eq!(app.clone().oneshot(save(1,json!([]))).await.unwrap().status(),StatusCode::OK);
+    let empty=body(router(state.clone()).oneshot(Request::builder().uri("/api/promotions").body(Body::empty()).unwrap()).await.unwrap()).await;
+    assert_eq!(empty["ads"],json!([]));
+    assert_eq!(sqlx::query_scalar::<_,i64>("SELECT COUNT(*) FROM admin_activity").fetch_one(&state.db).await.unwrap(),2);
+    server.abort();
+}
+
+#[tokio::test]
+async fn platform_content_is_persistent_audited_and_rejects_unsafe_links() {
+    let (state,_,server)=setup().await;let session=sign_in(&state,"admin").await;let app=router(state.clone());
+    let data=json!({"hero_title":"Actual platform title","pages":{"privacy":"Platform policy. বাংলা"},"announcement":"Marketplace update","announcement_url":"/products","support_email":"help@example.test"});
+    assert_eq!(app.clone().oneshot(admin_request("PUT","/api/admin/documents/settings",&session,json!({"revision":0,"content":data}))).await.unwrap().status(),StatusCode::OK);
+    let public=body(router(state.clone()).oneshot(Request::builder().uri("/api/promotions").body(Body::empty()).unwrap()).await.unwrap()).await;
+    assert_eq!(public["settings"],data);
+    assert_eq!(app.clone().oneshot(admin_request("PUT","/api/admin/documents/settings",&session,json!({"revision":1,"content":{"announcement_url":"//evil.example"}}))).await.unwrap().status(),StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(app.clone().oneshot(admin_request("PUT","/api/admin/documents/settings",&session,json!({"revision":1,"content":{"unknown":"field"}}))).await.unwrap().status(),StatusCode::UNPROCESSABLE_ENTITY);
+    let activity=body(app.oneshot(admin_request("GET","/api/admin/activity",&session,json!({}))).await.unwrap()).await;
+    assert_eq!(activity["activity"][0]["action"],"document.saved");
+    assert!(!activity.to_string().contains("Bearer"));server.abort();
+}
+
+#[tokio::test]
+async fn support_roles_are_server_enforced_and_blocked_accounts_lose_admin_session_flag() {
+    let (state,_,server)=setup().await;let session=sign_in(&state,"admin").await;let app=router(state.clone());
+    sqlx::query("INSERT INTO admin_roles VALUES('user-1','support')").execute(&state.db).await.unwrap();
+    assert_eq!(app.clone().oneshot(admin_request("GET","/api/admin/orders",&session,json!({}))).await.unwrap().status(),StatusCode::OK);
+    assert_eq!(app.clone().oneshot(admin_request("GET","/api/admin/documents/campaigns",&session,json!({}))).await.unwrap().status(),StatusCode::FORBIDDEN);
+    assert_eq!(app.clone().oneshot(admin_request("PUT","/api/admin/moderation",&session,json!({"kind":"shop","target_id":SHOP,"hidden":true,"reason":"Not allowed for support"}))).await.unwrap().status(),StatusCode::FORBIDDEN);
+    let note=json!({"target_type":"order","target_id":PRODUCT,"content":"Follow up with seller; no secrets stored."});
+    assert_eq!(app.clone().oneshot(admin_request("POST","/api/admin/notes",&session,note)).await.unwrap().status(),StatusCode::OK);
+    let notes=body(app.clone().oneshot(admin_request("GET",&format!("/api/admin/notes?target_type=order&target_id={PRODUCT}"),&session,json!({}))).await.unwrap()).await;
+    assert_eq!(notes["notes"].as_array().unwrap().len(),1);
+    sqlx::query("UPDATE admin_roles SET role='blocked'").execute(&state.db).await.unwrap();
+    assert_eq!(app.clone().oneshot(admin_request("GET","/api/admin",&session,json!({}))).await.unwrap().status(),StatusCode::FORBIDDEN);
+    let me=body(app.oneshot(admin_request("GET","/api/session",&session,json!({}))).await.unwrap()).await;
+    assert_eq!(me["user"]["admin"],false);server.abort();
+}
+
+#[tokio::test]
+async fn admin_review_hiding_updates_public_counts_without_editing_customer_content() {
+    let (state,_,server)=setup().await;let session=sign_in(&state,"admin").await;let app=router(state.clone());
+    let id="88888888-8888-4888-8888-888888888888";
+    sqlx::query("INSERT INTO reviews VALUES($1,$2,$3,$4,5,'Real buyer','A real verified customer comment',1)").bind(id).bind(id).bind(PRODUCT).bind(SHOP).execute(&state.db).await.unwrap();
+    let request=|hidden| admin_request("PUT",&format!("/api/admin/reviews/{id}/visibility"),&session,json!({"hidden":hidden,"reason":"Customer report reviewed"}));
+    assert_eq!(app.clone().oneshot(request(true)).await.unwrap().status(),StatusCode::OK);
+    let public=body(app.clone().oneshot(Request::builder().uri(format!("/api/products/{PRODUCT}/reviews")).body(Body::empty()).unwrap()).await.unwrap()).await;
+    assert_eq!(public["count"],0);assert_eq!(public["average"],Value::Null);
+    assert_eq!(app.clone().oneshot(request(false)).await.unwrap().status(),StatusCode::OK);
+    let public=body(app.oneshot(Request::builder().uri(format!("/api/products/{PRODUCT}/reviews")).body(Body::empty()).unwrap()).await.unwrap()).await;
+    assert_eq!(public["count"],1);assert_eq!(public["reviews"][0]["comment"],"A real verified customer comment");server.abort();
 }
 
 #[tokio::test]
