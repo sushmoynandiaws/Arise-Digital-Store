@@ -65,6 +65,7 @@ import {
   UserCheck,
   Wallet,
   Info,
+  Star,
 } from "./icons.js";
 import {
   api,
@@ -1282,28 +1283,25 @@ function Footer() {
                 {phone && (
                   <div className="dark-contact-item">
                     <span className="dark-contact-icon"><IconWhatsApp size={16} /></span>
-                    <span>
-                      <strong>{lang === "bn" ? "হোয়াটসঅ্যাপ (মেসেজ):" : "WhatsApp (Message only):"}</strong>{" "}
-                      <a href={supportHref(phone)} target="_blank" rel="noopener noreferrer">{phone}</a>
-                    </span>
+                    <a href={supportHref(phone)} target="_blank" rel="noopener noreferrer" className="dark-contact-link">
+                      <strong>{lang === "bn" ? "হোয়াটসঅ্যাপ (মেসেজ):" : "WhatsApp (Message only):"}</strong> {phone}
+                    </a>
                   </div>
                 )}
                 {email && (
                   <div className="dark-contact-item">
                     <span className="dark-contact-icon"><IconMail size={16} /></span>
-                    <span>
-                      <strong>{lang === "bn" ? "ইমেইল:" : "Email:"}</strong>{" "}
-                      <a href={`mailto:${email}`}>{email}</a>
-                    </span>
+                    <a href={`mailto:${email}`} className="dark-contact-link">
+                      <strong>{lang === "bn" ? "ইমেইল:" : "Email:"}</strong> {email}
+                    </a>
                   </div>
                 )}
                 {!fullAddress && !phone && !email && shop?.support && (
                   <div className="dark-contact-item">
                     <span className="dark-contact-icon"><IconGlobe size={16} /></span>
-                    <span>
-                      <strong>{lang === "bn" ? "সাপোর্ট:" : "Support:"}</strong>{" "}
-                      <a href={supportHref(shop.support)} target="_blank" rel="noopener noreferrer">{shop.support}</a>
-                    </span>
+                    <a href={supportHref(shop.support)} target="_blank" rel="noopener noreferrer" className="dark-contact-link">
+                      <strong>{lang === "bn" ? "সাপোর্ট:" : "Support:"}</strong> {shop.support}
+                    </a>
                   </div>
                 )}
               </div>
@@ -1333,29 +1331,41 @@ function Footer() {
               </ul>
             </div>
 
-            {/* Column 3: Shop Social Links (Dynamic) */}
+            {/* Column 3: Shop Social Links & Seller Community Shortcuts */}
             <div className="dark-footer-col dark-social-col">
               <span className="dark-footer-heading">{lang === "bn" ? "সোশ্যাল মিডিয়া ও সাপোর্ট" : "Community & social"}</span>
-              {shopSocials.length > 0 ? (
-                <div className="dark-social-pills-row">
-                  {shopSocials.map((item) => (
-                    <a
-                      key={item.key}
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="dark-social-pill"
-                    >
-                      {item.icon}
-                      <span>{item.label}</span>
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <p className="dark-muted-text">
-                  {lang === "bn" ? "যেকোনো সহায়তায় সরাসরি সেলারের সাথে যোগাযোগ করুন।" : "Contact seller directly for any inquiries or support."}
-                </p>
-              )}
+              <div className="dark-social-pills-row footer-platform-links">
+                {shopSocials.map((item) => (
+                  <a
+                    key={item.key}
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="dark-social-pill"
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </a>
+                ))}
+                {shop && (
+                  <Link to={`/shops/${slug}/reviews`} className="dark-social-pill">
+                    <Star size={14} />
+                    <span>{lang === "bn" ? "গ্রাহক রিভিউসমূহ" : "Customer reviews"}</span>
+                  </Link>
+                )}
+                {shopSocials.length <= 2 && (
+                  <Link to="/shops" className="dark-social-pill">
+                    <Store size={14} />
+                    <span>{lang === "bn" ? "সকল শপ ব্রাউজ করুন" : "Browse All Shops"}</span>
+                  </Link>
+                )}
+                {shopSocials.length === 0 && (
+                  <Link to="/seller" className="dark-social-pill">
+                    <Store size={14} />
+                    <span>{lang === "bn" ? "নিজের শপ খুলুন" : "Open Your Shop"}</span>
+                  </Link>
+                )}
+              </div>
             </div>
 
             {/* Column 4: Shop Useful Links */}
