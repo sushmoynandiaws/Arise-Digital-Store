@@ -97,7 +97,7 @@ export function purchaseMessage(order: Purchase) {
       ? { title: "Your order is being prepared", description: "Payment is verified. The seller is preparing your digital items." }
       : { title: "Preparing your digital items", description: "Payment is verified. This page updates automatically when your items are ready." };
   }
-  if (order.payment && new Date(order.payment.expires_at).getTime() < Date.now())
+  if (order.payment && new Date(order.payment.expires_at).getTime() <= Date.now())
     return { title: "Payment request expired", description: "This payment request has expired. Contact the seller if you have already paid." };
   if (order.payment_status === "pending_verification")
     return { title: "Checking your payment", description: "Your transaction ID was submitted. Your payment has not been verified yet. This page updates automatically." };

@@ -1403,26 +1403,6 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
   padding: 0 16px;
 }
 
-/* Purchase Sharing Actions */
-.purchase-sharing-actions {
-  display: flex;
-  gap: 10px;
-  margin: 16px 0;
-  flex-wrap: wrap;
-}
-.purchase-sharing-actions .button {
-  flex: 1;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  text-decoration: none;
-}
-.button-wa-share {
-  color: #25D366;
-}
-
 /* Track Order / OTP Verification Page */
 .track-order-page {
   max-width: 560px;
@@ -2749,11 +2729,16 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
 }
 .payment-expiry-note {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   margin-top: 16px;
-  font-size: 13px;
-  color: var(--muted);
+  font-size: var(--text-body);
+  color: var(--amber);
+}
+.payment-expiry-note strong {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* Seller Payment Settings in /seller */
@@ -3137,6 +3122,36 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
 }
 
 /* 6. Admin Sponsored Ads Management Panel */
+.admin-seller-highlight-card {
+  margin-bottom: 28px;
+  background: var(--primary-light);
+  border: 1.5px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+.admin-seller-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.admin-badge-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-control);
+  background: #ede9fe;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.admin-seller-header h2 {
+  margin: 4px 0 6px;
+  font-size: var(--title-subsection);
+  color: var(--primary-dark);
+}
 .ads-manager-panel {
   margin-bottom: 28px;
   border: 1px solid #e2e8f0;

@@ -3261,9 +3261,11 @@ export function detectPaymentAccountType(payment: any, shop?: Shop | null): "mer
 export function PaymentInstructionCard({
   order,
   session,
+  remainingSeconds,
 }: {
   order: Purchase;
   session?: Session | null;
+  remainingSeconds: number | null;
 }) {
   const { t, lang } = useLang();
   if (!order.payment) return null;
@@ -3406,14 +3408,15 @@ export function PaymentInstructionCard({
         </ol>
       </div>
 
-      <p className="muted form-hint payment-expiry-note">
-        <Clock size={14} />
-        <span>
-          {lang === "bn"
-            ? `পেমেন্টের সময় শেষ হবে ${new Date(payment.expires_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} মিনিটে।`
-            : `Payment request expires at ${new Date(payment.expires_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`}
-        </span>
-      </p>
+      {remainingSeconds !== null && (
+        <p className="payment-expiry-note">
+          <Clock size={18} aria-hidden="true" />
+          <span>{lang === "bn" ? "পেমেন্টের বাকি সময়:" : "Time left to pay:"}</span>
+          <strong role="timer" aria-live="off">
+            {String(Math.floor(remainingSeconds / 60)).padStart(2, "0")}:{String(remainingSeconds % 60).padStart(2, "0")}
+          </strong>
+        </p>
+      )}
 
       {session?.demo && (
         <p className="notice">
@@ -3437,6 +3440,21 @@ function PurchasePage() {
       null,
     );
   const navigate = useNavigate();
+  const [now, setNow] = useState(Date.now);
+  const paymentDeadline = order?.payment ? Date.parse(order.payment.expires_at) : NaN;
+  const paymentOpen = !!order && ["unpaid", "pending_verification", "review_required"].includes(order.payment_status);
+  const ticking = paymentOpen && order?.delivery_status !== "cancelled" && paymentDeadline > now;
+  useEffect(() => {
+    if (!ticking) return;
+    const tick = () => setNow(Date.now());
+    tick();
+    const interval = window.setInterval(tick, 1000);
+    window.addEventListener("focus", tick);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", tick);
+    };
+  }, [paymentDeadline, ticking]);
   const load = () =>
     api<Purchase>(`/orders/${id}`).then((o) => {
       setOrder(o);
@@ -3478,13 +3496,10 @@ function PurchasePage() {
     );
   const paid = order.payment_status === "paid",
     cancelled = order.delivery_status === "cancelled";
-  const paymentOpen = [
-    "unpaid",
-    "pending_verification",
-    "review_required",
-  ].includes(order.payment_status);
-  const expired =
-    order.payment && new Date(order.payment.expires_at).getTime() < Date.now();
+  const expired = paymentDeadline <= now;
+  const remainingSeconds = Number.isFinite(paymentDeadline)
+    ? Math.max(0, Math.ceil((paymentDeadline - now) / 1000))
+    : null;
   const message = purchaseMessage(order);
   return (
     <main id="main" className="container purchase-page narrow-page">
@@ -3564,7 +3579,7 @@ function PurchasePage() {
         )}
         {paymentOpen && !cancelled && order.payment && !expired && (
           <>
-            <PaymentInstructionCard order={order} session={session} />
+            <PaymentInstructionCard order={order} session={session} remainingSeconds={remainingSeconds} />
             <form
               className="proof-form"
               onSubmit={async (e) => {
@@ -3727,32 +3742,6 @@ function PurchasePage() {
             </Link>
           </div>
         )}
-        <div className="purchase-sharing-actions">
-          <button
-            type="button"
-            className="button secondary"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(window.location.href);
-                alert(t("recoveryLinkCopied"));
-              } catch {}
-            }}
-          >
-            <Copy size={15} />
-            {t("copyRecoveryLink")}
-          </button>
-          <a
-            href={`https://wa.me/?text=${encodeURIComponent(
-              `${order.shop.name}: Order ${order.ref} (${order.name})\nView digital purchase: ${window.location.href}`
-            )}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="button secondary button-wa-share"
-          >
-            <IconWhatsApp size={16} />
-            {t("sendToWhatsApp")}
-          </a>
-        </div>
       {(order.can_review || order.review) && <PurchaseReview key={order.id} order={order} />}
       <div className="purchase-support">
         <span>Need help with this order?</span>
@@ -3953,6 +3942,28 @@ function Seller() {
             Try connecting again
           </a>
         </div>
+      )}
+      {session?.user?.admin && (
+        <section className="panel admin-seller-highlight-card">
+          <div className="admin-seller-header">
+            <div className="admin-badge-icon">
+              <ShieldCheck size={24} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <span className="eyebrow">Platform Administration</span>
+              <h2>AriseSell Administrator Dashboard</h2>
+              <p className="muted">
+                {lang === "bn"
+                  ? "আপনি একজন অনুমোদিত AriseSell অ্যাডমিনিস্ট্রেটর হিসেবে লগইন করেছেন। আপনি সরাসরি এখান থেকেই মার্কেটপ্লেস স্পন্সরড অ্যাড ও ক্যাম্পেইন পরিচালনা করতে পারবেন।"
+                  : "Signed in with an authorized AriseSell administrator account. You have full control over marketplace sponsored ads, earnings, and monetization directly here."}
+              </p>
+            </div>
+            <Link to="/admin" className="button secondary small">
+              {lang === "bn" ? "সম্পূর্ণ অ্যাডমিন পেজ →" : "Full Admin Page →"}
+            </Link>
+          </div>
+          <AdminSponsoredAdsManager />
+        </section>
       )}
       <div className="seller-layout">
         <div>
@@ -4733,7 +4744,6 @@ type AdminData = {
 };
 function Admin() {
   const { session, reloadCatalog } = useMarket();
-  const [demoAdminOverride, setDemoAdminOverride] = useState(false);
   const [data, setData] = useState<AdminData | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -4762,8 +4772,7 @@ function Admin() {
     if (session?.user) void load();
   }, [session?.user?.id]);
   if (!session) return <Loading />;
-  const isAdmin = session.user?.admin || demoAdminOverride;
-  if (!isAdmin)
+  if (!session.user?.admin)
     return (
       <main id="main" className="container section">
         <Empty title="Administrator access required" heading="h1">
@@ -4771,14 +4780,6 @@ function Admin() {
           <a className="button primary" href="/api/auth/start">
             Continue with AriseSell
           </a>
-          <button
-            type="button"
-            className="button secondary"
-            style={{ marginTop: "12px" }}
-            onClick={() => setDemoAdminOverride(true)}
-          >
-            Access Ads Manager (Demo Mode)
-          </button>
         </Empty>
       </main>
     );

@@ -84,9 +84,6 @@ export const translations = {
     expiringSoon: "Expiring soon",
     expiredPlan: "Expired plan",
     oneClickRenew: "1-Click Renew Subscription (10% OFF)",
-    sendToWhatsApp: "Send Delivery to WhatsApp",
-    copyRecoveryLink: "Copy Order Recovery Link",
-    recoveryLinkCopied: "Order link copied to clipboard!",
   },
   bn: {
     // Nav
@@ -169,9 +166,6 @@ export const translations = {
     expiringSoon: "মেয়াদ দ্রুত শেষ হচ্ছে",
     expiredPlan: "মেয়াদোত্তীর্ণ",
     oneClickRenew: "১-ক্লিকে রিনিউ করুন (১০% ছাড়)",
-    sendToWhatsApp: "হোয়াটসঅ্যাপে ডেলিভারি নিন",
-    copyRecoveryLink: "অর্ডার রিকভারি লিঙ্ক কপি করুন",
-    recoveryLinkCopied: "অর্ডার লিঙ্ক ক্লিপবোর্ডে কপি হয়েছে!",
   },
 } as const;
 

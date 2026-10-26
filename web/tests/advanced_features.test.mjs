@@ -36,8 +36,8 @@ test("Bilingual i18n dictionary has complete symmetry and essential keys", () =>
   assert.ok(i18nCode.includes("অর্ডার ট্র্যাক"));
   assert.ok(i18nCode.includes("Track order"));
   assert.ok(i18nCode.includes("1-Click Renew Subscription"));
-  assert.ok(i18nCode.includes("Copy Order Recovery Link"));
-  assert.ok(i18nCode.includes("Send Delivery to WhatsApp"));
+  assert.ok(!i18nCode.includes("Copy Order Recovery Link"));
+  assert.ok(!i18nCode.includes("Send Delivery to WhatsApp"));
 });
 
 test("Bangladeshi phone normalization handles 01, +880, 880, and spaces", () => {
@@ -150,9 +150,9 @@ test("App.tsx integrates all advanced e-commerce components and routes", () => {
   // Badges & WhatsApp
   assert.ok(appCode.includes("product-trust-stats-badges"));
   assert.ok(appCode.includes("subscription-expiry-card"));
-  assert.ok(appCode.includes("purchase-sharing-actions"));
-  assert.ok(appCode.includes("wa.me/?text="));
-  assert.ok(appCode.includes("copyRecoveryLink"));
+  assert.ok(!appCode.includes("purchase-sharing-actions"));
+  assert.ok(!appCode.includes("wa.me/?text="));
+  assert.ok(!appCode.includes("copyRecoveryLink"));
 
   // Payment Instruction Card (Merchant vs Personal detection & clear step instructions)
   assert.ok(appCode.includes("function PaymentInstructionCard("));
@@ -162,7 +162,7 @@ test("App.tsx integrates all advanced e-commerce components and routes", () => {
   assert.ok(appCode.includes("merchantAccount"));
   assert.ok(appCode.includes("personalAccount"));
   assert.ok(appCode.includes("seller-payment-method-row"));
-  assert.ok(appCode.includes("<PaymentInstructionCard order={order} session={session} />"));
+  assert.ok(appCode.includes("<PaymentInstructionCard order={order} session={session} remainingSeconds={remainingSeconds} />"));
 
   // Sponsored Ads & Monetization Management
   assert.ok(appCode.includes("AdminSponsoredAdsManager"));

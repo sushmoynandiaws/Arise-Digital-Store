@@ -4,10 +4,10 @@ import fs from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
 
-function client(fetch=async()=>({ok:true,json:async()=>({ok:true})})){
+function client(fetch=async()=>({ok:true,json:async()=>({ok:true})}), clock=Date){
   const exports={};
   const code=ts.transpileModule(fs.readFileSync("src/api.ts","utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-  vm.runInNewContext(code,{exports,fetch,Intl,Number});return exports;
+  vm.runInNewContext(code,{exports,fetch,Intl,Number,Date:clock});return exports;
 }
 test("prices retain currency and decimals; availability comes from all actual variants",()=>{
   const helpers=client();assert.match(helpers.money("1290.50"),/1,290\.50/);assert.match(helpers.money("0.01"),/0\.01/);
@@ -84,4 +84,13 @@ test("purchase headings distinguish verified access, preparation, review, expiry
 test("connection failures and unreadable responses explain how to check the result safely",async()=>{
   await assert.rejects(client(async()=>{throw new TypeError("Failed to fetch");}).api("/checkout/accept"),/refresh this page to check the result/);
   await assert.rejects(client(async()=>({ok:false,json:async()=>{throw new Error("invalid JSON");}})).api("/checkout/accept"),/check the result before trying again/);
+});
+
+test("payment expires exactly at its deadline without overriding verified or refunded states",()=>{
+  class Clock extends Date { static now() { return Date.parse("2026-10-26T12:00:00Z"); } }
+  const {purchaseMessage}=client(undefined,Clock);
+  const order={payment_status:"unpaid",delivery_status:"awaiting_payment",ready:false,payment:{expires_at:"2026-10-26T12:00:00Z"}};
+  assert.equal(purchaseMessage(order).title,"Payment request expired");
+  assert.equal(purchaseMessage({...order,payment_status:"paid",ready:true}).title,"Your order is ready");
+  assert.equal(purchaseMessage({...order,payment_status:"refunded"}).title,"Payment refunded");
 });
