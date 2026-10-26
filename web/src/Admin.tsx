@@ -713,6 +713,7 @@ function ModerationDialog({
         ? "Hide review"
         : "Hide listing"
     : "Restore";
+  const dismiss = () => ref.current?.close();
   useEffect(() => {
     ref.current?.showModal();
     ref.current?.querySelector("textarea")?.focus();
@@ -757,7 +758,7 @@ function ModerationDialog({
               },
             );
             saved();
-            close();
+            dismiss();
           } catch (e) {
             setError((e as Error).message);
             setBusy(false);
@@ -771,7 +772,7 @@ function ModerationDialog({
             className="icon-button"
             aria-label="Close moderation"
             disabled={busy}
-            onClick={close}
+            onClick={dismiss}
           >
             <X size={20} />
           </button>
@@ -805,7 +806,7 @@ function ModerationDialog({
             type="button"
             className="button secondary"
             disabled={busy}
-            onClick={close}
+            onClick={dismiss}
           >
             Cancel
           </button>
@@ -1615,7 +1616,6 @@ function Content() {
     return <State error={resource.error} retry={resource.reload} />;
   return (
     <ContentForm
-      key={resource.data.revision}
       document={resource.data}
       reload={resource.reload}
     />
@@ -1632,6 +1632,7 @@ function ContentForm({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [saved, setSaved] = useState(false);
+  useEffect(() => setSettings(document.content), [document.revision]);
   return (
     <form
       onSubmit={async (e) => {

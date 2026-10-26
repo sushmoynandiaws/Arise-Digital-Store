@@ -2398,7 +2398,7 @@ function ProductPage() {
     if (section) document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = previousOverflow; };
   }, [section, product?.id]);
-  useEffect(() => setQuantity(1), [product?.id, variant]);
+  useEffect(() => setQuantity(1), [product?.id]);
   useEffect(() => {
     if (!product || !catalog) return;
     const previousTitle = document.title;
@@ -2456,7 +2456,7 @@ function ProductPage() {
           <Art product={product} large />
           <section id="customer-reviews" tabIndex={-1} className="product-visual-reviews" aria-label="Customer reviews">
             <h2 className="product-reviews-heading">Customer reviews</h2>
-            <ProductReviews key={product.id} productId={product.id} />
+            {location.pathname === productPath(product, catalog) && <ProductReviews key={product.id} productId={product.id} />}
           </section>
         </div>
         <div className="product-summary">
@@ -2482,7 +2482,7 @@ function ProductPage() {
               Choose your option
               <select
                 value={variant}
-                onChange={(e) => setVariant(e.target.value)}
+                onChange={(e) => { setVariant(e.target.value); setQuantity(1); }}
               >
                 {product.variants.map((v) => (
                   <option key={v.id} value={v.id}>
