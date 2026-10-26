@@ -47,7 +47,7 @@ const routes = [
   ["delivery", "/purchases/sample-order"], ["payment", "/purchases/sample-pending"], ["seller-connect", "/seller"],
   ["seller-workspace", "/seller"], ["admin", "/admin"], ["help", "/how-it-works"], ["not-found", "/missing-page"],
   ["tracking", "/track"], ["shop-reviews", "/shops/studio-north/reviews"],
-  ["shop-policy", "/shops/studio-north/info/terms"], ["marketplace-policy", "/info/terms"],
+  ["shop-policy", "/shops/studio-north/info/terms"], ["shop-contact", "/shops/studio-north/info/contact"], ["marketplace-policy", "/info/terms"],
 ];
 
 test("glass rims respond to the real backdrop while text and popovers stay unfiltered", async ({ page }) => {
@@ -276,7 +276,7 @@ test("shop reviews retain seller navigation and category links never leave the s
   await categories.getByRole("link", { name: "Design", exact: true }).click();
   await expect(page).toHaveURL(/\/shops\/studio-north\?category=Design$/);
   await expect(page.locator(".product-card")).toHaveCount(1);
-  await expect(nav.getByRole("link", { name: "Contact seller", exact: true })).toHaveAttribute("href", "mailto:hello@example.test");
+  await expect(nav.getByRole("link", { name: "Contact seller", exact: true })).toHaveAttribute("href", "/shops/studio-north/info/contact");
 });
 
 test("mobile navigation exposes complete destinations without a clipped horizontal tab strip", async ({ page }) => {
