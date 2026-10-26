@@ -614,13 +614,18 @@ function SubNavBar() {
   const productsActive = shopBase
     ? pathname === shopBase || pathname.startsWith(`${shopBase}/products/`) || pathname.startsWith("/checkout/")
     : pathname.startsWith("/products");
-  const [menu, setMenu] = useState<"categories" | "help" | null>(null);
+  const shopsActive = !shopBase && (pathname === "/shops" || pathname.startsWith("/shops/"));
+  const [menu, setMenu] = useState<"categories" | "shop-types" | "help" | null>(null);
   const navigation = useRef<HTMLDivElement>(null);
   const categoriesButton = useRef<HTMLButtonElement>(null);
+  const shopTypesButton = useRef<HTMLButtonElement>(null);
   const helpButton = useRef<HTMLButtonElement>(null);
   const categories = [...new Set((catalog?.products || [])
     .filter(product => !shopBase || product.shop_id === shop?.id)
     .map(product => product.category))].filter(Boolean);
+  const shopKinds = [...new Set((catalog?.shops || [])
+    .map(s => s.kind || (s.commerce_mode === "digital" ? "Digital Products" : ""))
+    .filter((kind): kind is string => Boolean(kind)))].sort();
   useEffect(() => setMenu(null), [pathname, search]);
   useEffect(() => {
     if (!menu) return;
@@ -629,8 +634,11 @@ function SubNavBar() {
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      const prev = menu;
       setMenu(null);
-      (menu === "categories" ? categoriesButton : helpButton).current?.focus();
+      if (prev === "categories") categoriesButton.current?.focus();
+      else if (prev === "shop-types") shopTypesButton.current?.focus();
+      else helpButton.current?.focus();
     };
     document.addEventListener("mousedown", outside);
     document.addEventListener("keydown", escape);
@@ -663,7 +671,48 @@ function SubNavBar() {
             <NavLink to={`${shopBase}/reviews`} className="navigation-link">{lang === "bn" ? "রিভিউসমূহ" : "Reviews"}</NavLink>
             <NavLink to={`${shopBase}/info/about`} className="navigation-link">{lang === "bn" ? "শপ সম্পর্কে" : "About this shop"}</NavLink>
           </> : <>
-            <NavLink to="/shops" className="navigation-link"><Store size={16} />{lang === "bn" ? "শপসমূহ" : "Shops"}</NavLink>
+            <div className={`navigation-products navigation-shops${shopsActive ? " is-current" : ""}`}>
+              <Link to="/shops" aria-current={shopsActive ? "page" : undefined} className="navigation-link">
+                <Store size={16} />{lang === "bn" ? "শপসমূহ" : "Shops"}
+              </Link>
+              <button
+                ref={shopTypesButton}
+                type="button"
+                className="category-pill-btn nav-category-toggle"
+                aria-label={lang === "bn" ? "শপ ক্যাটাগরি ব্রাউজ" : "Browse shop categories"}
+                aria-expanded={menu === "shop-types"}
+                aria-controls="navigation-shop-types"
+                onClick={() => setMenu(menu === "shop-types" ? null : "shop-types")}
+              >
+                <ChevronDown size={15} className={menu === "shop-types" ? "chevron-rotated" : ""} />
+              </button>
+              {menu === "shop-types" && (
+                <div id="navigation-shop-types" className="category-dropdown-menu navigation-dropdown" aria-label={lang === "bn" ? "শপ ক্যাটাগরি ডিরেক্টরি" : "Shop categories"}>
+                  <div className="navigation-menu-scroll">
+                    <p className="navigation-menu-label">{lang === "bn" ? "শপ ক্যাটাগরি অনুযায়ী খুঁজুন" : "Browse by shop category"}</p>
+                    <Link to="/shops" className="category-dropdown-item" onClick={() => setMenu(null)}>
+                      {lang === "bn" ? "সকল শপ" : "All shops"}
+                      <ArrowRight size={14} />
+                    </Link>
+                    {shopKinds.map((kind) => (
+                      <Link
+                        key={kind}
+                        to={`/shops?type=${encodeURIComponent(kind)}`}
+                        className="category-dropdown-item"
+                        onClick={() => setMenu(null)}
+                      >
+                        {kind}
+                      </Link>
+                    ))}
+                    {!shopKinds.length && (
+                      <p className="navigation-menu-empty">
+                        {lang === "bn" ? "শপ যুক্ত হলে ক্যাটাগরি দেখা যাবে।" : "Categories appear as shops are registered."}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <NavLink to="/purchases" className="navigation-link"><ShoppingBag size={16} />{t("myPurchases")}</NavLink>
           </>}
         </div>
@@ -2229,19 +2278,32 @@ function Products({ shop }: { shop?: Shop }) {
 function Shops() {
   const { catalog, catalogError, reloadCatalog } = useMarket();
   const { lang } = useLang();
+  const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState("");
-  const [storeType, setStoreType] = useState("");
-  const shops = catalog?.shops.filter((s) =>
-    (!storeType || s.kind === storeType) && `${s.name} ${s.description} ${s.kind || ""}`.toLowerCase().includes(query.toLowerCase()),
-  );
+  const storeType = params.get("type") || params.get("store_type") || "";
+  const setStoreType = (val: string) => {
+    const next = new URLSearchParams(params);
+    if (val) {
+      next.set("type", val);
+    } else {
+      next.delete("type");
+      next.delete("store_type");
+    }
+    setParams(next);
+  };
+  const shopKinds = [...new Set((catalog?.shops || [])
+    .map(s => s.kind || (s.commerce_mode === "digital" ? "Digital Products" : ""))
+    .filter((kind): kind is string => Boolean(kind)))].sort();
+  const shops = catalog?.shops.filter((s) => {
+    const kind = s.kind || (s.commerce_mode === "digital" ? "Digital Products" : "");
+    const matchesType = !storeType || kind.toLowerCase() === storeType.toLowerCase() || s.kind?.toLowerCase() === storeType.toLowerCase();
+    const matchesQuery = `${s.name} ${s.description} ${s.kind || ""}`.toLowerCase().includes(query.toLowerCase());
+    return matchesType && matchesQuery;
+  });
   return (
     <main id="main" className="container listing-page">
       <div className="page-intro">
         <p className="eyebrow">{lang === "bn" ? "শপ ডিরেক্টরি" : "Shop directory"}</p>
-        <label className="field">Shop type<select value={storeType} onChange={e => setStoreType(e.target.value)}>
-          <option value="">All shop types</option>
-          {[...new Set((catalog?.shops || []).map(s => s.kind).filter((kind): kind is string => Boolean(kind)))].sort().map(kind => <option key={kind} value={kind}>{kind}</option>)}
-        </select></label>
         <h1>
           {lang === "bn" ? "স্বাধীন শপসমূহ" : "Independent shops"}
         </h1>
@@ -2261,6 +2323,31 @@ function Shops() {
           placeholder={lang === "bn" ? "শপের নাম বা বিবরণ দিয়ে খুঁজুন..." : "Search shop names or descriptions"}
         />
       </div>
+      {shopKinds.length > 0 && (
+        <div className="catalog-toolbar-row">
+          <div className="filter-chips" role="group" aria-label={lang === "bn" ? "শপ ক্যাটাগরি ফিল্টার" : "Shop category filter"}>
+            <button
+              type="button"
+              className={!storeType ? "chip selected" : "chip"}
+              aria-pressed={!storeType}
+              onClick={() => setStoreType("")}
+            >
+              {lang === "bn" ? "সকল শপ" : "All shops"}
+            </button>
+            {shopKinds.map((kind) => (
+              <button
+                type="button"
+                key={kind}
+                className={storeType.toLowerCase() === kind.toLowerCase() ? "chip selected" : "chip"}
+                aria-pressed={storeType.toLowerCase() === kind.toLowerCase()}
+                onClick={() => setStoreType(storeType.toLowerCase() === kind.toLowerCase() ? "" : kind)}
+              >
+                {kind}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <FeaturedShopSponsoredAd />
       {catalogError ? (
         <ErrorBox message={catalogError} retry={() => void reloadCatalog()} />
