@@ -816,7 +816,7 @@ function SubNavBar() {
 
 function Header() {
   const { session, refreshSession } = useMarket();
-  const { t, lang, toggleLang } = useLang();
+  const { t, lang, setLang, toggleLang } = useLang();
   const { wishlist } = useWishlist();
   const [showWishlist, setShowWishlist] = useState(false);
   const [headerSearch, setHeaderSearch] = useState("");
@@ -928,15 +928,26 @@ function Header() {
             {wishlist.length > 0 && <span className="wishlist-badge">{wishlist.length}</span>}
           </button>
 
-          <button
-            type="button"
-            className="lang-toggle-btn"
-            aria-label="Switch language / ভাষা পরিবর্তন"
-            title={lang === "bn" ? "Switch to English" : "বাংলা ভাষায় দেখুন"}
-            onClick={toggleLang}
-          >
-            {lang === "bn" ? "EN" : "বাং"}
-          </button>
+          <div className="lang-toggle-pill-group" role="group" aria-label="Language selection / ভাষা নির্বাচন">
+            <button
+              type="button"
+              className={`lang-pill-btn ${lang === "bn" ? "active" : ""}`}
+              onClick={() => setLang("bn")}
+              aria-pressed={lang === "bn"}
+              title="বাংলা ভাষা নির্বাচন করুন"
+            >
+              বাং
+            </button>
+            <button
+              type="button"
+              className={`lang-pill-btn ${lang === "en" ? "active" : ""}`}
+              onClick={() => setLang("en")}
+              aria-pressed={lang === "en"}
+              title="Select English"
+            >
+              EN
+            </button>
+          </div>
 
           <Link
             to="/purchases"
@@ -991,13 +1002,27 @@ function Header() {
             <Heart size={18} className={wishlist.length > 0 ? "fill-heart" : ""} />
             <span>{t("wishlist")} ({wishlist.length})</span>
           </button>
-          <button
-            type="button"
-            className="mobile-nav-action-btn"
-            onClick={toggleLang}
-          >
-            <span>{lang === "bn" ? "🌐 Switch to English" : "🌐 বাংলায় দেখুন"}</span>
-          </button>
+          <div className="mobile-lang-row">
+            <span className="mobile-lang-label">🌐 {lang === "bn" ? "ভাষা:" : "Language:"}</span>
+            <div className="lang-toggle-pill-group" role="group" aria-label="Mobile language switcher">
+              <button
+                type="button"
+                className={`lang-pill-btn ${lang === "bn" ? "active" : ""}`}
+                onClick={() => setLang("bn")}
+                aria-pressed={lang === "bn"}
+              >
+                বাংলা
+              </button>
+              <button
+                type="button"
+                className={`lang-pill-btn ${lang === "en" ? "active" : ""}`}
+                onClick={() => setLang("en")}
+                aria-pressed={lang === "en"}
+              >
+                EN
+              </button>
+            </div>
+          </div>
           {!shop && (
             <>
               <Link to="/seller">{t("openShop")}</Link>
@@ -1532,6 +1557,7 @@ function Art({
 }
 function ProductCard({ product }: { product: Product }) {
   const { catalog } = useMarket();
+  const { lang } = useLang();
   const { isWishlisted, toggleWishlist } = useWishlist();
   const wish = isWishlisted(product.id);
   const shop = catalog?.shops.find((s) => s.id === product.shop_id);
@@ -1577,19 +1603,19 @@ function ProductCard({ product }: { product: Product }) {
               product.delivery_mode === "automatic" ? (
                 <>
                   <Zap size={12} />
-                  Automatic delivery
+                  {lang === "bn" ? "অটো ডেলিভারি" : "Automatic delivery"}
                 </>
               ) : (
-                "Seller-prepared delivery"
+                lang === "bn" ? "ম্যানুয়াল ডেলিভারি" : "Seller-prepared delivery"
               )
             ) : (
-              "Sold out"
+              lang === "bn" ? "স্টক শেষ" : "Sold out"
             )}
           </span>
         </div>
         <div className="product-bottom">
           <span className="price">
-            {product.variants.length > 1 && <small>From </small>}
+            {product.variants.length > 1 && <small>{lang === "bn" ? "শুরু " : "From "}</small>}
             {money(minimumPrice(product))}
           </span>
         </div>
@@ -1812,6 +1838,7 @@ function SectionTitle({
 }
 function Home() {
   const { catalog, catalogError, reloadCatalog } = useMarket();
+  const { t, lang } = useLang();
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
   const categories = [
@@ -1823,12 +1850,16 @@ function Home() {
         <section className="hero container">
           <div className="hero-copy">
             <h1>
-              Digital products
-              <br />
-              from independent shops
+              {lang === "bn" ? (
+                <>স্বাধীন শপ থেকে<br />ডিজিটাল প্রোডাক্টস</>
+              ) : (
+                <>Digital products<br />from independent shops</>
+              )}
             </h1>
             <p className="hero-description">
-              Browse software, templates, design assets and courses. Check each seller’s product details and terms before ordering.
+              {lang === "bn"
+                ? "সফটওয়্যার, টেমপ্লেট, ডিজাইন অ্যাসেট এবং কোর্স ব্রাউজ করুন। ক্রয়ের আগে বিক্রেতার পণ্যের বিবরণ ও শর্তাবলী যাচাই করে নিন।"
+                : "Browse software, templates, design assets and courses. Check each seller’s product details and terms before ordering."}
             </p>
             <form
               className="hero-search"
@@ -1839,20 +1870,20 @@ function Home() {
             >
               <Search size={21} />
               <label className="sr-only" htmlFor="home-search">
-                Search digital products
+                {lang === "bn" ? "ডিজিটাল পণ্য খুঁজুন" : "Search digital products"}
               </label>
               <input
                 id="home-search"
-                placeholder="Search digital products"
+                placeholder={lang === "bn" ? "ডিজিটাল পণ্য খুঁজুন..." : "Search digital products"}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-              <button aria-label="Search products">
+              <button aria-label={lang === "bn" ? "প্রোডাক্ট খুঁজুন" : "Search products"}>
                 <ArrowRight size={22} />
               </button>
             </form>
             <div className="hero-popular">
-              <span>Try searching</span>
+              <span>{lang === "bn" ? "জনপ্রিয় সার্চ:" : "Try searching"}</span>
               {["Templates", "Courses", "Software"].map((term) => (
                 <Link key={term} to={`/products?q=${term}`}>
                   {term}
@@ -1861,21 +1892,21 @@ function Home() {
             </div>
           </div>
           <aside className="discovery-shelf" aria-labelledby="discovery-title">
-            <div className="discovery-heading"><span className="discovery-symbol"><ShoppingBag size={22} /></span><div><p>Product preview</p><h2 id="discovery-title">Explore the catalog</h2></div></div>
+            <div className="discovery-heading"><span className="discovery-symbol"><ShoppingBag size={22} /></span><div><p>{lang === "bn" ? "প্রোডাক্ট প্রিভিউ" : "Product preview"}</p><h2 id="discovery-title">{lang === "bn" ? "ক্যাটালগ এক্সপ্লোর করুন" : "Explore the catalog"}</h2></div></div>
             {catalog?.products.length ? <div className="discovery-picks">
               {catalog.products.slice(0, 3).map(product => <Link className="discovery-pick" key={product.id} to={productPath(product, catalog)}>
                 <span className="discovery-art"><CategoryIcon category={product.category} size={24} /></span>
-                <span><small>{product.category}</small><strong>{product.name}</strong><span>{product.variants.length > 1 ? "From " : ""}{money(minimumPrice(product))}</span></span>
+                <span><small>{product.category}</small><strong>{product.name}</strong><span>{product.variants.length > 1 ? (lang === "bn" ? "শুরু " : "From ") : ""}{money(minimumPrice(product))}</span></span>
               </Link>)}
-            </div> : catalog ? <p className="discovery-empty">No products are published yet.</p> : catalogError ? <p className="discovery-empty">Products could not be loaded. Use Try again in the product section below.</p> : <Loading />}
-            <Link className="discovery-footer" to="/products">Browse all products <ArrowRight size={18} /></Link>
+            </div> : catalog ? <p className="discovery-empty">{lang === "bn" ? "এখনও কোনো প্রোডাক্ট প্রকাশ করা হয়নি।" : "No products are published yet."}</p> : catalogError ? <p className="discovery-empty">{lang === "bn" ? "প্রোডাক্ট লোড করা যায়নি। নিচে পুনরায় চেষ্টা করুন।" : "Products could not be loaded. Use Try again in the product section below."}</p> : <Loading />}
+            <Link className="discovery-footer" to="/products">{lang === "bn" ? "সব প্রোডাক্ট দেখুন" : "Browse all products"} <ArrowRight size={18} /></Link>
           </aside>
         </section>
         <HomeHeroSponsoredAd />
         <section className="container section">
           <SectionTitle
-            title="Browse categories"
-            link="Browse all products"
+            title={lang === "bn" ? "ক্যাটাগরি ব্রাউজ করুন" : "Browse categories"}
+            link={lang === "bn" ? "সব প্রোডাক্ট দেখুন" : "Browse all products"}
             to="/products"
           />
           {categories.length > 0 ? (
@@ -1899,8 +1930,8 @@ function Home() {
         </section>
         <section className="container section products-section">
           <SectionTitle
-            title="Explore products"
-            link="View all products"
+            title={lang === "bn" ? "ফিচার্ড প্রোডাক্টসমূহ" : "Explore products"}
+            link={lang === "bn" ? "সব প্রোডাক্ট দেখুন" : "View all products"}
             to="/products"
           />
           {catalogError ? (
@@ -1931,8 +1962,8 @@ function Home() {
         </section>
         <section className="container section">
           <SectionTitle
-            title="Independent shops"
-            link="Browse all shops"
+            title={lang === "bn" ? "স্বাধীন শপসমূহ" : "Independent shops"}
+            link={lang === "bn" ? "সব শপ দেখুন" : "Browse all shops"}
             to="/shops"
           />
           <div className="shop-grid">
@@ -1950,17 +1981,23 @@ function Home() {
             </div>
             <div>
               <p className="eyebrow">
-                For independent sellers
+                {lang === "bn" ? "স্বাধীন সেলারদের জন্য" : "For independent sellers"}
               </p>
-              <h2>Sell your digital products</h2>
+              <h2>{lang === "bn" ? "আপনার ডিজিটাল পণ্য বিক্রি করুন" : "Sell your digital products"}</h2>
               <p>
-                Publish your AriseSell products on this marketplace.
-                <br />
-                Your products, payments, and stock stay in sync.
+                {lang === "bn" ? (
+                  "এই মার্কেটপ্লেসে আপনার AriseSell পণ্য প্রকাশ করুন। আপনার পণ্য, পেমেন্ট ও স্টক সবসময় সিঙ্ক থাকবে।"
+                ) : (
+                  <>
+                    Publish your AriseSell products on this marketplace.
+                    <br />
+                    Your products, payments, and stock stay in sync.
+                  </>
+                )}
               </p>
             </div>
             <Link to="/seller" className="button light">
-              Open your shop
+              {t("openShop")}
             </Link>
           </div>
         </section>
@@ -2006,10 +2043,12 @@ function Products({ shop }: { shop?: Shop }) {
     <Container id={shop ? undefined : "main"} className="container listing-page" aria-label={shop ? "Shop products" : undefined}>
       {!shop && (
         <div className="page-intro">
-          <p className="eyebrow">Explore the marketplace</p>
-          <h1>All products</h1>
+          <p className="eyebrow">{lang === "bn" ? "মার্কেটপ্লেস এক্সপ্লোর করুন" : "Explore the marketplace"}</p>
+          <h1>{lang === "bn" ? "সকল প্রোডাক্ট" : "All products"}</h1>
           <p>
-            Search products, filter by category, and compare prices from independent shops.
+            {lang === "bn"
+              ? "প্রোডাক্ট খুঁজুন, ক্যাটাগরি ফিল্টার করুন এবং স্বাধীন শপগুলোর দাম তুলনা করুন।"
+              : "Search products, filter by category, and compare prices from independent shops."}
           </p>
         </div>
       )}
@@ -2072,8 +2111,8 @@ function Products({ shop }: { shop?: Shop }) {
         </div>
       )}
       <p className="results-count" role="status">
-        {products.length} {products.length === 1 ? "product" : "products"}
-        {query && <> for “{query}”</>}
+        {products.length} {products.length === 1 ? (lang === "bn" ? "টি প্রোডাক্ট" : "product") : (lang === "bn" ? "টি প্রোডাক্ট" : "products")}
+        {query && <> {lang === "bn" ? `খোঁজা হচ্ছে: “${query}”` : `for “${query}”`}</>}
       </p>
       {catalogError ? (
         <ErrorBox message={catalogError} retry={() => void reloadCatalog()} />
@@ -2087,8 +2126,8 @@ function Products({ shop }: { shop?: Shop }) {
           ))}
         </div>
       ) : (
-        <Empty title="No products found">
-          <p>Try another search, choose a different category, or clear your filters.</p>
+        <Empty title={lang === "bn" ? "কোনো প্রোডাক্ট পাওয়া যায়নি" : "No products found"}>
+          <p>{lang === "bn" ? "অন্য কোনো সার্চ করুন, অন্য ক্যাটাগরি বেছে নিন অথবা ফিল্টার মুছুন।" : "Try another search, choose a different category, or clear your filters."}</p>
           <button
             className="button secondary"
             onClick={() => {
@@ -2096,7 +2135,7 @@ function Products({ shop }: { shop?: Shop }) {
               setInStock(false);
             }}
           >
-            Clear filters
+            {lang === "bn" ? "ফিল্টার মুছুন" : "Clear filters"}
           </button>
         </Empty>
       )}
@@ -2105,6 +2144,7 @@ function Products({ shop }: { shop?: Shop }) {
 }
 function Shops() {
   const { catalog, catalogError, reloadCatalog } = useMarket();
+  const { lang } = useLang();
   const [query, setQuery] = useState("");
   const shops = catalog?.shops.filter((s) =>
     `${s.name} ${s.description}`.toLowerCase().includes(query.toLowerCase()),
@@ -2112,24 +2152,24 @@ function Shops() {
   return (
     <main id="main" className="container listing-page">
       <div className="page-intro">
-        <p className="eyebrow">Shop directory</p>
+        <p className="eyebrow">{lang === "bn" ? "শপ ডিরেক্টরি" : "Shop directory"}</p>
         <h1>
-          Independent shops
+          {lang === "bn" ? "স্বাধীন শপসমূহ" : "Independent shops"}
         </h1>
         <p>
-          Browse independent shops and their digital products.
+          {lang === "bn" ? "স্বাধীন শপ এবং তাদের ডিজিটাল পণ্যগুলো ব্রাউজ করুন।" : "Browse independent shops and their digital products."}
         </p>
       </div>
       <div className="catalog-search standalone-search">
         <Search size={20} />
         <label className="sr-only" htmlFor="shop-search">
-          Search shops
+          {lang === "bn" ? "শপ খুঁজুন" : "Search shops"}
         </label>
         <input
           id="shop-search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search shop names or descriptions"
+          placeholder={lang === "bn" ? "শপের নাম বা বিবরণ দিয়ে খুঁজুন..." : "Search shop names or descriptions"}
         />
       </div>
       <FeaturedShopSponsoredAd />
@@ -2149,7 +2189,7 @@ function Shops() {
               <ShopCard shop={shop} heading="h2" />
               <p>{shop.description}</p>
               <Link className="text-link" to={`/shops/${shop.slug}`}>
-                Visit shop
+                {lang === "bn" ? "শপে যান" : "Visit shop"}
                 <ArrowRight size={16} />
               </Link>
             </div>
@@ -2586,7 +2626,7 @@ function ProductPage() {
           <div className="product-purchase-box">
             <div className="product-purchase-total" aria-live="polite" aria-atomic="true">
               <span>
-                Total price <small>For {quantity} {quantity === 1 ? "item" : "items"}</small>
+                {lang === "bn" ? "মোট মূল্য" : "Total price"} <small>{lang === "bn" ? `${quantity}টি আইটেম` : `For ${quantity} ${quantity === 1 ? "item" : "items"}`}</small>
                 {discountPct > 0 && (
                   <span className="volume-savings-badge">
                     {discountPct}% OFF
@@ -2616,12 +2656,12 @@ function ProductPage() {
                 discountPct > 0 ? `&coupon=VOLUME${discountPct}` : ""
               }`}
             >
-              Buy now
+              {lang === "bn" ? "এখনই কিনুন" : "Buy now"}
               <ArrowRight size={18} />
             </Link>
           ) : (
             <button className="button primary buy-now" disabled>
-              {!available ? (product.sales_enabled ? "Currently unavailable" : "Purchases paused") : "Check quantity"}
+              {!available ? (product.sales_enabled ? (lang === "bn" ? "বর্তমানে স্টক নেই" : "Currently unavailable") : (lang === "bn" ? "বিক্রি সাময়িকভাবে বন্ধ" : "Purchases paused")) : (lang === "bn" ? "পরিমাণ চেক করুন" : "Check quantity")}
             </button>
           )}
               <button
@@ -2636,9 +2676,9 @@ function ProductPage() {
             </div>
             {available && !canBuy && <p role="alert" className="product-quantity-error">Choose a whole quantity between 1 and {maximum}.</p>}
             <div className="product-policy-links">
-              <button type="button" onClick={() => selectSection("terms")}>Purchase terms</button>
-              <button type="button" onClick={() => selectSection("delivery")}>Delivery details</button>
-              <button type="button" onClick={() => selectSection("reviews")}>Reviews</button>
+              <button type="button" onClick={() => selectSection("terms")}>{lang === "bn" ? "ক্রয়ের শর্তাবলী" : "Purchase terms"}</button>
+              <button type="button" onClick={() => selectSection("delivery")}>{lang === "bn" ? "ডেলিভারি বিবরণ" : "Delivery details"}</button>
+              <button type="button" onClick={() => selectSection("reviews")}>{lang === "bn" ? "রিভিউসমূহ" : "Reviews"}</button>
             </div>
           </div>
         </div>
@@ -2646,7 +2686,7 @@ function ProductPage() {
       <dialog ref={infoDialog} className="product-info-dialog" aria-labelledby="product-info-title"
         onClose={closeSection} onClick={(event) => { if (event.target === event.currentTarget) closeSection(); }}>
         <div className="product-info-header">
-          <h2 id="product-info-title">{section === "overview" ? "Product description" : section === "delivery" ? "Delivery details" : section === "reviews" ? "Customer reviews" : "Purchase terms"}</h2>
+          <h2 id="product-info-title">{section === "overview" ? (lang === "bn" ? "পণ্যের বিবরণ" : "Product description") : section === "delivery" ? (lang === "bn" ? "ডেলিভারি বিবরণ" : "Delivery details") : section === "reviews" ? (lang === "bn" ? "গ্রাহক রিভিউ" : "Customer reviews") : (lang === "bn" ? "ক্রয়ের শর্তাবলী" : "Purchase terms")}</h2>
           <button type="button" className="icon-button" aria-label="Close product details" onClick={closeSection}><X size={20} /></button>
         </div>
         <div className="product-info-content">
@@ -2733,6 +2773,7 @@ function ProductPage() {
 function Checkout() {
   const { id } = useParams();
   const { catalog, session } = useMarket();
+  const { lang, t } = useLang();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const product = catalog?.products.find((p) => p.id === id);
@@ -2809,26 +2850,26 @@ function Checkout() {
     <main id="main" className="container checkout-page">
       <Link to={productPath(product, catalog!)} className="back-link">
         <ArrowLeft size={16} />
-        Back to product
+        {lang === "bn" ? "প্রোডাক্টে ফিরে যান" : "Back to product"}
       </Link>
       <div className="checkout-heading">
-        <p className="eyebrow">Checkout · {shop.name}</p>
-        <h1>{quote ? "Review your order" : "Checkout"}</h1>
+        <p className="eyebrow">{lang === "bn" ? "চেকআউট" : "Checkout"} · {shop.name}</p>
+        <h1>{quote ? (lang === "bn" ? "অর্ডারটি রিভিউ করুন" : "Review your order") : (lang === "bn" ? "চেকআউট" : "Checkout")}</h1>
         <p>
           {quote
-            ? "Review the current price and seller terms before creating your payment request."
-            : "Enter your details and choose a payment method."}
+            ? (lang === "bn" ? "পেমেন্ট রিকোয়েস্ট তৈরির আগে পণ্যের বর্তমান মূল্য এবং বিক্রেতার শর্তাবলী মিলিয়ে দেখুন।" : "Review the current price and seller terms before creating your payment request.")
+            : (lang === "bn" ? "আপনার যোগাযোগের তথ্য লিখুন এবং পেমেন্ট মাধ্যম নির্বাচন করুন।" : "Enter your details and choose a payment method.")}
         </p>
         <ol className="checkout-progress" aria-label="Checkout progress">
-          <li aria-current={!quote ? "step" : undefined}><span>{quote ? <Check size={14} /> : "1"}</span>Details & payment</li>
-          <li aria-current={quote ? "step" : undefined}><span>2</span>Review order</li>
+          <li aria-current={!quote ? "step" : undefined}><span>{quote ? <Check size={14} /> : "1"}</span>{lang === "bn" ? "তথ্য ও পেমেন্ট" : "Details & payment"}</li>
+          <li aria-current={quote ? "step" : undefined}><span>2</span>{lang === "bn" ? "অর্ডার রিভিউ" : "Review order"}</li>
         </ol>
       </div>
       <div className="checkout-grid">
         <form onSubmit={submit} className="panel checkout-form">
           <div className="step-heading">
             <span>{quote ? "02" : "01"}</span>
-            <h2>{quote ? "Order details" : "Contact details"}</h2>
+            <h2>{quote ? (lang === "bn" ? "অর্ডারের বিবরণ" : "Order details") : (lang === "bn" ? "যোগাযোগের তথ্য" : "Contact details")}</h2>
           </div>
           {!quote ? (
             <>
@@ -2842,10 +2883,10 @@ function Checkout() {
                 .map((field) => (
                   <label className="field" key={field}>
                     {field === "name"
-                      ? "Full name"
+                      ? (lang === "bn" ? "পূর্ণ নাম" : "Full name")
                       : field === "email"
-                        ? "Email address"
-                        : "Phone number"}
+                        ? (lang === "bn" ? "ইমেইল অ্যাড্রেস" : "Email address")
+                        : (lang === "bn" ? "ফোন নম্বর" : "Phone number")}
                     <input
                       required
                       name={field}
@@ -2941,8 +2982,8 @@ function Checkout() {
                 <small id="checkout-quantity-hint">{money(variant.price)} each · Up to {Math.min(variant.stock, 100)} per order</small>
               </label>
               <fieldset className="checkout-payment">
-                <legend>Payment method</legend>
-                <p className="form-hint muted">Choose how you’ll pay {shop.name}.</p>
+                <legend>{lang === "bn" ? "পেমেন্ট মাধ্যম" : "Payment method"}</legend>
+                <p className="form-hint muted">{lang === "bn" ? `কীভাবে ${shop.name}-কে পেমেন্ট করবেন তা নির্বাচন করুন।` : `Choose how you’ll pay ${shop.name}.`}</p>
                 <div className="payment-options">
                 {shop.payment_methods?.map((method) => (
                   <label
@@ -3036,7 +3077,7 @@ function Checkout() {
           )}
           {error && <ErrorBox message={error} />}
           <div className="checkout-payable" aria-live="polite" aria-atomic="true">
-            <span>{quote ? "Total to pay" : "Estimated total"}<small>BDT · {quote?.snapshot.quantity ?? quantity} item{(quote?.snapshot.quantity ?? quantity) === 1 ? "" : "s"}</small></span>
+            <span>{quote ? (lang === "bn" ? "মোট প্রদেয় টাকা" : "Total to pay") : (lang === "bn" ? "মোট আনুমানিক মূল্য" : "Estimated total")}<small>BDT · {quote?.snapshot.quantity ?? quantity} {lang === "bn" ? "টি আইটেম" : `item${(quote?.snapshot.quantity ?? quantity) === 1 ? "" : "s"}`}</small></span>
             <strong>{total !== null ? money(total) : "—"}</strong>
           </div>
           <button
@@ -3119,6 +3160,7 @@ function Checkout() {
 }
 function Purchases() {
   const { session, sessionError } = useMarket();
+  const { lang, t } = useLang();
   const [orders, setOrders] = useState<Purchase[] | null>(null),
     [error, setError] = useState("");
   const load = () => {
@@ -3133,9 +3175,9 @@ function Purchases() {
   return (
     <main id="main" className="container listing-page narrow-page">
       <div className="page-intro">
-        <h1>My purchases</h1>
+        <h1>{t("myPurchases")}</h1>
         <p>
-          Track payments, check delivery status, and access your digital items.
+          {lang === "bn" ? "পেমেন্ট ট্র্যাক করুন, ডেলিভারি স্ট্যাটাস চেক করুন এবং আপনার ডিজিটাল পণ্য অ্যাক্সেস করুন।" : "Track payments, check delivery status, and access your digital items."}
         </p>
       </div>
       {!session?.user && (
@@ -3175,7 +3217,7 @@ function Purchases() {
                 </span>
                 <h2>{order.name}</h2>
                 <span>
-                  {order.quantity} {order.quantity === 1 ? "item" : "items"} ·{" "}
+                  {order.quantity} {order.quantity === 1 ? (lang === "bn" ? "টি আইটেম" : "item") : (lang === "bn" ? "টি আইটেম" : "items")} ·{" "}
                   {money(order.total)}
                 </span>
               </div>
@@ -3184,10 +3226,10 @@ function Purchases() {
                   className={`pill ${order.payment_status === "paid" ? "positive" : ""}`}
                 >
                   {order.delivery_status === "cancelled"
-                    ? "Cancelled"
+                    ? (lang === "bn" ? "বাতিল" : "Cancelled")
                     : order.payment_status === "paid"
-                      ? deliveryLabel(order.delivery_status)
-                      : paymentLabel(order.payment_status)}
+                      ? deliveryLabel(order.delivery_status, lang)
+                      : paymentLabel(order.payment_status, lang)}
                 </span>
                 <span>
                   {new Date(order.created_at).toLocaleDateString("en-GB", {
@@ -3544,12 +3586,12 @@ function PurchasePage() {
   const remainingSeconds = Number.isFinite(paymentDeadline)
     ? Math.max(0, Math.ceil((paymentDeadline - now) / 1000))
     : null;
-  const message = purchaseMessage(order);
+  const message = purchaseMessage(order, lang);
   return (
     <main id="main" className="container purchase-page narrow-page">
       <Link to="/purchases" className="back-link">
         <ArrowLeft size={16} />
-        My purchases
+        {lang === "bn" ? "আমার অর্ডারসমূহ" : "My purchases"}
       </Link>
       <div className="purchase-page-heading">
         <span className={`purchase-hero-icon ${paid && !cancelled ? "positive" : ""}`}>
@@ -3567,55 +3609,55 @@ function PurchasePage() {
             <span className="muted">{order.shop.name}</span>
             <h2>{order.name}</h2>
             <p>
-              {order.quantity} {order.quantity === 1 ? "item" : "items"}
-              {order.coupon_code && <span className="order-coupon-pill"> · Coupon {order.coupon_code}</span>}
+              {order.quantity} {order.quantity === 1 ? (lang === "bn" ? "টি আইটেম" : "item") : (lang === "bn" ? "টি আইটেম" : "items")}
+              {order.coupon_code && <span className="order-coupon-pill"> · {lang === "bn" ? `কুপন ${order.coupon_code}` : `Coupon ${order.coupon_code}`}</span>}
             </p>
           </div>
           <div className="purchase-pricing-col">
             <strong className="price">{money(order.total)}</strong>
             {order.discount && Number(order.discount) > 0 && (
-              <span className="purchase-discount-tag">Discount: -{money(order.discount)}</span>
+              <span className="purchase-discount-tag">{lang === "bn" ? "ছাড়: -" : "Discount: -"}{money(order.discount)}</span>
             )}
           </div>
         </div>
         <div className="order-status-grid">
           <div>
-            <span>Payment</span>
-            <strong>{paymentLabel(order.payment_status)}</strong>
+            <span>{lang === "bn" ? "পেমেন্ট" : "Payment"}</span>
+            <strong>{paymentLabel(order.payment_status, lang)}</strong>
           </div>
           <div>
-            <span>Delivery</span>
-            <strong>{deliveryLabel(order.delivery_status)}</strong>
+            <span>{lang === "bn" ? "ডেলিভারি" : "Delivery"}</span>
+            <strong>{deliveryLabel(order.delivery_status, lang)}</strong>
           </div>
         </div>
         {(order.buyer_name || order.buyer_email || order.buyer_phone || order.buyer_fields?.note) && (
           <div className="purchase-buyer-info">
             <span className="buyer-details-label">
-              Customer details
+              {lang === "bn" ? "ক্রেতার তথ্য" : "Customer details"}
             </span>
             <div className="buyer-summary-grid">
               {order.buyer_name && (
                 <div>
-                  <span className="muted">Name: </span>
+                  <span className="muted">{lang === "bn" ? "নাম: " : "Name: "}</span>
                   <strong>{order.buyer_name}</strong>
                 </div>
               )}
               {order.buyer_email && (
                 <div>
-                  <span className="muted">Email: </span>
+                  <span className="muted">{lang === "bn" ? "ইমেইল: " : "Email: "}</span>
                   <strong>{order.buyer_email}</strong>
                 </div>
               )}
               {order.buyer_phone && (
                 <div>
-                  <span className="muted">Phone: </span>
+                  <span className="muted">{lang === "bn" ? "ফোন: " : "Phone: "}</span>
                   <strong>{order.buyer_phone}</strong>
                 </div>
               )}
             </div>
             {order.buyer_fields?.note && (
               <p className="preserve-lines buyer-note">
-                <span className="muted">Note / details: </span>
+                <span className="muted">{lang === "bn" ? "নোট / বিবরণ: " : "Note / details: "}</span>
                 <strong>{String(order.buyer_fields.note)}</strong>
               </p>
             )}
@@ -3644,7 +3686,7 @@ function PurchasePage() {
               }}
             >
               <label className="field">
-                Transaction ID
+                {lang === "bn" ? "ট্রানজাকশন আইডি (TrxID)" : "Transaction ID"}
                 <input
                   required
                   minLength={4}
@@ -3654,11 +3696,11 @@ function PurchasePage() {
                   spellCheck={false}
                   value={trx}
                   onChange={(e) => setTrx(e.target.value)}
-                  placeholder="Enter the TrxID from your payment receipt"
+                  placeholder={lang === "bn" ? "পেমেন্ট রসিদ থেকে প্রাপ্ত TrxID লিখুন" : "Enter the TrxID from your payment receipt"}
                 />
               </label>
               <button className="button primary" disabled={busy}>
-                {busy ? "Checking…" : "Check payment"}
+                {busy ? (lang === "bn" ? "যাচাই করা হচ্ছে…" : "Checking…") : (lang === "bn" ? "পেমেন্ট চেক করুন" : "Check payment")}
                 <ArrowRight size={17} />
               </button>
             </form>
@@ -3672,12 +3714,12 @@ function PurchasePage() {
         )}
         {paymentOpen && (expired || cancelled) && (
           <div className="notice">
-            <p>This payment request is no longer active. Do not send payment using these details.</p>
+            <p>{lang === "bn" ? "এই পেমেন্ট রিকোয়েস্টটির মেয়াদ শেষ হয়েছে। অনুগ্রহ করে এই নম্বরে টাকা পাঠাবেন না।" : "This payment request is no longer active. Do not send payment using these details."}</p>
             <button
               className="button secondary"
               onClick={() => navigate("/products")}
             >
-              Browse products
+              {lang === "bn" ? "প্রোডাক্ট ব্রাউজ করুন" : "Browse products"}
               <ArrowRight size={16} />
             </button>
           </div>
@@ -3686,9 +3728,9 @@ function PurchasePage() {
           <div className="private-delivery">
             <div>
               <LockKeyhole size={24} />
-              <h3>Your digital items</h3>
+              <h3>{lang === "bn" ? "আপনার ডিজিটাল পণ্য" : "Your digital items"}</h3>
               <p>
-                Keep your passwords, license keys and access details private.
+                {lang === "bn" ? "আপনার পাসওয়ার্ড, লাইসেন্স কী ও এক্সেস তথ্য সবসময় গোপন ও নিরাপদ রাখুন।" : "Keep your passwords, license keys and access details private."}
               </p>
             </div>
             {items ? (
@@ -3698,7 +3740,7 @@ function PurchasePage() {
                   return (
                     <div key={item.item} className="private-item">
                       <div className="private-item-header">
-                        <strong>Item {item.item}</strong>
+                        <strong>{lang === "bn" ? `আইটেম ${item.item}` : `Item ${item.item}`}</strong>
                         <CopyButton value={item.content} />
                       </div>
                       {downloadLinks.length > 0 && (
@@ -3724,7 +3766,7 @@ function PurchasePage() {
                   );
                 })}
                 <button className="button ghost" onClick={() => setItems(null)}>
-                  Hide my items
+                  {lang === "bn" ? "তথ্য লুকান" : "Hide my items"}
                 </button>
               </div>
             ) : (
@@ -3747,7 +3789,7 @@ function PurchasePage() {
                   }
                 }}
               >
-                {busy ? "Opening…" : "View my items"}
+                {busy ? (lang === "bn" ? "খোলা হচ্ছে…" : "Opening…") : (lang === "bn" ? "আমার আইটেম দেখুন" : "View my items")}
                 <LockKeyhole size={16} />
               </button>
             )}
@@ -3788,14 +3830,14 @@ function PurchasePage() {
         )}
       {(order.can_review || order.review) && <PurchaseReview key={order.id} order={order} />}
       <div className="purchase-support">
-        <span>Need help with this order?</span>
+        <span>{lang === "bn" ? "এই অর্ডার সংক্রান্ত সহায়তার প্রয়োজন?" : "Need help with this order?"}</span>
         {order.shop.support ? (
           <a className="text-link" href={supportHref(order.shop.support)}>
-            Contact {order.shop.name}
+            {lang === "bn" ? `${order.shop.name}-এর সাথে যোগাযোগ করুন` : `Contact ${order.shop.name}`}
           </a>
         ) : (
           <Link className="text-link" to={`/shops/${order.shop.slug}`}>
-            Visit seller’s shop
+            {lang === "bn" ? "বিক্রেতার শপে যান" : "Visit seller’s shop"}
             <ArrowRight size={16} />
           </Link>
         )}

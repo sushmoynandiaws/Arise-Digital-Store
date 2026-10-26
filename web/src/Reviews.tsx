@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Star, CheckCircle2, ExternalLink } from "./icons";
 import { api } from "./api";
+import { useLang } from "./i18n";
 import { productPath } from "./product";
 import type { Catalog, Product, ProductReview, ProductReviewsPage, Purchase, Shop } from "./types";
 
@@ -11,15 +12,17 @@ function Stars({ rating }: { rating: number }) {
   </span>;
 }
 function ReviewCard({ review }: { review: ProductReview }) {
+  const { lang } = useLang();
   return <article className="review-card">
     <div className="review-card-top"><Stars rating={review.rating} /><time dateTime={new Date(review.created_at * 1000).toISOString()}>
-      {new Date(review.created_at * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+      {new Date(review.created_at * 1000).toLocaleDateString(lang === "bn" ? "bn-BD" : "en-GB", { day: "numeric", month: "short", year: "numeric" })}
     </time></div>
     <p className="preserve-lines">{review.comment}</p>
-    <div className="review-author"><strong>{review.display_name}</strong><span>Verified purchase</span></div>
+    <div className="review-author"><strong>{review.display_name}</strong><span>{lang === "bn" ? "ভেরিফাইড বায়ার" : "Verified purchase"}</span></div>
   </article>;
 }
 export function ProductReviews({ productId }: { productId: string }) {
+  const { lang } = useLang();
   const [data, setData] = useState<ProductReviewsPage | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -42,17 +45,18 @@ export function ProductReviews({ productId }: { productId: string }) {
     {!data && !error && <p role="status">Loading reviews…</p>}
     {data && <>
       <div className="review-summary">
-        {data.count > 0 && data.average !== null ? <><strong>{data.average.toFixed(1)}<small> / 5</small></strong><span>{data.count} {data.count === 1 ? "review" : "reviews"}<small>From verified purchases</small></span></> : <p>No reviews yet.</p>}
+        {data.count > 0 && data.average !== null ? <><strong>{data.average.toFixed(1)}<small> / 5</small></strong><span>{data.count} {data.count === 1 ? (lang === "bn" ? "টি রিভিউ" : "review") : (lang === "bn" ? "টি রিভিউ" : "reviews")}<small>{lang === "bn" ? "ভেরিফাইড বায়ারদের রিভিউ" : "From verified purchases"}</small></span></> : <p>{lang === "bn" ? "এখনও কোনো রিভিউ নেই।" : "No reviews yet."}</p>}
       </div>
       {data.reviews.length > 0 && <div className="review-list" role="region" aria-label="Customer review list" tabIndex={0}>
         {data.reviews.map(review => <ReviewCard key={review.id} review={review} />)}
       </div>}
-      {data.has_more && !error && <button type="button" className="button secondary full-width" disabled={busy} onClick={() => void load()}>{busy ? "Loading…" : "Load more reviews"}</button>}
-      <p className="review-guidance">After payment verification and delivery, you can leave or edit a review in <Link to="/purchases">My purchases</Link>.</p>
+      {data.has_more && !error && <button type="button" className="button secondary full-width" disabled={busy} onClick={() => void load()}>{busy ? (lang === "bn" ? "লোড হচ্ছে…" : "Loading…") : (lang === "bn" ? "আরো রিভিউ দেখুন" : "Load more reviews")}</button>}
+      <p className="review-guidance">{lang === "bn" ? <>পেমেন্ট যাচাই ও ডেলিভারির পর আপনি <Link to="/purchases">আমার অর্ডারসমূহ</Link> পেজে রিভিউ দিতে বা পরিবর্তন করতে পারবেন।</> : <>After payment verification and delivery, you can leave or edit a review in <Link to="/purchases">My purchases</Link>.</>}</p>
     </>}
   </div>;
 }
 export function PurchaseReview({ order }: { order: Purchase }) {
+  const { lang } = useLang();
   const [review, setReview] = useState(order.review ?? null);
   const [editing, setEditing] = useState(!order.review);
   const [rating, setRating] = useState(order.review?.rating ?? 5);
@@ -61,8 +65,8 @@ export function PurchaseReview({ order }: { order: Purchase }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return <section className="panel purchase-review" aria-labelledby="purchase-review-title">
-    <h2 id="purchase-review-title">{review ? "Your review" : "How was your purchase?"}</h2>
-    {review && !editing ? <><ReviewCard review={review} />{order.can_review && <button type="button" className="button secondary small" onClick={() => setEditing(true)}>Edit your review</button>}</> : <form onSubmit={async event => {
+    <h2 id="purchase-review-title">{review ? (lang === "bn" ? "আপনার রিভিউ" : "Your review") : (lang === "bn" ? "আপনার ক্রয়ের অভিজ্ঞতা কেমন ছিল?" : "How was your purchase?")}</h2>
+    {review && !editing ? <><ReviewCard review={review} />{order.can_review && <button type="button" className="button secondary small" onClick={() => setEditing(true)}>{lang === "bn" ? "রিভিউ পরিবর্তন করুন" : "Edit your review"}</button>}</> : <form onSubmit={async event => {
       event.preventDefault(); if (busy) return;
       setBusy(true); setError("");
       try {
@@ -71,15 +75,15 @@ export function PurchaseReview({ order }: { order: Purchase }) {
       } catch (error) { setError((error as Error).message); }
       finally { setBusy(false); }
     }}>
-      <fieldset className="review-rating-input"><legend>Your rating</legend>
+      <fieldset className="review-rating-input"><legend>{lang === "bn" ? "আপনার রেটিং" : "Your rating"}</legend>
         {[1, 2, 3, 4, 5].map(value => <label key={value}><input type="radio" name="rating" value={value} checked={rating === value} onChange={() => setRating(value)} required /><Star size={25} fill={value <= rating ? "currentColor" : "none"} aria-hidden="true" /><span className="sr-only">{value} {value === 1 ? "star" : "stars"}</span></label>)}
       </fieldset>
-      <label className="field">Your public name<input required minLength={2} maxLength={60} value={name} onChange={event => setName(event.target.value)} /></label>
-      <label className="field">Your review<textarea required minLength={10} maxLength={2000} rows={4} value={comment} onChange={event => setComment(event.target.value)} placeholder="Tell others about the product and your experience." /></label>
+      <label className="field">{lang === "bn" ? "আপনার নাম (পাবলিক)" : "Your public name"}<input required minLength={2} maxLength={60} value={name} onChange={event => setName(event.target.value)} /></label>
+      <label className="field">{lang === "bn" ? "আপনার রিভিউ" : "Your review"}<textarea required minLength={10} maxLength={2000} rows={4} value={comment} onChange={event => setComment(event.target.value)} placeholder={lang === "bn" ? "প্রোডাক্ট এবং আপনার অভিজ্ঞতা কেমন ছিল তা লিখুন..." : "Tell others about the product and your experience."} /></label>
       <p className="review-guidance">Your public name, rating, review and review date appear on the product page. Keep passwords, license keys and payment details private.</p>
       {error && <p role="alert" className="notice error">{error}</p>}
-      <button className="button primary" disabled={busy || !order.can_review}>{busy ? "Saving review…" : review ? "Update review" : "Publish review"}</button>
-      {review && <button type="button" className="button ghost" onClick={() => setEditing(false)}>Cancel</button>}
+      <button className="button primary" disabled={busy || !order.can_review}>{busy ? (lang === "bn" ? "সংরক্ষণ করা হচ্ছে…" : "Saving review…") : review ? (lang === "bn" ? "রিভিউ আপডেট করুন" : "Update review") : (lang === "bn" ? "রিভিউ প্রকাশ করুন" : "Publish review")}</button>
+      {review && <button type="button" className="button ghost" onClick={() => setEditing(false)}>{lang === "bn" ? "বাতিল" : "Cancel"}</button>}
     </form>}
   </section>;
 }

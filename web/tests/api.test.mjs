@@ -94,3 +94,22 @@ test("payment expires exactly at its deadline without overriding verified or ref
   assert.equal(purchaseMessage({...order,payment_status:"paid",ready:true}).title,"Your order is ready");
   assert.equal(purchaseMessage({...order,payment_status:"refunded"}).title,"Payment refunded");
 });
+
+test("bilingual payment status and purchase headings render correctly in Bangla and English", () => {
+  const { paymentLabel, deliveryLabel, purchaseMessage } = client();
+  assert.equal(paymentLabel("paid", "bn"), "পেমেন্ট সম্পন্ন");
+  assert.equal(paymentLabel("unpaid", "bn"), "পেমেন্টের অপেক্ষায়");
+  assert.equal(paymentLabel("pending_verification", "bn"), "পেমেন্ট যাচাই হচ্ছে");
+  assert.equal(deliveryLabel("delivered", "bn"), "ডেলিভারি সম্পন্ন");
+  assert.equal(deliveryLabel("awaiting_manual", "bn"), "সেলার অর্ডার প্রস্তুত করছেন");
+  assert.equal(deliveryLabel("sent", "bn"), "ব্যবহারের জন্য প্রস্তুত");
+
+  const order = { payment_status: "unpaid", delivery_status: "awaiting_payment", ready: false, payment: null };
+  const bnMsg = purchaseMessage(order, "bn");
+  assert.equal(bnMsg.title, "পেমেন্ট সম্পন্ন করুন");
+  assert.match(bnMsg.description, /নির্দেশনা অনুযায়ী পেমেন্ট করুন/);
+
+  const readyOrder = { ...order, payment_status: "paid", ready: true };
+  assert.equal(purchaseMessage(readyOrder, "bn").title, "আপনার অর্ডার প্রস্তুত");
+  assert.equal(purchaseMessage(readyOrder, "en").title, "Your order is ready");
+});
