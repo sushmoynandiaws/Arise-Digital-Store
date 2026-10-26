@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("arise_lang", "en"));
+});
+
 test("product options, quantity and total stay consistent through checkout", async ({ page }) => {
   const product = {
     id: "product-test", shop_id: "shop-test", name: "Digital course", category: "Education",

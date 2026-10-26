@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("arise_lang", "en"));
+});
+
 test("checkout updates totals, rejects invalid quantities and uses the seller quote at review", async ({ page }) => {
   const product = {
     id: "checkout-test", shop_id: "shop-test", name: "Digital course", category: "Education",

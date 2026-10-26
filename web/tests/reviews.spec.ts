@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("arise_lang", "en"));
+});
+
 const product = { id: "product-test", shop_id: "shop-test", name: "Digital course", category: "Education", description: "Course materials", image_url: "", currency: "BDT", delivery_mode: "automatic", delivery_note: "Private delivery", purchase_terms: "Seller terms", required_buyer_fields: [], sales_enabled: true, variants: [{ id: "variant-test", name: "Standard", price: "10.00", stock: 9 }] };
 const shop = { id: "shop-test", slug: "test-shop", name: "Test shop", support: "", payment_methods: ["bkash"] };
 

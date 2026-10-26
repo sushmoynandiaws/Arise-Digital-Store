@@ -114,7 +114,7 @@ test("customer pages support direct links, refresh, responsive layouts and bilin
   await page.locator("footer").getByRole("link", { name: "Contact us", exact: true }).click();
   await expect(main.getByRole("link", { name: "Contact support" })).toHaveAttribute("href", "mailto:help@example.test");
   await expect(main).toContainText("Dhaka");
-  await page.getByRole("button", { name: /Switch language/ }).click();
+  await page.getByRole("group", { name: "Language selection / ভাষা নির্বাচন", exact: true }).getByRole("button", { name: "বাং", exact: true }).click();
   await page.locator("footer").getByRole("link", { name: "গোপনীয়তা নীতি", exact: true }).click();
   await expect(main.getByRole("heading", { name: "গোপনীয়তা নীতি", level: 1 })).toBeVisible();
   await expect(main).toContainText(shop.pages.privacy);

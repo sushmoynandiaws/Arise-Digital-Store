@@ -22,6 +22,7 @@ const catalog: Catalog = { shops: [shop, otherShop], products, synced_at: "2026-
 const readyOrder: Purchase = { id: "sample-order", ref: "SAMPLE-001", shop, name: products[0].name, product_id: products[0].id, quantity: 1, total: "490.00", currency: "BDT", payment_status: "paid", delivery_status: "delivered", delivery_mode: "automatic", delivery_estimate: "", created_at: "2026-10-25T10:00:00Z", ready: true, payment: null, buyer_name: "Sample Buyer", buyer_email: "buyer@example.test", can_review: true };
 
 async function preview(page: Page, options: { signedIn?: boolean; admin?: boolean; empty?: boolean; failure?: boolean } = {}) {
+  await page.addInitScript(() => localStorage.setItem("arise_lang", "en"));
   await page.route("https://example.test/**", route => route.fulfill({ status: 200, contentType: "text/html", body: "" }));
   await page.route("**/api/**", async route => {
     if (new URL(route.request().url()).pathname === "/api/promotions") return route.fulfill({ json: { ads: [], settings: {} } });
