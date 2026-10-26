@@ -4,10 +4,10 @@ import path from "node:path";
 const env=Object.fromEntries(fs.readFileSync(path.resolve("../.env"),"utf8").trim().split(/\r?\n/).map(line=>{const i=line.indexOf("=");return [line.slice(0,i),line.slice(i+1)];}));
 
 test("storefront search, category filters, shop navigation and mobile reflow",async({page})=>{
-  await page.goto("/");await expect(page.getByRole("heading",{name:/Digital products/})).toBeVisible();
+  await page.goto("/");await expect(page.getByRole("heading",{name:/Products/})).toBeVisible();
   await expect(page.locator(".product-card")).toHaveCount(8);
   await page.screenshot({path:"../artifacts/home-desktop.png",fullPage:true});
-  await page.getByLabel("Search digital products").fill("Rust");await page.getByRole("button",{name:"Search products",exact:true}).click();
+  await page.getByLabel("Search products").fill("Rust");await page.getByRole("button",{name:"Search products",exact:true}).click();
   await expect(page.getByRole("link",{name:"Practical Rust Essentials",exact:true})).toBeVisible();await expect(page.locator(".product-card")).toHaveCount(1);
   await page.getByRole("button",{name:"Clear search"}).click();await page.getByRole("button",{name:"Templates",exact:true}).click();
   await expect(page.locator(".product-card")).toHaveCount(2);

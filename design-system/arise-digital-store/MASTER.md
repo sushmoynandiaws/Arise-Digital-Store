@@ -1,4 +1,4 @@
-# Design System Master File — Arise Digital Store
+# Design System Master File — Arise Store
 
 > **LOGIC:** When building a specific page, first check `design-system/pages/[page-name].md`.
 > If that file exists, its rules **override** this Master file.
@@ -6,9 +6,9 @@
 
 ---
 
-**Project:** Arise Digital Store
-**Version:** 3.0 (Commercial Digital Goods & Subscription Marketplace — Subscriptions BD Inspired)
-**Category:** Independent Digital Goods, Tools & AI Subscriptions Marketplace (Bangladesh)
+**Project:** Arise Store
+**Version:** 3.0 (Independent Shops Marketplace)
+**Category:** AriseSell Storefront Marketplace (Bangladesh)
 
 ---
 

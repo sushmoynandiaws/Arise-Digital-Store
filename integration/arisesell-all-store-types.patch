@@ -1,0 +1,703 @@
+diff --git a/backend/app/api/v1/marketplace.py b/backend/app/api/v1/marketplace.py
+index d4ce2266..b3fc2296 100644
+--- a/backend/app/api/v1/marketplace.py
++++ b/backend/app/api/v1/marketplace.py
+@@ -29,13 +29,14 @@ from app.models.product import Product
+ from app.models.tenant import Business
+ from app.models.user import User
+ from app.schemas.digital import AcceptRequest, PaymentProofRequest, QuoteRequest
+-from app.services import digital_checkout as checkout
++from app.services import digital_checkout as checkout, marketplace_checkout as physical
++from app.services.order_numbering import lock_numbering as lock_business
+ from app.services.ai_quota_service import is_store_owner
+-from app.services.digital_inventory import active_store, config_for, decrypt_stock, event, fingerprint, lock_business, receiving_accounts, utc, utcnow
++from app.services.digital_inventory import active_store, config_for, decrypt_stock, event, fingerprint, receiving_accounts, utc, utcnow
+ from app.services.session_service import require_active_session
+ from app.services.product_images import display_image_url
+ 
+-router = APIRouter(prefix="/marketplace", tags=["Arise Digital Store"])
++router = APIRouter(prefix="/marketplace", tags=["Arise Store"])
+ 
+ 
+ def configured():
+@@ -45,7 +46,7 @@ def configured():
+     if (len(settings.MARKETPLACE_BRIDGE_KEY) < 32 or not parsed.netloc or parsed.username or parsed.password
+             or parsed.query or parsed.fragment or parsed.path != "/api/auth/callback"
+             or not (parsed.scheme == "https" or parsed.scheme == "http" and local)):
+-        raise HTTPException(503, "Arise Digital Store integration is not configured")
++        raise HTTPException(503, "Arise Store integration is not configured")
+ 
+ 
+ def bridge(request: Request, response: Response):
+@@ -107,6 +108,10 @@ class BuyerFields(Input):
+     email: str = Field(default="", max_length=255)
+     phone: str = Field(default="", max_length=32)
+     note: str = Field(default="", max_length=500)
++    address: str = Field(default="", max_length=4000)
++    district: str = Field(default="", max_length=128)
++    landmark: str = Field(default="", max_length=255)
++    alt_phone: str = Field(default="", max_length=32)
+ 
+     @field_validator("email")
+     @classmethod
+@@ -115,6 +120,7 @@ class BuyerFields(Input):
+ 
+ 
+ class MarketQuote(QuoteRequest):
++    provider: str = Field(pattern=r"^(bkash|nagad|rocket|cod)$")
+     shop_id: uuid.UUID
+     buyer: BuyerFields
+ 
+@@ -129,6 +135,7 @@ class TrackOtpVerify(Input):
+ 
+ 
+ class MarketAccept(AcceptRequest):
++    provider: str = Field(pattern=r"^(bkash|nagad|rocket|cod)$")
+     shop_id: uuid.UUID
+     product_id: uuid.UUID
+     draft_id: uuid.UUID
+@@ -190,8 +197,8 @@ async def optional_user(request: Request, db=Depends(get_db)):
+ 
+ async def owned_store(db, user, shop_id):
+     business = await db.get(Business, shop_id)
+-    if not business or business.commerce_mode != "digital" or not is_store_owner(user, business):
+-        raise HTTPException(404, "Digital store not found")
++    if not business or not is_store_owner(user, business):
++        raise HTTPException(404, "Store not found")
+     return business
+ 
+ 
+@@ -244,6 +251,10 @@ def shop_json(business):
+ 
+     return {
+         "id": str(business.id),
++        "kind": business.kind,
++        "commerce_mode": business.commerce_mode,
++        "currency": business.currency,
++        "payment_account_types": {provider: "personal" for provider in receiving_accounts(business)},
+         "slug": business.slug,
+         "name": listing.get("name") or business.name,
+         "description": listing.get("description") or "",
+@@ -261,11 +272,28 @@ async def products_json(db, business, *, published=False):
+     listing = (business.settings_data or {}).get("marketplace_listing") or {}
+     selected = set(listing.get("product_ids") or [])
+     products = list(await db.scalars(select(Product).where(Product.business_id == business.id,
+-        Product.fulfilment_kind == "digital", Product.digital_archived.is_(False)).options(selectinload(Product.variants), selectinload(Product.images))))
++        Product.digital_archived.is_(False)).options(selectinload(Product.variants), selectinload(Product.images))))
++    physical_products = [p for p in products if p.fulfilment_kind == "physical"]
++    if physical_products:
++        from app.services.craft_knowledge import apply_knowledge
++        await apply_knowledge(db, business.id, physical_products)
+     available = dict((await db.execute(select(DigitalStockUnit.variant_id, func.count()).where(
+         DigitalStockUnit.business_id == business.id, DigitalStockUnit.state == "available").group_by(DigitalStockUnit.variant_id))).all())
+     result = []
+     for product in products:
++        if product.fulfilment_kind == "physical":
++            if published and str(product.id) not in selected:
++                continue
++            reason = physical.unavailable_reason(business, product)
++            result.append({"id": str(product.id), "shop_id": str(business.id), "name": product.name,
++                "category": product.category, "description": product.blurb or "", "image_url": display_image_url(product) or product.image_url,
++                "variants": [{"id": str(v.id), "name": v.label, "price": str(v.price), "stock": v.stock} for v in product.variants],
++                "currency": business.currency, "fulfilment_kind": "physical", "delivery_mode": "shipping",
++                "delivery_estimate": "", "delivery_note": "", "purchase_terms": "",
++                "required_buyer_fields": physical.buyer_fields(business), "payment_methods": physical.payment_methods(business),
++                "sales_enabled": True, "checkout_available": not reason, "checkout_unavailable_reason": reason,
++                "selected": str(product.id) in selected})
++            continue
+         config = config_for(product)
+         if published and (str(product.id) not in selected or not config.sales_enabled):
+             continue
+@@ -274,7 +302,9 @@ async def products_json(db, business, *, published=False):
+         img = display_image_url(product) or getattr(product, "image_url", "")
+         result.append({"id": str(product.id), "shop_id": str(business.id), "name": product.name,
+             "category": product.category, "description": product.blurb or "", "image_url": img,
+-            "variants": variants, "currency": "BDT", "delivery_mode": config.delivery_mode,
++            "variants": variants, "currency": "BDT", "fulfilment_kind": "digital", "delivery_mode": config.delivery_mode,
++            "payment_methods": list(receiving_accounts(business)),
++            "checkout_available": not physical.unavailable_reason(business, product), "checkout_unavailable_reason": physical.unavailable_reason(business, product),
+             "delivery_estimate": config.delivery_estimate, "delivery_note": config.delivery_note,
+             "purchase_terms": config.purchase_terms, "required_buyer_fields": config.required_buyer_fields,
+             "warranty_type": config.warranty_type, "warranty_days": config.warranty_days,
+@@ -286,7 +316,7 @@ async def products_json(db, business, *, published=False):
+ async def me(user=Depends(market_user), db=Depends(get_db)):
+     from app.api.v1.orders import _resolve_user_business_ids
+     ids = await _resolve_user_business_ids(user, db)
+-    businesses = list(await db.scalars(select(Business).where(Business.id.in_(ids), Business.commerce_mode == "digital"))) if ids else []
++    businesses = list(await db.scalars(select(Business).where(Business.id.in_(ids)))) if ids else []
+     return {"user": {"id": str(user.id), "name": f"{user.first_name} {user.last_name}".strip(),
+         "email": user.email, "admin": user.is_superadmin},
+         "shops": [shop_json(b) for b in businesses if is_store_owner(user, b)]}
+@@ -300,8 +330,7 @@ async def admin_marketplace_orders(user=Depends(market_user), db=Depends(get_db)
+     if not user.is_superadmin:
+         raise HTTPException(403, "Administrator access is required")
+     from sqlalchemy import case, or_
+-    scope = [Order.fulfilment_kind == "digital",
+-             Order.checkout_data["marketplace_buyer"].as_string().is_not(None)]
++    scope = [Order.checkout_data["marketplace_buyer"].as_string().is_not(None)]
+     if q.strip():
+         scope.append(or_(Order.ref.icontains(q.strip(), autoescape=True),
+                          Order.customer_name.icontains(q.strip(), autoescape=True)))
+@@ -318,12 +347,13 @@ async def admin_marketplace_orders(user=Depends(market_user), db=Depends(get_db)
+     result = []
+     for order in orders[:50]:
+         data = order.checkout_data or {}
+-        quote = data.get("digital_quote") or {}
++        quote = data.get("digital_quote") or data.get("marketplace_quote") or {}
+         result.append({"id": str(order.id), "ref": order.ref, "shop_id": str(order.business_id),
+                        "shop_name": businesses.get(order.business_id, ""), "name": quote.get("name", ""),
+                        "buyer_name": order.customer_name, "buyer_email": (data.get("buyer_fields") or {}).get("email", ""),
+                        "quantity": quote.get("quantity"), "total": quote.get("total"), "currency": order.currency,
+-                       "payment_status": order.payment_status, "delivery_status": order.digital_status,
++                       "fulfilment_kind": order.fulfilment_kind,
++                       "payment_status": order.payment_status, "delivery_status": order.digital_status if order.fulfilment_kind == "digital" else order.state,
+                        "created_at": utc(order.placed_at).isoformat()})
+     return {"orders": result, "has_more": len(orders) > 50,
+             "summary": {k: int(v or 0) for k, v in summary.items()}, "checked_at": utcnow().isoformat()}
+@@ -341,7 +371,7 @@ async def admin_marketplace_users(user=Depends(market_user), db=Depends(get_db))
+ async def seller_catalog(shop_id: uuid.UUID, user=Depends(market_user), db=Depends(get_db)):
+     business = await owned_store(db, user, shop_id)
+     return {"shop": shop_json(business), "products": await products_json(db, business),
+-        "payment_methods": list(receiving_accounts(business)), "active": active_store(business)}
++        "payment_methods": physical.payment_methods(business), "active": active_store(business)}
+ 
+ 
+ @router.put("/stores/{shop_id}/listing", dependencies=[Depends(bridge)])
+@@ -349,13 +379,13 @@ async def save_listing(shop_id: uuid.UUID, req: Listing, user=Depends(market_use
+     business = await owned_store(db, user, shop_id)
+     business = await lock_business(db, business.id)
+     if not is_store_owner(user, business):
+-        raise HTTPException(404, "Digital store not found")
++        raise HTTPException(404, "Store not found")
+     products = await products_json(db, business)
+     available = {p["id"] for p in products if not req.published or p["sales_enabled"]}
+     if len(set(req.product_ids)) != len(req.product_ids) or any(str(id) not in available for id in req.product_ids):
+-        raise HTTPException(409, "Select active digital products belonging to this store")
+-    if req.published and (not req.product_ids or not receiving_accounts(business) or not active_store(business)):
+-        raise HTTPException(409, "Choose at least one active product and connect a receiving payment account before publishing")
++        raise HTTPException(409, "Select active products belonging to this store")
++    if req.published and (not req.product_ids or not active_store(business)):
++        raise HTTPException(409, "Choose at least one active product before publishing")
+     business.settings_data = {**(business.settings_data or {}), "marketplace_listing": req.model_dump(mode="json")}
+     await db.commit()
+     return {"shop": shop_json(business), "synced_at": utcnow().isoformat()}
+@@ -363,12 +393,12 @@ async def save_listing(shop_id: uuid.UUID, req: Listing, user=Depends(market_use
+ 
+ @router.get("/feed", dependencies=[Depends(bridge)])
+ async def feed(db=Depends(get_db)):
+-    businesses = list(await db.scalars(select(Business).where(Business.commerce_mode == "digital")))
++    businesses = list(await db.scalars(select(Business)))
+     shops, products = [], []
+     for business in businesses:
+-        if not active_store(business) or not receiving_accounts(business) or not shop_json(business)["published"]:
++        if not active_store(business) or not shop_json(business)["published"]:
+             continue
+-        shops.append({**shop_json(business), "payment_methods": list(receiving_accounts(business))})
++        shops.append({**shop_json(business), "payment_methods": physical.payment_methods(business)})
+         products.extend(await products_json(db, business, published=True))
+     return {"shops": shops, "products": products, "synced_at": utcnow().isoformat()}
+ 
+@@ -395,7 +425,7 @@ async def context(db, business, identity, fields=None):
+     channel = await db.scalar(select(ConnectedChannel).where(ConnectedChannel.business_id == business.id,
+         ConnectedChannel.channel_type == "marketplace", ConnectedChannel.external_id == "arise-digital-store"))
+     if not channel:
+-        channel = ConnectedChannel(business_id=business.id, channel_type="marketplace", external_id="arise-digital-store", label="Arise Digital Store", is_live=True)
++        channel = ConnectedChannel(business_id=business.id, channel_type="marketplace", external_id="arise-digital-store", label="Arise Store", is_live=True)
+         db.add(channel)
+         await db.flush()
+     if not channel.is_live:
+@@ -415,9 +445,18 @@ async def create_quote(req: MarketQuote, request: Request, user=Depends(optional
+     identity = buyer_id(request)
+     business = await public_product(db, req.shop_id, req.product_id)
+     channel, conversation = await context(db, business, identity, req.buyer.model_dump())
+-    draft = await checkout.create_quote(db, business, channel, conversation, identity,
+-        QuoteRequest(**req.model_dump(include={"product_id", "variant_id", "quantity", "provider", "coupon_code"})))
+-    draft.data = {**draft.data, "buyer_fields": req.buyer.model_dump(), "marketplace_buyer": identity,
++    product = await db.get(Product, req.product_id)
++    if not product or product.business_id != business.id:
++        raise HTTPException(404, "Product not found")
++    if product.fulfilment_kind == "physical":
++        draft = await physical.create_quote(db, business, channel, conversation, identity, req)
++    else:
++        if req.provider not in receiving_accounts(business):
++            raise HTTPException(409, "Choose a source-supported payment method")
++        draft = await checkout.create_quote(db, business, channel, conversation, identity,
++            QuoteRequest(**req.model_dump(include={"product_id", "variant_id", "quantity", "provider", "coupon_code"})))
++    buyer_fields = req.buyer.model_dump(exclude={"address", "district", "landmark", "alt_phone"}) if product.fulfilment_kind == "digital" else req.buyer.model_dump()
++    draft.data = {**draft.data, "buyer_fields": buyer_fields, "marketplace_buyer": identity,
+         "marketplace_user_id": str(user.id) if user else None}
+     await db.commit()
+     return {"draft_id": str(draft.id), "quote_hash": draft.data["quote_hash"], "snapshot": draft.data["snapshot"]}
+@@ -428,14 +467,19 @@ async def accept_quote(req: MarketAccept, request: Request, user=Depends(optiona
+     identity = buyer_id(request)
+     business = await public_product(db, req.shop_id, req.product_id)
+     channel, conversation = await context(db, business, identity)
+-    draft = await db.get(CheckoutDraft, req.draft_id)
++    draft = await db.scalar(select(CheckoutDraft).where(CheckoutDraft.id == req.draft_id).with_for_update())
+     if not draft or (draft.data or {}).get("snapshot", {}).get("product_id") != str(req.product_id):
+         raise HTTPException(404, "Checkout not found")
+     started_by = (draft.data or {}).get("marketplace_user_id")
+     if started_by and (not user or str(user.id) != started_by):
+         raise HTTPException(409, "Sign in with the account that started this checkout")
+-    order = await checkout.accept_quote(db, business, channel, conversation, identity, req.draft_id,
+-        AcceptRequest(**req.model_dump(include={"quote_hash", "idempotency_key", "provider", "accepted"})), "marketplace:" + req.idempotency_key)
++    if (draft.data or {}).get("physical"):
++        order = await physical.accept_quote(db, business, channel, conversation, identity, draft, req)
++    else:
++        if req.provider not in receiving_accounts(business):
++            raise HTTPException(409, "Choose a source-supported payment method")
++        order = await checkout.accept_quote(db, business, channel, conversation, identity, req.draft_id,
++            AcceptRequest(**req.model_dump(include={"quote_hash", "idempotency_key", "provider", "accepted"})), "marketplace:" + req.idempotency_key)
+     order.checkout_data = {**order.checkout_data, "marketplace_buyer": identity,
+         "marketplace_user_id": (draft.data or {}).get("marketplace_user_id")}
+     await db.commit()
+@@ -454,19 +498,43 @@ def order_owned(order, identity, user):
+ async def bound_order(db, request, order_id, user):
+     identity = buyer_id(request)
+     order = await db.get(Order, order_id)
+-    if not order or order.fulfilment_kind != "digital" or not order_owned(order, identity, user):
++    if not order or not order_owned(order, identity, user):
+         raise HTTPException(404, "Purchase not found")
+-    return await checkout.lock_order(db, order.business_id, order.id)
++    if order.fulfilment_kind == "digital":
++        return await checkout.lock_order(db, order.business_id, order.id)
++    await lock_business(db, order.business_id)
++    return await db.scalar(select(Order).where(Order.id == order.id).with_for_update().execution_options(populate_existing=True))
+ 
+ 
+ async def order_json(db, order):
++    # Digital payment requests use receiving_accounts, which accepts personal gateways only.
++    if order.fulfilment_kind == "physical":
++        await db.refresh(order, ["lines", "courier_booking"])
++        from app.services.order_integrity import settled, shipment_status
++        from app.services.courier_tracking import tracking_url
++        business = await db.get(Business, order.business_id)
++        data = order.checkout_data or {}
++        quote = data.get("marketplace_quote") or {}
++        booking = order.courier_booking
++        return {"id": str(order.id), "ref": order.ref, "shop": shop_json(business), "name": quote.get("name", ""),
++            "product_id": quote.get("product_id"), "fulfilment_kind": "physical", "quantity": quote.get("quantity"),
++            "total": quote.get("total"), "discount": str(order.discount), "coupon_code": data.get("coupon_code"),
++            "currency": order.currency, "payment_status": order.payment_status if order.payment_status in {"refunded", "partially_refunded"} else "paid" if settled(order) else order.payment_status or "unpaid",
++            "payment_method": order.payment_method, "delivery_status": shipment_status(order) or order.state,
++            "delivery_mode": "shipping", "delivery_estimate": "", "delivery_charge": str(order.delivery_charge),
++            "buyer_name": order.customer_name, "buyer_phone": order.phone, "buyer_email": (data.get("buyer_fields") or {}).get("email"),
++            "buyer_fields": data.get("buyer_fields"), "address": order.address, "district": order.district,
++            "advance_amount": data.get("advance_amount", "0"), "seller_message": data.get("marketplace_message", ""),
++            "tracking": {"provider": booking.provider, "status": booking.status, "tracking": booking.tracking_number,
++                "tracking_url": tracking_url(booking)} if booking else None,
++            "created_at": utc(order.placed_at).isoformat(), "ready": False, "payment": None}
+     payment = await checkout.payment_request_for(db, order)
+     business = await db.get(Business, order.business_id)
+     quote = (order.checkout_data or {}).get("digital_quote") or {}
+     units = await checkout.units_for(db, order)
+     buyer_fields = (order.checkout_data or {}).get("buyer_fields") or {}
+     return {"id": str(order.id), "ref": order.ref, "shop": shop_json(business), "name": quote.get("name"),
+-        "product_id": quote.get("product_id"), "buyer_name": order.customer_name,
++        "product_id": quote.get("product_id"), "fulfilment_kind": "digital", "buyer_name": order.customer_name,
+         "buyer_email": buyer_fields.get("email"), "buyer_phone": order.phone, "buyer_fields": buyer_fields,
+         "quantity": quote.get("quantity"), "total": quote.get("total"), "discount": str(order.discount),
+         "coupon_code": (order.checkout_data or {}).get("coupon_code"), "currency": "BDT", "payment_status": order.payment_status,
+@@ -474,7 +542,7 @@ async def order_json(db, order):
+         "delivery_estimate": (quote.get("digital_config") or {}).get("delivery_estimate"),
+         "created_at": utc(order.placed_at).isoformat(),
+         "ready": order.payment_status == "paid" and bool(units) and all(u.stock_unit_id and u.status in {"queued", "accepted", "delivered"} for u in units),
+-        "payment": {"provider": payment.provider, "account": payment.receiving_account, "amount": str(payment.amount),
++        "payment": {"provider": payment.provider, "account_type": "personal", "account": payment.receiving_account, "amount": str(payment.amount),
+             "trx_id": payment.proof_trx_id, "expires_at": utc(payment.expires_at).isoformat()} if payment else None}
+ 
+ 
+@@ -486,7 +554,7 @@ async def orders(request: Request, user=Depends(optional_user), db=Depends(get_d
+         Order.checkout_data["marketplace_user_id"].as_string().is_(None))]
+     if user:
+         where.append(Order.checkout_data["marketplace_user_id"].as_string() == str(user.id))
+-    entries = list(await db.scalars(select(Order).where(Order.fulfilment_kind == "digital", or_(*where))
++    entries = list(await db.scalars(select(Order).where(or_(*where))
+         .order_by(Order.placed_at.desc()).limit(100)))
+     return {"orders": [await order_json(db, order) for order in entries]}
+ 
+@@ -607,6 +675,8 @@ async def verify_track_otp(req: TrackOtpVerify, request: Request, db=Depends(get
+ @router.post("/orders/{order_id}/proof", dependencies=[Depends(bridge)])
+ async def proof(order_id: uuid.UUID, req: PaymentProofRequest, request: Request, user=Depends(optional_user), db=Depends(get_db)):
+     order = await bound_order(db, request, order_id, user)
++    if order.fulfilment_kind != "digital":
++        raise HTTPException(409, "Contact the seller for physical order payment verification")
+     business = await db.get(Business, order.business_id)
+     payment = await checkout.payment_request_for(db, order)
+     if not payment:
+@@ -622,6 +692,8 @@ async def proof(order_id: uuid.UUID, req: PaymentProofRequest, request: Request,
+ @router.post("/orders/{order_id}/reveal", dependencies=[Depends(bridge)])
+ async def reveal(order_id: uuid.UUID, request: Request, user=Depends(optional_user), db=Depends(get_db)):
+     order = await bound_order(db, request, order_id, user)
++    if order.fulfilment_kind != "digital":
++        raise HTTPException(409, "Physical orders use delivery tracking")
+     business = await db.get(Business, order.business_id)
+     if order.payment_status != "paid" or not active_store(business) or order.digital_status == "needs_attention":
+         raise HTTPException(409, "Your items will be available after verified payment and preparation")
+diff --git a/backend/tests/test_marketplace.py b/backend/tests/test_marketplace.py
+index e6995ae3..f2a69c33 100644
+--- a/backend/tests/test_marketplace.py
++++ b/backend/tests/test_marketplace.py
+@@ -3,6 +3,7 @@ import base64
+ import hashlib
+ import json
+ import uuid
++from decimal import Decimal
+ from unittest.mock import AsyncMock
+ 
+ import fakeredis.aioredis
+@@ -82,6 +83,121 @@ async def sign_in(client):
+     return {"code": code, "code_verifier": verifier, "redirect_uri": settings.MARKETPLACE_REDIRECT_URI}
+ 
+ 
++@pytest.fixture
++async def physical_shop(sales, monkeypatch):
++    from app.services import craft_knowledge, pipeline_service, order_extractor, courier_fraud_shield
++    monkeypatch.setattr(craft_knowledge, "apply_knowledge", AsyncMock())
++    monkeypatch.setattr(pipeline_service, "record_or_update_pipeline_stage_on_interaction", AsyncMock())
++    monkeypatch.setattr(courier_fraud_shield, "evaluate_comprehensive_fraud_risk", AsyncMock(return_value=None))
++    monkeypatch.setattr(order_extractor, "evaluate_fraud_risk", AsyncMock(return_value=None))
++    sales.business.commerce_mode, sales.business.kind = "standard", "Fashion & Clothing"
++    sales.business.settings_data = {**sales.business.settings_data, "cod_enabled": True,
++        "shipping_rates": {"inside_dhaka": 70, "outside_dhaka": 130}}
++    sales.product.fulfilment_kind, sales.product.category = "physical", "Clothing"
++    sales.variant.stock = 4
++    await sales.db.commit()
++    return sales
++
++
++async def test_physical_catalog_quote_checkout_and_customer_isolation(market_api, physical_shop):
++    sales = physical_shop
++    feed = (await market_api.get("/api/v1/marketplace/feed")).json()
++    assert feed["shops"][0]["kind"] == "Fashion & Clothing"
++    assert feed["shops"][0]["commerce_mode"] == "standard"
++    assert feed["products"][0]["fulfilment_kind"] == "physical"
++    assert feed["products"][0]["payment_methods"] == ["cod"]
++    req = {"shop_id": str(sales.business.id), "product_id": str(sales.product.id), "variant_id": str(sales.variant.id),
++        "quantity": 2, "provider": "cod", "buyer": {"name": "Physical buyer", "phone": "01712345678",
++        "address": "House 12 Road 4 Mirpur Dhaka", "district": "Dhaka"}}
++    invalid = await market_api.post("/api/v1/marketplace/checkout/quote", json={**req, "buyer": {"name": "Buyer"}})
++    assert invalid.status_code == 422
++    invalid_destination = await market_api.post("/api/v1/marketplace/checkout/quote", json={**req,
++        "buyer": {**req["buyer"], "address": "House 12 Road 4", "district": "unknown"}})
++    assert invalid_destination.status_code == 422
++    quoted = await market_api.post("/api/v1/marketplace/checkout/quote", json=req)
++    assert quoted.status_code == 200, quoted.text
++    q = quoted.json()
++    assert Decimal(q["snapshot"]["total"]) == Decimal("270")
++    payload = {"shop_id": req["shop_id"], "product_id": req["product_id"], "draft_id": q["draft_id"],
++        "quote_hash": q["quote_hash"], "provider": "cod", "accepted": True, "idempotency_key": "physical-order-1"}
++    stolen = await market_api.post("/api/v1/marketplace/checkout/accept", json=payload, headers={"X-Marketplace-Buyer": "b" * 64})
++    assert stolen.status_code == 404
++    accepted = await market_api.post("/api/v1/marketplace/checkout/accept", json=payload)
++    assert accepted.status_code == 200, accepted.text
++    order = accepted.json()
++    assert order["fulfilment_kind"] == "physical" and order["payment"] is None and not order["ready"]
++    assert order["delivery_status"] == "confirmed" and order["payment_status"] == "unpaid"
++    assert (await market_api.post("/api/v1/marketplace/checkout/accept", json=payload)).json()["id"] == order["id"]
++    await sales.db.refresh(sales.variant)
++    assert sales.variant.stock == 2
++    assert (await market_api.get(f"/api/v1/marketplace/orders/{order['id']}", headers={"X-Marketplace-Buyer": "b" * 64})).status_code == 404
++    assert (await market_api.post(f"/api/v1/marketplace/orders/{order['id']}/reveal")).status_code == 409
++    assert len((await market_api.get("/api/v1/marketplace/orders")).json()["orders"]) == 1
++    from app.models.order import CourierBooking
++    stored = await sales.db.get(Order, uuid.UUID(order["id"]))
++    stored.state = "in_transit"
++    sales.db.add(CourierBooking(order_id=stored.id, provider="steadfast", consignment="SHIP123", tracking_number="TRACK123", status="in_transit"))
++    await sales.db.commit()
++    tracked = (await market_api.get(f"/api/v1/marketplace/orders/{order['id']}")).json()
++    assert tracked["delivery_status"] == "in_transit" and tracked["payment_status"] == "unpaid"
++    assert tracked["tracking"]["tracking_url"] == "https://steadfast.com.bd/t/TRACK123"
++
++
++@pytest.mark.parametrize("changed", ["price", "shipping", "stock"])
++async def test_physical_checkout_rechecks_price_and_source_capabilities(market_api, physical_shop, changed):
++    sales = physical_shop
++    req = {"shop_id": str(sales.business.id), "product_id": str(sales.product.id), "variant_id": str(sales.variant.id),
++        "quantity": 1, "provider": "cod", "buyer": {"name": "Physical buyer", "phone": "01712345678",
++        "address": "House 12 Road 4 Mirpur Dhaka", "district": "Dhaka"}}
++    q = (await market_api.post("/api/v1/marketplace/checkout/quote", json=req)).json()
++    if changed == "price":
++        sales.variant.price = Decimal("200")
++    elif changed == "shipping":
++        sales.business.settings_data = {**sales.business.settings_data, "shipping_rates": {"inside_dhaka": 90}}
++    else:
++        sales.variant.stock = 0
++    await sales.db.commit()
++    response = await market_api.post("/api/v1/marketplace/checkout/accept", json={"shop_id": req["shop_id"], "product_id": req["product_id"],
++        "draft_id": q["draft_id"], "quote_hash": q["quote_hash"], "provider": "cod", "accepted": True, "idempotency_key": "physical-changed"})
++    assert response.status_code == 409
++    assert await sales.db.scalar(select(func.count()).select_from(Order)) == 0
++    sales.business.settings_data = {**sales.business.settings_data, "cod_enabled": False}
++    await sales.db.commit()
++    feed = (await market_api.get("/api/v1/marketplace/feed")).json()
++    assert feed["products"][0]["checkout_available"] is False
++    assert (await market_api.post("/api/v1/marketplace/checkout/quote", json=req)).status_code == 409
++
++
++async def test_standard_shop_owner_and_mixed_fulfillment_are_source_owned(market_api, physical_shop):
++    sales = physical_shop
++    token = (await market_api.post("/api/v1/marketplace/token", json=await sign_in(market_api))).json()["access_token"]
++    headers = {"Authorization": "Bearer " + token}
++    me = (await market_api.get("/api/v1/marketplace/me", headers=headers)).json()
++    assert me["shops"][0]["kind"] == "Fashion & Clothing"
++    assert (await market_api.get(f"/api/v1/marketplace/stores/{uuid.uuid4()}/catalog", headers=headers)).status_code == 404
++    body = {"published": True, "name": "Fashion shop", "description": "Source-owned physical products", "product_ids": [str(sales.product.id)]}
++    assert (await market_api.put(f"/api/v1/marketplace/stores/{sales.business.id}/listing", headers=headers, json=body)).status_code == 200
++    assert (await market_api.put(f"/api/v1/marketplace/stores/{sales.business.id}/listing", headers=headers,
++        json={**body, "kind": "Digital Products"})).status_code == 422
++    assert (await market_api.put(f"/api/v1/marketplace/stores/{sales.business.id}/listing", headers=headers,
++        json={**body, "product_ids": [str(uuid.uuid4())]})).status_code == 409
++    sales.product.fulfilment_kind = "digital"
++    await sales.db.commit()
++    product = (await market_api.get("/api/v1/marketplace/feed")).json()["products"][0]
++    assert product["fulfilment_kind"] == "digital" and not product["checkout_available"]
++    assert "enabled digital checkout" in product["checkout_unavailable_reason"]
++
++
++async def test_physical_custom_requirements_disable_checkout_and_show_reason(market_api, physical_shop):
++    sales = physical_shop
++    sales.product.custom_order = {"enabled": True, "fields": [{"id": "print", "label": "Printed name",
++        "question": "Which name should be printed?", "type": "text"}]}
++    await sales.db.commit()
++    product = (await market_api.get("/api/v1/marketplace/feed")).json()["products"][0]
++    assert product["checkout_available"] is False
++    assert "custom order requirements" in product["checkout_unavailable_reason"]
++
++
+ async def test_marketplace_guest_order_uses_authoritative_stock_and_verified_payment(market_api, sales):
+     await stock(sales, 2)
+     feed = await market_api.get("/api/v1/marketplace/feed")
+@@ -98,6 +214,7 @@ async def test_marketplace_guest_order_uses_authoritative_stock_and_verified_pay
+     assert status.json()["buyer_name"] == "Marketplace buyer"
+     assert "Marketplace buyer" not in (await market_api.get("/api/v1/marketplace/feed")).text
+     assert accepted.json()["payment"]["expires_at"].endswith("+00:00")
++    assert accepted.json()["payment"]["account_type"] == "personal"
+     assert accepted.json()["created_at"].endswith("+00:00")
+     order = await sales.db.get(Order, uuid.UUID(order_id))
+     await sales.db.refresh(sales.variant)
+diff --git a/frontend/app/console/fulfilment/page.tsx b/frontend/app/console/fulfilment/page.tsx
+index bf23bb09..f7561ed0 100644
+--- a/frontend/app/console/fulfilment/page.tsx
++++ b/frontend/app/console/fulfilment/page.tsx
+@@ -161,7 +161,7 @@ function getChannelLabel(channel?: string): string {
+   if (ch === "whatsapp") return "WhatsApp";
+   if (ch === "messenger" || ch === "facebook") return "Messenger";
+   if (ch === "instagram") return "Instagram";
+-  if (ch === "marketplace") return "Arise Digital Store";
++  if (ch === "marketplace") return "Arise Store";
+   return "Website";
+ }
+ 
+@@ -232,7 +232,7 @@ function ChannelAttributionBadge({
+   }
+   return (
+     <span
+-      title={uiCopy.text(ch === "marketplace" ? "Arise Digital Store" : "Website / Online Store")}
++      title={uiCopy.text(ch === "marketplace" ? "Arise Store" : "Website / Online Store")}
+       className={cx(
+         "inline-flex items-center justify-center rounded-md bg-amber/10 text-amber dark:text-amber border border-amber/25 shadow-2xs shrink-0 select-none",
+         showLabel ? "gap-1 px-1.5 py-0.5 text-[11px] font-semibold" : "size-5",
+@@ -240,7 +240,7 @@ function ChannelAttributionBadge({
+       )}
+     >
+       <IconGlobe width={11.5} height={11.5} className="shrink-0" />
+-      {showLabel && <span>{uiCopy.text(ch === "marketplace" ? "Arise Digital Store" : "Website")}</span>}
++      {showLabel && <span>{uiCopy.text(ch === "marketplace" ? "Arise Store" : "Website")}</span>}
+     </span>
+   );
+ }
+diff --git a/frontend/app/marketplace/connect/page.tsx b/frontend/app/marketplace/connect/page.tsx
+index 572e2e1b..028d3ebf 100644
+--- a/frontend/app/marketplace/connect/page.tsx
++++ b/frontend/app/marketplace/connect/page.tsx
+@@ -20,10 +20,10 @@ function ConnectForm() {
+     catch(error){setError(error instanceof Error?error.message:copy.text("Unable to connect. Please retry."));setBusy(false);}
+   }
+   return <main className="min-h-screen bg-canvas px-4 py-16 text-text"><section className="mx-auto max-w-lg space-y-6 rounded-2xl border border-line bg-surface p-7 shadow-sm">
+-    <Wordmark/><div><p className="mb-2 text-sm font-semibold text-signal"><UiText>Arise Digital Store</UiText></p><h1 className="text-2xl font-semibold"><UiText>Your shop. A bigger audience.</UiText></h1><p className="mt-3 text-text-2"><UiText>Use your AriseSell account to open your digital storefront. Choose what to publish after connecting.</UiText></p></div>
+-    {!valid?<p role="alert" className="text-coral"><UiText>This connection link is incomplete. Return to Arise Digital Store and choose Continue with AriseSell again.</UiText></p>:loading?<p role="status"><UiText>Checking your account…</UiText></p>:!user?<div className="flex flex-wrap gap-3"><Button href={`/login?from=${encodeURIComponent(returnTo)}`}><UiText>Sign in to AriseSell</UiText></Button><Button variant="outline" href={`/signup?from=${encodeURIComponent(returnTo)}`}><UiText>Create an account</UiText></Button></div>:<>
+-      <p><UiText>Continue as</UiText> <strong>{user.email}</strong></p><ul className="list-disc space-y-2 pl-5 text-sm text-text-2"><li><UiText>Connect your account and digital stores.</UiText></li><li><UiText>Choose your public shop profile and products.</UiText></li><li><UiText>Keep payments, stock and delivery managed in AriseSell.</UiText></li></ul><p className="text-xs text-text-3"><UiText>Your password and private stock are never shared with the marketplace browser.</UiText></p>
+-      {error&&<p role="alert" className="text-sm text-coral">{error}</p>}<Button disabled={busy} onClick={connect}>{copy.text(busy?"Connecting…":"Continue to Arise Digital Store")}</Button>
++    <Wordmark/><div><p className="mb-2 text-sm font-semibold text-signal"><UiText>Arise Store</UiText></p><h1 className="text-2xl font-semibold"><UiText>Your shop. A bigger audience.</UiText></h1><p className="mt-3 text-text-2"><UiText>Use your AriseSell account to open your storefront. Your existing shop type is used automatically.</UiText></p></div>
++    {!valid?<p role="alert" className="text-coral"><UiText>This connection link is incomplete. Return to Arise Store and choose Continue with AriseSell again.</UiText></p>:loading?<p role="status"><UiText>Checking your account…</UiText></p>:!user?<div className="flex flex-wrap gap-3"><Button href={`/login?from=${encodeURIComponent(returnTo)}`}><UiText>Sign in to AriseSell</UiText></Button><Button variant="outline" href={`/signup?from=${encodeURIComponent(returnTo)}`}><UiText>Create an account</UiText></Button></div>:<>
++      <p><UiText>Continue as</UiText> <strong>{user.email}</strong></p><ul className="list-disc space-y-2 pl-5 text-sm text-text-2"><li><UiText>Connect your account and stores.</UiText></li><li><UiText>Choose your public shop profile and products.</UiText></li><li><UiText>Keep payments, stock and delivery managed in AriseSell.</UiText></li></ul><p className="text-xs text-text-3"><UiText>Your password and private stock are never shared with the marketplace browser.</UiText></p>
++      {error&&<p role="alert" className="text-sm text-coral">{error}</p>}<Button disabled={busy} onClick={connect}>{copy.text(busy?"Connecting…":"Continue to Arise Store")}</Button>
+     </>}
+     <Link href="/console" className="block text-sm text-text-3 underline"><UiText>Return to AriseSell</UiText></Link>
+   </section></main>;
+diff --git a/frontend/locales/bn.json b/frontend/locales/bn.json
+index f4c00c1a..123da6ab 100644
+--- a/frontend/locales/bn.json
++++ b/frontend/locales/bn.json
+@@ -6980,5 +6980,9 @@
+   "Unable to connect. Please retry.": "সংযোগ করা যায়নি। আবার চেষ্টা করুন।",
+   "Catalog matched · In stock": "ক্যাটালগে মিলেছে · স্টকে আছে",
+   "Buyer approved · Details collected": "ক্রেতার সম্মতি · তথ্য পাওয়া গেছে",
+-  "Courier booked · Pickup pending": "কুরিয়ারে বুক হয়েছে · পিকআপ বাকি"
++  "Courier booked · Pickup pending": "কুরিয়ারে বুক হয়েছে · পিকআপ বাকি",
++  "Use your AriseSell account to open your storefront. Your existing shop type is used automatically.": "আপনার AriseSell অ্যাকাউন্ট দিয়ে দোকান খুলুন। দোকানের বর্তমান ধরন স্বয়ংক্রিয়ভাবে ব্যবহার করা হবে।",
++  "Connect your account and stores.": "আপনার অ্যাকাউন্ট ও দোকান সংযুক্ত করুন।",
++  "This connection link is incomplete. Return to Arise Store and choose Continue with AriseSell again.": "সংযোগের লিংকটি অসম্পূর্ণ। Arise Store-এ ফিরে আবার Continue with AriseSell বেছে নিন।",
++  "Continue to Arise Store": "Arise Store-এ এগিয়ে যান"
+ }
+diff --git a/backend/app/services/marketplace_checkout.py b/backend/app/services/marketplace_checkout.py
+new file mode 100644
+--- /dev/null
++++ b/backend/app/services/marketplace_checkout.py
+@@ -0,0 +1,155 @@
++"""Marketplace transport for the existing physical order confirmation service."""
++from datetime import datetime, timedelta
++from decimal import Decimal
++import secrets
++import uuid
++
++from fastapi import HTTPException
++from sqlalchemy import select
++from sqlalchemy.orm import selectinload
++
++from app.models.commerce import CheckoutDraft
++from app.models.product import Product, Variant
++from app.services.digital_inventory import active_store, fingerprint, utc, utcnow
++from app.services.courier_service import effective_shipping_rates
++from app.services.knowledge_checkout import checkout_discount, complete_address, valid_customer_name, required_advance
++
++
++def payment_methods(business):
++    from app.services.digital_inventory import receiving_accounts
++    from app.services.sales_reply import merchant_facts
++    if business.commerce_mode == "digital":
++        return list(receiving_accounts(business))
++    facts = merchant_facts(business.settings_data or {})
++    allowed = facts.get("cod_enabled") is True or facts.get("cod_policy") in {"full_cod", "selected_locations", "advance_delivery"}
++    return ["cod"] if allowed and facts.get("cod_enabled") is not False and facts.get("cod_policy") not in {"disabled", "prepaid", "advance_only"} else []
++
++
++def unavailable_reason(business, product):
++    if product.fulfilment_kind == "digital":
++        if business.commerce_mode != "digital":
++            return "This shop has not enabled digital checkout in AriseSell."
++        return "" if payment_methods(business) else "The seller needs to connect a receiving account in AriseSell."
++    if business.commerce_mode != "standard" or business.currency != "BDT":
++        return "This product's checkout is not supported by the source store configuration."
++    from app.services.custom_orders import config_for
++    try:
++        custom = config_for(product)
++    except ValueError:
++        return "The seller needs to review this product's custom order configuration in AriseSell."
++    if product.__dict__.get("_craft_conflict") or custom:
++        return "Contact the seller in AriseSell to complete this product's custom order requirements."
++    if not payment_methods(business):
++        return "The seller needs to configure a supported payment method in AriseSell."
++    rates = effective_shipping_rates(business.settings_data or {})
++    if not rates.get("free_delivery_min") and not any(rates.get(tier) is not None for tier in ("inside_dhaka", "sub_dhaka", "outside_dhaka")):
++        return "The seller needs to configure delivery charges in AriseSell."
++    return ""
++
++
++def buyer_fields(business):
++    cfg = business.settings_data or {}
++    return ["name", "phone", "address", "district"] + [field for field, snake, camel in (
++        ("landmark", "require_landmark", "requireLandmark"),
++        ("alt_phone", "require_alt_phone", "requireAltPhone")) if cfg.get(snake, cfg.get(camel, False))]
++
++
++async def snapshot(db, business, product_id, variant_id, quantity, buyer, coupon_code=None):
++    if not active_store(business):
++        raise HTTPException(409, "This shop is unavailable")
++    product = await db.scalar(select(Product).where(Product.id == product_id, Product.business_id == business.id,
++        Product.fulfilment_kind == "physical", Product.digital_archived.is_(False)).options(selectinload(Product.variants)))
++    if not product:
++        raise HTTPException(404, "Product not found")
++    from app.services.craft_knowledge import apply_knowledge
++    await apply_knowledge(db, business.id, [product])
++    reason = unavailable_reason(business, product)
++    if reason:
++        raise HTTPException(409, reason)
++    variant = await db.scalar(select(Variant).where(Variant.id == variant_id, Variant.product_id == product.id)
++        .with_for_update().execution_options(populate_existing=True))
++    if not variant or variant.stock < quantity:
++        raise HTTPException(409, "The selected option is unavailable or has insufficient stock")
++    from app.services.order_extractor import normalize_bd_phone, resolve_district_and_delivery_charge
++    from app.services.messaging_policy import optional_kyc_missing
++    phone = normalize_bd_phone(buyer.get("phone", ""))
++    district, _, tier = resolve_district_and_delivery_charge(buyer.get("address", ""), buyer.get("district", ""))
++    if not valid_customer_name(buyer["name"]) or not phone or not district or tier == "unknown" or not complete_address(buyer.get("address", ""), district):
++        raise HTTPException(422, "Provide your name, a valid mobile number, full delivery address and district")
++    details = {**buyer, "phone": phone, "district": district}
++    if optional_kyc_missing(details, business.settings_data or {}, "en"):
++        raise HTTPException(422, "Provide the seller's required landmark or alternative phone number")
++    unit_price = Decimal(str(variant.price))
++    if not unit_price.is_finite() or unit_price <= 0:
++        raise HTTPException(409, "The seller needs to review this product's price")
++    subtotal = unit_price * quantity
++    code, discount = checkout_discount(business.settings_data or {}, subtotal)
++    if coupon_code and coupon_code.strip().upper() != code:
++        raise HTTPException(409, "This coupon is not available for this order")
++    rates = effective_shipping_rates(business.settings_data or {})
++    free = Decimal(str(rates.get("free_delivery_min") or 0))
++    shipping = Decimal(0) if free > 0 and subtotal >= free else rates.get(tier)
++    if shipping is None:
++        raise HTTPException(409, "The seller has not configured delivery to this destination")
++    shipping = Decimal(str(shipping))
++    if not shipping.is_finite() or shipping < 0:
++        raise HTTPException(409, "The seller's delivery charge needs review")
++    total = subtotal - discount + shipping
++    advance = required_advance(business.settings_data or {}, tier, shipping, total)
++    return {"product_id": str(product.id), "variant_id": str(variant.id), "sku": variant.sku,
++        "name": product.name, "variant": variant.label, "quantity": quantity, "fulfilment_kind": "physical",
++        "unit_price": str(variant.price), "subtotal": str(subtotal), "discount": str(discount),
++        "coupon_code": code, "delivery_charge": str(shipping), "total": str(total), "advance_amount": str(advance),
++        "currency": business.currency, "buyer": details, "tier": tier, "payment_method": "cod"}
++
++
++async def create_quote(db, business, channel, conversation, identity, req):
++    if req.provider != "cod":
++        raise HTTPException(409, "Choose a source-supported payment method")
++    snap = await snapshot(db, business, req.product_id, req.variant_id, req.quantity, req.buyer.model_dump(), req.coupon_code)
++    draft = await db.scalar(select(CheckoutDraft).where(CheckoutDraft.business_id == business.id,
++        CheckoutDraft.channel_id == channel.id, CheckoutDraft.recipient == identity).with_for_update())
++    if not draft:
++        draft = CheckoutDraft(business_id=business.id, channel_id=channel.id, conversation_id=conversation.id, recipient=identity)
++        db.add(draft)
++    draft.data = {"physical": True, "snapshot": snap, "quote_hash": fingerprint({"snapshot": snap, "nonce": secrets.token_hex(16)}),
++        "quoted_at": utcnow().isoformat(), "provider": "cod"}
++    draft.order_id, draft.confirmation_token = None, secrets.token_hex(4)
++    await db.flush()
++    return draft
++
++
++async def accept_quote(db, business, channel, conversation, identity, draft, req):
++    data = draft.data
++    if not data.get("physical") or draft.business_id != business.id or draft.channel_id != channel.id or draft.conversation_id != conversation.id or draft.recipient != identity:
++        raise HTTPException(404, "Checkout not found")
++    if req.quote_hash != data["quote_hash"] or req.provider != "cod":
++        raise HTTPException(409, "The purchase changed; review the current quote")
++    if draft.order_id:
++        from app.models.order import Order
++        return await db.get(Order, draft.order_id)
++    if utcnow() - utc(datetime.fromisoformat(data["quoted_at"])) > timedelta(minutes=15):
++        raise HTTPException(409, "The quote expired; request a fresh quote")
++    snap = data["snapshot"]
++    current = await snapshot(db, business, uuid.UUID(snap["product_id"]), uuid.UUID(snap["variant_id"]), snap["quantity"], snap["buyer"])
++    if fingerprint(snap) != fingerprint(current):
++        raise HTTPException(409, "Price, delivery charge or terms changed; request a fresh quote")
++    variant = await db.get(Variant, uuid.UUID(snap["variant_id"]))
++    details = {**snap["buyer"], "customer_name": snap["buyer"]["name"], "subtotal": snap["subtotal"],
++        "total": snap["total"], "discount": snap["discount"], "coupon_code": snap["coupon_code"],
++        "delivery_charge": snap["delivery_charge"], "tier": snap["tier"], "quoted_at": data["quoted_at"],
++        "lines": [{"variant_id": snap["variant_id"], "sku": snap["sku"], "name": f"{snap['name']} — {snap['variant']}",
++            "qty": snap["quantity"], "unit_price": snap["unit_price"]}]}
++    from app.services.order_confirmation_service import _create_and_commit_order
++    cfg = business.settings_data or {}
++    reply = await _create_and_commit_order(db, business, channel, conversation, identity, "Confirm marketplace order",
++        draft, details, cfg, effective_shipping_rates(cfg), (cfg.get("couriers") or {}).get("default_provider", "steadfast"),
++        {str(variant.id): variant}, "en")
++    if not draft.order_id:
++        raise HTTPException(409, reply)
++    from app.models.order import Order, OrderLine
++    order = await db.get(Order, draft.order_id)
++    order.checkout_data = {**order.checkout_data, "marketplace_quote": snap, "buyer_fields": snap["buyer"], "marketplace_message": reply}
++    for line in await db.scalars(select(OrderLine).where(OrderLine.order_id == order.id)):
++        line.product_id, line.variant_id, line.item_snapshot = uuid.UUID(snap["product_id"]), variant.id, snap
++    return order

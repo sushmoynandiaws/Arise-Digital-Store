@@ -1,8 +1,21 @@
-# Arise Digital Store
+# Arise Store
 
-A Rust marketplace for independent AriseSell digital shops. Includes a responsive React/TypeScript storefront, seller onboarding, single-shop checkout, browser-bound guest purchases, secure delivery access, and marketplace moderation.
+A Rust marketplace for independent AriseSell shops. Includes a responsive React/TypeScript storefront, seller onboarding, single-shop checkout, browser-bound guest purchases, physical delivery tracking, secure digital delivery access, and marketplace moderation.
 
-**The marketplace is implemented locally. It has not been deployed or connected to production AriseSell credentials.** The included preview is explicitly labeled sample data and runs the real AriseSell digital commerce services against an isolated development database. It never sends money or uses real stock.
+## Store types and fulfillment
+
+The storefront uses AriseSell's existing `Business.kind` and `commerce_mode` without a second category selection. All source store categories can publish products. Checkout follows each product's `fulfilment_kind`, not its shop label. Existing digital bridge responses remain compatible through their original automatic/manual delivery modes; unrecognized contracts cannot open checkout.
+
+The companion source changes are in `integration/arisesell-all-store-types.patch`, based on source revision recorded in `integration/manifest.json`. They are also implemented, uncommitted, in the local `marketplace-admin-prod-release` AriseSell worktree. Apply the companion patch only to a compatible checkout that does not already contain these changes, using `git apply --check` before applying it. No new environment variables or database migrations are required. Roll out the source bridge before the storefront when deployment is separately authorized.
+
+- Digital checkout retains AriseSell's reservation, payment verification and private fulfillment services.
+- Physical checkout adapts AriseSell's existing order-confirmation service, including source prices, stock locks, shipping rates, discounts, address/KYC requirements, fraud/advance holds, order numbering and courier jobs. The browser never supplies order totals or delivery charges.
+- Physical orders support source-configured COD; source-required advance is shown and remains seller-verified through AriseSell. This bridge does not create prepaid physical payment requests. Unsupported payment setups and custom product questions/design requirements show an explicit checkout-unavailable reason. Products remain browsable.
+- The source currently models only physical and digital fulfillment, with standard and digital commerce modes. There is no service-booking contract to expose. Digital products inside standard shops remain unavailable for checkout until the source enables that flow.
+- Purchases remain bound to their original customer/account. Physical orders show source courier tracking; shipped/delivered COD is not labeled paid without source payment evidence. Reviews still require verified payment and the existing eligible delivery state.
+- Shop category search/filters use actual source values. Marketplace branding says Arise Store; internal audience/channel IDs, old shop links, source credentials and database names stay compatible.
+
+**The store-type extension is implemented locally and has not been deployed.** The included preview is explicitly labeled sample data and runs the real AriseSell digital commerce services against an isolated development database. It never sends money or uses real stock.
 
 ## Architecture
 

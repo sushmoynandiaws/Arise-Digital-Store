@@ -1,6 +1,10 @@
 # Content style guide
 
-Write simple, direct English for people buying digital products in Bangladesh. Use the same terms across discovery, checkout and order support. This guide applies to app-owned UI text; seller content remains unchanged.
+Write simple, direct English for people buying products in Bangladesh. Use the same terms across discovery, checkout and order support. This guide applies to app-owned UI text; seller content remains unchanged.
+
+Shop category comes from AriseSell's `Business.kind`. Commerce mode is `standard` or `digital`; each product's `fulfilment_kind` determines checkout and delivery wording. Never label every shop digital or ask sellers to choose their category again. Unknown types show a neutral label and unavailable checkout.
+
+Physical checkout requests the source-required delivery address, district, phone and optional seller-required landmark/alternative phone. Show source-quoted shipping and any required advance before consent. Physical orders show courier tracking, never private digital access. COD delivery does not prove payment settlement. Keep refund/cancellation messages ahead of fulfillment updates. Custom requirements or unsupported source payment capabilities must show an unavailable reason rather than a Buy now promise. Discounts, warranties and expiry dates require source data; browser settings cannot create them.
 
 ## Voice
 

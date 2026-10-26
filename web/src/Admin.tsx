@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { api, deliveryLabel, money, paymentLabel, stock } from "./api";
+import { api, deliveryLabel, money, paymentLabel, stock, shopType, productFulfilment } from "./api";
 import { shopPageSections } from "./shopPages";
 import type { Catalog, Shop, SponsoredAd, User } from "./types";
 import {
@@ -54,6 +54,7 @@ type Settings = {
   pages?: Shop["pages"];
 };
 type Order = {
+  fulfilment_kind?: "physical" | "digital";
   id: string;
   ref: string;
   shop_name: string;
@@ -532,7 +533,7 @@ function Overview({ data }: { data: Base }) {
         <section className="admin-panel">
           <h2>Keep commerce in sync</h2>
           <p>
-            Order totals, payment verification, inventory and digital delivery
+            Order totals, payment verification, inventory and delivery
             come from AriseSell.
           </p>
           {data.permissions.includes("orders") && (
@@ -628,6 +629,7 @@ function CatalogView({
                   <tr key={row.id} className="admin-row">
                     <td>
                       <strong>{row.name}</strong>
+                      <small>{product ? productFulfilment(product) : shop ? shopType(shop) : "Shop"}</small>
                       <small>{row.id}</small>
                       {moderation?.reason && (
                         <small>Reason: {moderation.reason}</small>
@@ -932,6 +934,7 @@ function OrderView({
                         <td>
                           <strong>{o.ref}</strong>
                           <small>{o.name}</small>
+                          {o.fulfilment_kind && <small>{o.fulfilment_kind === "physical" ? "Physical delivery" : "Digital delivery"}</small>}
                           <small>
                             <Stamp value={o.created_at} />
                           </small>

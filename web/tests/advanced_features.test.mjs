@@ -138,18 +138,11 @@ test("App.tsx integrates all advanced e-commerce components and routes", () => {
   // Shop customer reviews with clear product attribution
   assert.ok(appCode.includes("<ShopReviews"));
 
-  // Volume discount (opt-in from shop setup with customizable percentage tiers) and Bundle box (removed per user request)
-  assert.ok(appCode.includes("volume-discount-widget"));
-  assert.ok(appCode.includes("isVolumeDiscountEnabled"));
-  assert.ok(appCode.includes("getShopVolumeConfig"));
-  assert.ok(appCode.includes("volume-discount-settings-row"));
-  assert.ok(appCode.includes("tier-quick-presets"));
-  assert.ok(!appCode.includes("bundle-cross-sell-box"));
-  assert.ok(appCode.includes("RENEW10"));
-
-  // Badges & WhatsApp
-  assert.ok(appCode.includes("product-trust-stats-badges"));
-  assert.ok(appCode.includes("subscription-expiry-card"));
+  // Commerce terms and warranty must come from the source; no local discount or expiry promises.
+  assert.ok(!appCode.includes("getShopVolumeConfig"));
+  assert.ok(!appCode.includes("RENEW10"));
+  assert.ok(!appCode.includes("subscription-expiry-card"));
+  assert.ok(appCode.includes("product.warranty_days"));
   assert.ok(!appCode.includes("purchase-sharing-actions"));
   assert.ok(!appCode.includes("wa.me/?text="));
   assert.ok(!appCode.includes("copyRecoveryLink"));
@@ -157,11 +150,11 @@ test("App.tsx integrates all advanced e-commerce components and routes", () => {
   // Payment Instruction Card (Merchant vs Personal detection & clear step instructions)
   assert.ok(appCode.includes("function PaymentInstructionCard("));
   assert.ok(appCode.includes("detectPaymentAccountType"));
-  assert.ok(appCode.includes("getSellerPaymentAccountType"));
-  assert.ok(appCode.includes("setSellerPaymentAccountType"));
+  assert.ok(!appCode.includes("getSellerPaymentAccountType"));
+  assert.ok(!appCode.includes("setSellerPaymentAccountType"));
   assert.ok(appCode.includes("merchantAccount"));
   assert.ok(appCode.includes("personalAccount"));
-  assert.ok(appCode.includes("seller-payment-method-row"));
+  assert.ok(appCode.includes("Your AriseSell shop controls payment accounts"));
   assert.ok(appCode.includes("<PaymentInstructionCard order={order} session={session} remainingSeconds={remainingSeconds} />"));
 
   // Sponsored Ads & Monetization Management

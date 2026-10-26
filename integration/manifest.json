@@ -18,5 +18,21 @@
     "frontend/app/marketplace/connect/page.tsx",
     "frontend/scripts/test-marketplace-return.mjs"
   ],
-  "production_deployed": false
+  "production_deployed": false,
+  "store_types_extension": {
+    "source_repository": "nazmulh0/arise-sell",
+    "base_revision": "a50c6cfef96db9d30db2c5fcd498162c4cdcc5ee",
+    "patch": "arisesell-all-store-types.patch",
+    "files": [
+      "backend/app/api/v1/marketplace.py",
+      "backend/tests/test_marketplace.py",
+      "frontend/app/marketplace/connect/page.tsx",
+      "frontend/app/console/fulfilment/page.tsx",
+      "frontend/locales/bn.json",
+      "backend/app/services/marketplace_checkout.py"
+    ],
+    "production_deployed": false,
+    "database_migration_required": false,
+    "new_environment_variables": []
+  }
 }

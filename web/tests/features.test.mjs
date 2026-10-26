@@ -31,13 +31,13 @@ function generateWhatsAppUrl(contact, { product, shop, order } = {}) {
   const digits = contact.replace(/\D/g, "");
   if (digits.length >= 10) {
     const cleanPhone = digits.length === 11 && digits.startsWith("01") ? `88${digits}` : digits;
-    let text = "Hello! I am contacting you from Arise Digital Store.";
+    let text = "Hello! I am contacting you from Arise Store.";
     if (order) {
-      text = `Hello! I need help with my order *${order.ref}* (${order.name}) on Arise Digital Store.`;
+      text = `Hello! I need help with my order *${order.ref}* (${order.name}) on Arise Store.`;
     } else if (product) {
-      text = `Hello! I have a question about *${product.name}* on Arise Digital Store.`;
+      text = `Hello! I have a question about *${product.name}* on Arise Store.`;
     } else if (shop) {
-      text = `Hello! I have a question regarding *${shop.name}* on Arise Digital Store.`;
+      text = `Hello! I have a question regarding *${shop.name}* on Arise Store.`;
     }
     return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
   }

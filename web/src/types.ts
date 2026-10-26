@@ -13,7 +13,11 @@ export type Product = {
   image_url: string;
   variants: Variant[];
   currency: string;
-  delivery_mode: "automatic" | "manual";
+  fulfilment_kind?: "physical" | "digital";
+  delivery_mode: "automatic" | "manual" | "shipping";
+  payment_methods?: string[];
+  checkout_available?: boolean;
+  checkout_unavailable_reason?: string;
   delivery_estimate: string;
   delivery_note: string;
   purchase_terms: string;
@@ -52,6 +56,9 @@ export type Shop = {
   cover_url: string;
   support: string;
   published: boolean;
+  kind?: string | null;
+  commerce_mode?: "standard" | "digital";
+  currency?: string;
   payment_methods?: string[];
   tagline?: string;
   social_links?: ShopSocialLinks;
@@ -80,7 +87,11 @@ export type Quote = {
     name: string;
     variant: string;
     quantity: number;
-    digital_config: {
+    fulfilment_kind?: "physical" | "digital";
+    delivery_charge?: string;
+    advance_amount?: string;
+    buyer?: Record<string, string>;
+    digital_config?: {
       purchase_terms: string;
       delivery_note: string;
       delivery_mode: string;
@@ -88,6 +99,14 @@ export type Quote = {
   };
 };
 export type Purchase = {
+  fulfilment_kind?: "physical" | "digital";
+  payment_method?: string;
+  delivery_charge?: string;
+  address?: string;
+  district?: string;
+  advance_amount?: string;
+  seller_message?: string;
+  tracking?: {provider: string; status: string; tracking: string; tracking_url?: string | null} | null;
   id: string;
   ref: string;
   shop: Shop;

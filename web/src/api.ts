@@ -1,4 +1,4 @@
-import type { Purchase } from "./types";
+import type { Product, Purchase, Shop } from "./types";
 
 let csrf = "";
 export function setCsrf(value: string) {
@@ -32,14 +32,29 @@ export async function api<T>(
     );
   return payload;
 }
-export const money = (amount: string) =>
+export const money = (amount: string, currency = "BDT") =>
   new Intl.NumberFormat("en-BD", {
     style: "currency",
-    currency: "BDT",
+    currency,
     maximumFractionDigits: 2,
   }).format(Number(amount));
 export const paymentMethodLabel = (value: string) =>
-  ({ bkash: "bKash", nagad: "Nagad", rocket: "Rocket" })[value] || value;
+  ({ bkash: "bKash", nagad: "Nagad", rocket: "Rocket", cod: "Cash on delivery" })[value] || value;
+export function productFulfilment(product: Pick<Product, "fulfilment_kind" | "delivery_mode">) {
+  if (product.fulfilment_kind === "physical" || product.fulfilment_kind === "digital") return product.fulfilment_kind;
+  if (product.fulfilment_kind) return "unknown";
+  // The original bridge returned only digital products, identified by these delivery modes.
+  return product.delivery_mode === "automatic" || product.delivery_mode === "manual" ? "digital" : "unknown";
+}
+export function productPayments(product: Product, shop: Shop) {
+  return product.payment_methods ?? (productFulfilment(product) === "digital" ? shop.payment_methods ?? [] : []);
+}
+export function canCheckout(product: Product, shop: Shop) {
+  return product.sales_enabled && product.checkout_available !== false && productFulfilment(product) !== "unknown" && productPayments(product, shop).length > 0;
+}
+export function shopType(shop: Shop) {
+  return shop.kind || (shop.commerce_mode === "digital" ? "Digital products" : "Shop");
+}
 export function checkoutTotal(price: string, quantity: number): string | null {
   if (!/^\d+(?:\.\d{1,2})?$/.test(price) || !Number.isInteger(quantity) || quantity < 1 || quantity > 100)
     return null;
@@ -86,6 +101,13 @@ export const paymentLabel = (value: string, lang: string = "en") => {
 };
 
 export const deliveryLabel = (value: string, lang: string = "en") => {
+  const shipping = {
+    confirmed: ["Order confirmed", "অর্ডার নিশ্চিত হয়েছে"], awaiting_confirm: ["Awaiting confirmation", "নিশ্চিতকরণের অপেক্ষায়"],
+    awaiting_advance: ["Awaiting advance verification", "অগ্রিম যাচাইয়ের অপেক্ষায়"],
+    courier_booked: ["Courier booked", "কুরিয়ার বুকিং হয়েছে"], awaiting_pickup: ["Awaiting pickup", "কুরিয়ার সংগ্রহের অপেক্ষায়"],
+    in_transit: ["In transit", "ডেলিভারির পথে"], returned: ["Returned", "ফেরত এসেছে"], settled: ["Settled", "হিসাব সম্পন্ন"],
+  }[value];
+  if (shipping) return shipping[lang === "bn" ? 1 : 0];
   if (lang === "bn") {
     return (
       ({
@@ -115,6 +137,17 @@ export const deliveryLabel = (value: string, lang: string = "en") => {
 };
 
 export function purchaseMessage(order: Purchase, lang: string = "en") {
+  if (order.fulfilment_kind === "physical" && !["refunded", "partially_refunded"].includes(order.payment_status) && order.delivery_status !== "cancelled") {
+    const bn = lang === "bn";
+    if (["delivered", "settled"].includes(order.delivery_status)) return {
+      title: bn ? "অর্ডার ডেলিভারি হয়েছে" : "Your order was delivered",
+      description: order.payment_status === "paid" ? (bn ? "পেমেন্ট যাচাই সম্পন্ন হয়েছে।" : "Payment is verified.") : (bn ? "ডেলিভারি হয়েছে; পেমেন্ট নিষ্পত্তি এখনও নিশ্চিত হয়নি।" : "Delivery is complete. Payment settlement has not been confirmed."),
+    };
+    if (order.delivery_status === "returned") return { title: bn ? "অর্ডার ফেরত এসেছে" : "Your order was returned", description: bn ? "পরবর্তী পদক্ষেপের জন্য বিক্রেতার সাথে যোগাযোগ করুন।" : "Contact the seller for the next step." };
+    return {title: deliveryLabel(order.delivery_status, lang), description: order.delivery_status === "awaiting_advance"
+      ? (bn ? "অগ্রিম পেমেন্ট যাচাই করতে বিক্রেতার সাথে যোগাযোগ করুন।" : "Contact the seller to verify the required advance before dispatch.")
+      : (bn ? "ডেলিভারি আপডেট এখানে দেখুন। পেমেন্ট ও ডেলিভারির স্ট্যাটাস আলাদাভাবে দেখানো হয়।" : "Follow delivery updates here. Payment and delivery statuses are shown separately.")};
+  }
   if (lang === "bn") {
     if (order.payment_status === "refunded")
       return {

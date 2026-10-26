@@ -1,4 +1,4 @@
-# Marketplace Implementation Decisions — Arise Digital Store
+# Marketplace Implementation Decisions — Arise Store
 
 Overrides and standards applied across the storefront, seller, checkout, and purchase history interfaces:
 
@@ -7,7 +7,7 @@ Overrides and standards applied across the storefront, seller, checkout, and pur
 - **Catalog Navigation:** Lead with instant catalog search, responsive category chips, and verified listings. No fake reviews, sales counters, or manufactured urgency tickers.
 - **Product Artwork:** Seller-provided images take priority. Missing or failed images use a simple category emblem on a token-colored surface, alongside the actual delivery mode. The homepage discovery shelf uses actual catalog products and prices.
 - **Accessibility & Touch:** All actionable buttons and links maintain minimum 44px hit targets, visible 2px keyboard focus rings, descriptive inline errors, and persistent form inputs. Reduced-motion preferences are strictly respected.
-- **Single-Shop Checkout & Direct Links:** One shop per checkout transaction. Payment verification and license delivery remain authoritative in AriseSell. Shared `/shops/:slug` links open a seller-branded storefront preserving that seller's context throughout discovery and checkout.
+- **Single-Shop Checkout & Direct Links:** One shop per checkout transaction. Payment verification, physical shipping and digital delivery remain authoritative in AriseSell. Shared `/shops/:slug` links open a seller-branded storefront preserving that seller's context throughout discovery and checkout.
 - **Development Preview Transparency:** Sample fixtures and demo data are clearly flagged. No test purchase is misrepresented as a live transaction.
 - **Viewport Resilience:** Verify every route at 320px, 768px, 1024px and 1440px, plus the existing 375px portrait and 812px landscape purchase regressions. Pages must not overflow horizontally (`document.documentElement.scrollWidth <= window.innerWidth`).
 

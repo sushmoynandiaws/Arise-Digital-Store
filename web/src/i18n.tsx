@@ -18,7 +18,7 @@ export const translations = {
 
     // Track order
     trackTitle: "Track your orders",
-    trackSubtitle: "Enter your email address to find all your digital purchases and instant recovery links.",
+    trackSubtitle: "Find your purchases and follow their payment and delivery status.",
     emailLabel: "Email address",
     emailPlaceholder: "e.g. name@example.com",
     phoneLabel: "Phone number",

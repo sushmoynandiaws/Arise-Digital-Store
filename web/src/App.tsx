@@ -77,6 +77,10 @@ import {
   deliveryLabel,
   purchaseMessage,
   paymentMethodLabel,
+  productFulfilment,
+  productPayments,
+  canCheckout,
+  shopType,
 } from "./api";
 import type { Catalog, Shop, Product, Session, Quote, Purchase } from "./types";
 import { productForRoute, productPath, productSection, type ProductSection } from "./product";
@@ -163,11 +167,11 @@ function Empty({ title, children, heading: Heading = "h2" }: { title: string; ch
 }
 function Brand() {
   return (
-    <Link className="brand" to="/" aria-label="Arise Digital Store home">
+    <Link className="brand" to="/" aria-label="Arise Store home">
       <img src="/favicon.svg" width="38" height="38" alt="" />
       <span>
         arise<span className="brand-divider">/</span>
-        <span className="brand-sub">digital store</span>
+        <span className="brand-sub">store</span>
       </span>
     </Link>
   );
@@ -250,7 +254,7 @@ export function WishlistModal({
                     <Link to={productPath(prod, catalog!)} onClick={onClose} className="wishlist-item-title">
                       {prod.name}
                     </Link>
-                    <span className="price">{money(minimumPrice(prod))}</span>
+                    <span className="price">{money(minimumPrice(prod), prod.currency)}</span>
                   </div>
                   <div className="wishlist-item-actions">
                     <Link to={productPath(prod, catalog!)} onClick={onClose} className="button primary small">
@@ -479,9 +483,9 @@ export function TrackOrderPage() {
   return (
     <main id="main" className="container narrow-page track-order-page">
       <div className="page-intro">
-        <p className="eyebrow">{lang === "bn" ? "গ্লোবাল অর্ডার অনুসন্ধান · Arise Digital Store" : "Global Order Tracking · Arise Digital Store"}</p>
+        <p className="eyebrow">{lang === "bn" ? "গ্লোবাল অর্ডার অনুসন্ধান · Arise Store" : "Global Order Tracking · Arise Store"}</p>
         <h1>{t("trackTitle")}</h1>
-        <p>{lang === "bn" ? "Arise Digital Store-এর যেকোনো শপ থেকে কেনা আপনার সমস্ত অর্ডার এক জায়গায় দেখতে ইমেইল দিন।" : "Enter your email to look up all purchases made from any shop across Arise Digital Store."}</p>
+        <p>{lang === "bn" ? "Arise Store-এর যেকোনো শপ থেকে কেনা আপনার সমস্ত অর্ডার এক জায়গায় দেখতে ইমেইল দিন।" : "Enter your email to look up all purchases made from any shop across Arise Store."}</p>
       </div>
 
       {error && <ErrorBox message={error} />}
@@ -547,8 +551,8 @@ export function TrackOrderPage() {
               <strong>{t("trackSuccess")}</strong>
               <span className="track-success-subtext">
                 {lang === "bn"
-                  ? `Arise Digital Store-এর ${ordersByShop.length}টি শপ থেকে মোট ${foundOrders.length}টি অর্ডার পাওয়া গেছে`
-                  : `Found ${foundOrders.length} ${foundOrders.length === 1 ? "order" : "orders"} across ${ordersByShop.length} ${ordersByShop.length === 1 ? "shop" : "shops"} on Arise Digital Store`}
+                  ? `Arise Store-এর ${ordersByShop.length}টি শপ থেকে মোট ${foundOrders.length}টি অর্ডার পাওয়া গেছে`
+                  : `Found ${foundOrders.length} ${foundOrders.length === 1 ? "order" : "orders"} across ${ordersByShop.length} ${ordersByShop.length === 1 ? "shop" : "shops"} on Arise Store`}
               </span>
             </div>
           </div>
@@ -588,7 +592,7 @@ export function TrackOrderPage() {
                         </p>
                       </div>
                       <div className="purchase-actions-col">
-                        <strong className="price">{money(order.total)}</strong>
+                        <strong className="price">{money(order.total, order.currency)}</strong>
                         <span className={`status-pill ${order.delivery_status}`}>
                           {order.payment_status === "paid" ? deliveryLabel(order.delivery_status) : paymentLabel(order.payment_status)}
                         </span>
@@ -655,8 +659,8 @@ function TopAnnouncementBar() {
             <span className="announcement-flash">⚡</span>
             <span>
               {shop
-                ? (shop.tagline || (lang === "bn" ? `${shop.name}-এর স্টকে থাকা ডিজিটাল প্রোডাক্ট দেখুন` : `${shop.name} · Verified Digital Products In Stock`))
-                : (platform.announcement || (lang === "bn" ? "ডিজিটাল পণ্য ও সাবস্ক্রিপশন দেখুন" : "Browse digital products and subscriptions"))}
+                ? (shop.tagline || (lang === "bn" ? `${shop.name}-এর পণ্য দেখুন` : `${shop.name} · Browse products`))
+                : (platform.announcement || (lang === "bn" ? "স্বাধীন শপের পণ্য দেখুন" : "Browse products from independent shops"))}
             </span>
             <span className="announcement-arrow">→</span>
           </Link>
@@ -668,7 +672,7 @@ function TopAnnouncementBar() {
             <span>
               {shop
                 ? (lang === "bn" ? "সাপোর্ট সময় : সকাল ১০.০০ - রাত ১২.০০" : "Support Hours : 10.00 AM - 12.00 AM (BD TIME)")
-                : (lang === "bn" ? "২৪/৭ ইনস্ট্যান্ট অটো-ডেলিভারি" : "24/7 Automated Delivery & Instant Support")}
+                : (lang === "bn" ? "স্বাধীন শপের পণ্য ও সহায়তা" : "Products and support from independent shops")}
             </span>
           </div>
 
@@ -882,7 +886,7 @@ function Header() {
             <ShopAvatar shop={shop} />
             <span>
               <strong>{shop.name}</strong>
-              <small>Digital shop</small>
+              <small>{shopType(shop)}</small>
             </span>
           </Link>
         ) : (
@@ -1090,7 +1094,7 @@ function ShopInformationPage() {
   const { lang } = useLang();
   const section = shopPageSections.find(section => section.key === sectionKey);
   const title = section ? (lang === "bn" ? section.titleBn : section.title) : "";
-  const shopName = shop?.name || "Arise Digital Store";
+  const shopName = shop?.name || "Arise Store";
   useEffect(() => {
     if (!title) return;
     const previous = document.title;
@@ -1191,7 +1195,7 @@ function Footer() {
                 </div>
               </div>
               <p className="dark-brand-tagline">
-                {shop?.tagline || shop?.description || (lang === "bn" ? "সেরা মূল্যে সর্বোচ্চ মানের ভেরিফাইড ডিজিটাল সাবস্ক্রিপশন ও সফটওয়্যার সেবা।" : "Committed to the best service and verified digital products with convenient prices.")}
+                {shop?.tagline || shop?.description || (lang === "bn" ? "এই শপের পণ্য দেখুন এবং প্রয়োজনে বিক্রেতার সাথে যোগাযোগ করুন।" : "Browse this shop’s products and contact the seller for help.")}
               </p>
               <div className="dark-contact-list">
                 {fullAddress && (
@@ -1305,7 +1309,7 @@ function Footer() {
               © {new Date().getFullYear()} {shopName}. {lang === "bn" ? "সর্বস্বত্ব সংরক্ষিত।" : "All rights reserved."}
             </span>
             <span className="dark-powered">
-              {lang === "bn" ? "সিকিউর পেমেন্ট ও অটোমেটেড ডিজিটাল ডেলিভারি পাওয়ারড বাই " : "Secured payments & instant digital delivery via "}
+              {lang === "bn" ? "অর্ডার পরিচালনায় " : "Orders managed via "}
               <strong>AriseSell</strong>
             </span>
           </div>
@@ -1328,13 +1332,13 @@ function Footer() {
                 <span className="logo-sparkle">✦</span>
               </div>
               <div className="dark-brand-title-wrap">
-                <strong className="dark-brand-name">Arise Digital Store</strong>
+                <strong className="dark-brand-name">Arise Store</strong>
               </div>
             </div>
             <p className="dark-brand-tagline">
               {lang === "bn"
-                ? "স্বতন্ত্র বিক্রেতাদের নির্ভরযোগ্য ডিজিটাল স্টোর এবং ইনস্ট্যান্ট লাইসেন্স মার্কেটপ্লেস।"
-                : "Digital products from verified independent shops with instant delivery and warranty."}
+                ? "স্বাধীন শপের পণ্য দেখুন। পেমেন্ট, স্টক ও ডেলিভারি বিক্রেতা AriseSell-এ পরিচালনা করেন।"
+                : "Products from independent shops. Payments, stock and delivery are managed by each seller in AriseSell."}
             </p>
             <div className="dark-contact-list">
               <div className="dark-contact-item">
@@ -1343,11 +1347,11 @@ function Footer() {
               </div>
               <div className="dark-contact-item">
                 <span className="dark-contact-icon">⚡</span>
-                <span>{lang === "bn" ? "অটোমেটেড ইনস্ট্যান্ট লাইসেন্স ডেলিভারি" : "Instant Automated License Delivery"}</span>
+                <span>{lang === "bn" ? "My purchases থেকে অর্ডার দেখুন" : "Follow your order in My purchases"}</span>
               </div>
               <div className="dark-contact-item">
                 <span className="dark-contact-icon">🔒</span>
-                <span>{lang === "bn" ? "নিরাপদ ডিজিটাল পেমেন্ট এসক্রো" : "Secure Payment Escrow Protection"}</span>
+                <span>{lang === "bn" ? "বিক্রেতার পেমেন্ট পদ্ধতি" : "Seller-configured payment methods"}</span>
               </div>
             </div>
           </div>
@@ -1422,10 +1426,10 @@ function Footer() {
         {/* Sub-bottom Bar */}
         <div className="dark-footer-subbottom">
           <span className="dark-copyright">
-            © {new Date().getFullYear()} Arise Digital Store. {lang === "bn" ? "সর্বস্বত্ব সংরক্ষিত।" : "All rights reserved."}
+            © {new Date().getFullYear()} Arise Store. {lang === "bn" ? "সর্বস্বত্ব সংরক্ষিত।" : "All rights reserved."}
           </span>
           <span className="dark-powered">
-            {lang === "bn" ? "সিকিউর পেমেন্ট ও অটোমেটেড ডিজিটাল ডেলিভারি পাওয়ারড বাই " : "Secured payments & instant digital delivery via "}
+            {lang === "bn" ? "অর্ডার পরিচালনায় " : "Orders managed via "}
             <strong>AriseSell</strong>
           </span>
         </div>
@@ -1552,7 +1556,7 @@ function Art({
           )}
         </div>
         <span className="art-brand-pill">
-          {product.category || "Digital Product"}
+          {product.category || "Product"}
         </span>
       </div>}
     </div>
@@ -1603,7 +1607,7 @@ function ProductCard({ product }: { product: Product }) {
           <span>{product.category}</span>
           <span className={stock(product) > 0 ? "availability" : "sold-out"}>
             {stock(product) > 0 ? (
-              product.delivery_mode === "automatic" ? (
+              productFulfilment(product) === "physical" ? <>Physical delivery</> : product.delivery_mode === "automatic" ? (
                 <>
                   <Zap size={12} />
                   {lang === "bn" ? "অটো ডেলিভারি" : "Automatic delivery"}
@@ -1619,7 +1623,7 @@ function ProductCard({ product }: { product: Product }) {
         <div className="product-bottom">
           <span className="price">
             {product.variants.length > 1 && <small>{lang === "bn" ? "শুরু " : "From "}</small>}
-            {money(minimumPrice(product))}
+            {money(minimumPrice(product), product.currency)}
           </span>
         </div>
       </div>
@@ -1806,8 +1810,9 @@ function ShopCard({ shop, heading: Heading = "h3" }: { shop: Shop; heading?: "h2
       <ShopAvatar shop={shop} />
       <div>
         <Heading>{shop.name}</Heading>
+        <small>{shopType(shop)}</small>
         <p>
-          {count} digital {count === 1 ? "product" : "products"}
+          {count} {count === 1 ? "product" : "products"}
         </p>
       </div>
     </Link>
@@ -1855,9 +1860,9 @@ function Home() {
           <div className="hero-copy">
             <h1>
               {platform.hero_title || (lang === "bn" ? (
-                <>স্বাধীন শপ থেকে<br />ডিজিটাল প্রোডাক্টস</>
+                <>স্বাধীন শপ থেকে<br />আপনার পছন্দের পণ্য</>
               ) : (
-                <>Digital products<br />from independent shops</>
+                <>Products<br />from independent shops</>
               ))}
             </h1>
             <p className="hero-description">
@@ -1874,11 +1879,11 @@ function Home() {
             >
               <Search size={21} />
               <label className="sr-only" htmlFor="home-search">
-                {lang === "bn" ? "ডিজিটাল পণ্য খুঁজুন" : "Search digital products"}
+                {lang === "bn" ? "পণ্য খুঁজুন" : "Search products"}
               </label>
               <input
                 id="home-search"
-                placeholder={lang === "bn" ? "ডিজিটাল পণ্য খুঁজুন..." : "Search digital products"}
+                placeholder={lang === "bn" ? "পণ্য খুঁজুন..." : "Search products"}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -1900,7 +1905,7 @@ function Home() {
             {catalog?.products.length ? <div className="discovery-picks">
               {catalog.products.slice(0, 3).map(product => <Link className="discovery-pick" key={product.id} to={productPath(product, catalog)}>
                 <span className="discovery-art"><CategoryIcon category={product.category} size={24} /></span>
-                <span><small>{product.category}</small><strong>{product.name}</strong><span>{product.variants.length > 1 ? (lang === "bn" ? "শুরু " : "From ") : ""}{money(minimumPrice(product))}</span></span>
+                <span><small>{product.category}</small><strong>{product.name}</strong><span>{product.variants.length > 1 ? (lang === "bn" ? "শুরু " : "From ") : ""}{money(minimumPrice(product), product.currency)}</span></span>
               </Link>)}
             </div> : catalog ? <p className="discovery-empty">{lang === "bn" ? "এখনও কোনো প্রোডাক্ট প্রকাশ করা হয়নি।" : "No products are published yet."}</p> : catalogError ? <p className="discovery-empty">{lang === "bn" ? "প্রোডাক্ট লোড করা যায়নি। নিচে পুনরায় চেষ্টা করুন।" : "Products could not be loaded. Use Try again in the product section below."}</p> : <Loading />}
             <Link className="discovery-footer" to="/products">{lang === "bn" ? "সব প্রোডাক্ট দেখুন" : "Browse all products"} <ArrowRight size={18} /></Link>
@@ -1987,7 +1992,7 @@ function Home() {
               <p className="eyebrow">
                 {lang === "bn" ? "স্বাধীন সেলারদের জন্য" : "For independent sellers"}
               </p>
-              <h2>{lang === "bn" ? "আপনার ডিজিটাল পণ্য বিক্রি করুন" : "Sell your digital products"}</h2>
+              <h2>{lang === "bn" ? "আপনার পণ্য বিক্রি করুন" : "Sell your products"}</h2>
               <p>
                 {lang === "bn" ? (
                   "এই মার্কেটপ্লেসে আপনার AriseSell পণ্য প্রকাশ করুন। আপনার পণ্য, পেমেন্ট ও স্টক সবসময় সিঙ্ক থাকবে।"
@@ -2014,7 +2019,8 @@ function Products({ shop }: { shop?: Shop }) {
   const { lang } = useLang();
   const [params, setParams] = useSearchParams();
   const query = params.get("q") || params.get("search") || "",
-    category = params.get("category") || "";
+    category = params.get("category") || "",
+    storeType = params.get("store_type") || "";
   const [sort, setSort] = useState("recommended"),
     [inStock, setInStock] = useState(false);
   const list = (catalog?.products || []).filter(
@@ -2025,8 +2031,9 @@ function Products({ shop }: { shop?: Shop }) {
     .filter(
       (p) =>
         (!category || p.category === category) &&
+        (!storeType || catalog?.shops.find(s => s.id === p.shop_id)?.kind === storeType) &&
         (!inStock || stock(p) > 0) &&
-        `${p.name} ${p.category} ${p.description} ${catalog?.shops.find((s) => s.id === p.shop_id)?.name}`
+        `${p.name} ${p.category} ${p.description} ${catalog?.shops.find((s) => s.id === p.shop_id)?.name} ${catalog?.shops.find((s) => s.id === p.shop_id)?.kind || ""}`
           .toLowerCase()
           .includes(query.toLowerCase()),
     )
@@ -2058,6 +2065,10 @@ function Products({ shop }: { shop?: Shop }) {
       )}
       {/* Consolidated toolbar: category filter pills on left, sorting and stock filter on right */}
       <div className="catalog-toolbar-row">
+        {!shop && <label className="field">Shop type<select value={storeType} onChange={e => update("store_type", e.target.value)}>
+          <option value="">All shop types</option>
+          {[...new Set((catalog?.shops || []).map(s => s.kind).filter((kind): kind is string => Boolean(kind)))].sort().map(kind => <option key={kind} value={kind}>{kind}</option>)}
+        </select></label>}
         <div className="filter-chips">
           <button
             className={!category ? "chip selected" : "chip"}
@@ -2150,18 +2161,23 @@ function Shops() {
   const { catalog, catalogError, reloadCatalog } = useMarket();
   const { lang } = useLang();
   const [query, setQuery] = useState("");
+  const [storeType, setStoreType] = useState("");
   const shops = catalog?.shops.filter((s) =>
-    `${s.name} ${s.description}`.toLowerCase().includes(query.toLowerCase()),
+    (!storeType || s.kind === storeType) && `${s.name} ${s.description} ${s.kind || ""}`.toLowerCase().includes(query.toLowerCase()),
   );
   return (
     <main id="main" className="container listing-page">
       <div className="page-intro">
         <p className="eyebrow">{lang === "bn" ? "শপ ডিরেক্টরি" : "Shop directory"}</p>
+        <label className="field">Shop type<select value={storeType} onChange={e => setStoreType(e.target.value)}>
+          <option value="">All shop types</option>
+          {[...new Set((catalog?.shops || []).map(s => s.kind).filter((kind): kind is string => Boolean(kind)))].sort().map(kind => <option key={kind} value={kind}>{kind}</option>)}
+        </select></label>
         <h1>
           {lang === "bn" ? "স্বাধীন শপসমূহ" : "Independent shops"}
         </h1>
         <p>
-          {lang === "bn" ? "স্বাধীন শপ এবং তাদের ডিজিটাল পণ্যগুলো ব্রাউজ করুন।" : "Browse independent shops and their digital products."}
+          {lang === "bn" ? "স্বাধীন শপ এবং তাদের পণ্যগুলো ব্রাউজ করুন।" : "Browse independent shops and their products."}
         </p>
       </div>
       <div className="catalog-search standalone-search">
@@ -2236,7 +2252,7 @@ function ShopPage() {
           <h1>{shop.name}</h1>
           <div className="shop-online-indicator">
             <span className="online-dot" />
-            <span>{lang === "bn" ? "ভেরিফাইড ডিজিটাল শপ" : "Verified Digital Shop"}</span>
+            <span>{shopType(shop)}</span>
           </div>
         </div>
       </section>
@@ -2333,13 +2349,13 @@ function WhatsAppFloatingButton({
   if (!/^https:\/\/(?:wa\.me|(?:api|web)\.whatsapp\.com)(?:\/|$)/i.test(targetUrl)) return null;
 
   if (!/^https:\/\//i.test(contact)) {
-    let text = "Hello! I am contacting you from Arise Digital Store.";
+    let text = "Hello! I am contacting you from Arise Store.";
     if (order) {
-      text = `Hello! I need help with my order *${order.ref}* (${order.name}) on Arise Digital Store.`;
+      text = `Hello! I need help with my order *${order.ref}* (${order.name}) on Arise Store.`;
     } else if (product) {
-      text = `Hello! I have a question about *${product.name}* on Arise Digital Store.`;
+      text = `Hello! I have a question about *${product.name}* on Arise Store.`;
     } else if (supportShop) {
-      text = `Hello! I have a question regarding *${supportShop.name}* on Arise Digital Store.`;
+      text = `Hello! I have a question regarding *${supportShop.name}* on Arise Store.`;
     }
     const url = new URL(targetUrl);
     url.searchParams.set("text", text);
@@ -2366,41 +2382,6 @@ function WhatsAppFloatingButton({
     </aside>
   );
 }
-export interface ShopVolumeConfig {
-  enabled: boolean;
-  tier3Pct: number;
-  tier5Pct: number;
-}
-
-export function getShopVolumeConfig(shopId?: string, shop?: any): ShopVolumeConfig {
-  const defaultConfig: ShopVolumeConfig = {
-    enabled: Boolean(shop?.volume_discount_enabled),
-    tier3Pct: 5,
-    tier5Pct: 10,
-  };
-  if (!shopId) return defaultConfig;
-  try {
-    const raw = localStorage.getItem(`arise_volume_discount_${shopId}`);
-    if (!raw) return defaultConfig;
-    if (raw === "true") return { enabled: true, tier3Pct: 5, tier5Pct: 10 };
-    if (raw === "false") return { enabled: false, tier3Pct: 5, tier5Pct: 10 };
-    const parsed = JSON.parse(raw);
-    return {
-      enabled: Boolean(parsed.enabled),
-      tier3Pct: typeof parsed.tier3Pct === "number" && parsed.tier3Pct > 0 ? parsed.tier3Pct : 5,
-      tier5Pct: typeof parsed.tier5Pct === "number" && parsed.tier5Pct > 0 ? parsed.tier5Pct : 10,
-    };
-  } catch {
-    return defaultConfig;
-  }
-}
-
-export function saveShopVolumeConfig(shopId: string, config: ShopVolumeConfig) {
-  try {
-    localStorage.setItem(`arise_volume_discount_${shopId}`, JSON.stringify(config));
-  } catch {}
-}
-
 function ProductPage() {
   const route = useParams();
   const navigate = useNavigate();
@@ -2443,7 +2424,7 @@ function ProductPage() {
   useEffect(() => {
     if (!product || !catalog) return;
     const previousTitle = document.title;
-    document.title = `${product.name} | ${catalog.shops.find((shop) => shop.id === product.shop_id)?.name || "Arise Digital Store"}`;
+    document.title = `${product.name} | ${catalog.shops.find((shop) => shop.id === product.shop_id)?.name || "Arise Store"}`;
     const canonical = productPath(product, catalog);
     if (location.pathname !== canonical) navigate(canonical + location.search + location.hash, { replace: true });
     return () => { document.title = previousTitle; };
@@ -2468,16 +2449,10 @@ function ProductPage() {
   const shop = catalog.shops.find((s) => s.id === product.shop_id)!;
   const selected = product.variants.find((v) => v.id === variant) ||
     product.variants.find((v) => v.stock > 0) || product.variants[0];
-  const available = Boolean(product.sales_enabled && selected && selected.stock > 0);
+  const digital = productFulfilment(product) === "digital";
+  const available = Boolean(canCheckout(product, shop) && selected && selected.stock > 0);
   const maximum = Math.min(selected?.stock ?? 0, 100);
-  const volumeConfig = getShopVolumeConfig(shop.id || product.shop_id, shop);
-  const isVolumeDiscountEnabled = volumeConfig.enabled;
-  const rawTotal = selected ? checkoutTotal(selected.price, quantity) : null;
-  const discountPct = !isVolumeDiscountEnabled ? 0
-    : quantity >= 5 ? volumeConfig.tier5Pct : quantity >= 3 ? volumeConfig.tier3Pct : 0;
-  const discountedTotal = rawTotal === null ? null
-    : discountPct > 0 ? (Number(rawTotal) * (1 - discountPct / 100)).toFixed(2) : rawTotal;
-  const total = discountedTotal;
+  const total = selected ? checkoutTotal(selected.price, quantity) : null;
   const canBuy = available && total !== null && quantity <= maximum;
   return (
     <main id="main" className="container detail-page">
@@ -2510,7 +2485,7 @@ function ProductPage() {
             {shop.name}
           </Link>
           <div className="detail-price">
-            {selected ? money(selected.price) : money(minimumPrice(product))}
+            {selected ? money(selected.price) : money(minimumPrice(product), product.currency)}
             <span>Price per item</span>
           </div>
           {product.description && <div className="product-brief">
@@ -2527,7 +2502,7 @@ function ProductPage() {
               >
                 {product.variants.map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.name} · {money(v.price)}
+                    {v.name} · {money(v.price, product.currency)}
                     {!v.stock ? " · Sold out" : ""}
                   </option>
                 ))}
@@ -2541,10 +2516,10 @@ function ProductPage() {
                 {selected!.stock} in stock
               </span>
             ) : (
-              <span className="product-stock unavailable">{product.sales_enabled ? "Sold out" : "Purchases paused"}</span>
+              <span className="product-stock unavailable">{selected?.stock ? "Checkout unavailable" : product.sales_enabled ? "Sold out" : "Purchases paused"}</span>
             )}
             <span>
-              {product.delivery_mode === "automatic" ? (
+              {!digital ? <><Package size={14} />Physical delivery</> : product.delivery_mode === "automatic" ? (
                 <>
                   <Zap size={14} />
                   Automatic delivery
@@ -2558,78 +2533,18 @@ function ProductPage() {
             </span>
           </div>
 
-          <div className="product-trust-stats-badges">
-            <div className="trust-stat-badge">
-              <span className="stat-icon">⚡</span>
-              <div>
-                <strong>
-                  {product.delivery_mode === "automatic"
-                    ? t("instantDeliveryBadge")
-                    : `${t("manualDeliveryBadge")} (${product.delivery_estimate || "1-3 Hours"})`}
-                </strong>
-                <small>{t("instantDeliveryDesc")}</small>
-              </div>
-            </div>
-            <div className="trust-stat-badge">
-              <span className="stat-icon">🛡️</span>
-              <div>
-                <strong>{t("completionRateBadge")}</strong>
-                <small>{t("fullWarrantyBadge")}</small>
-              </div>
-            </div>
-          </div>
+          {productFulfilment(product) === "digital" && product.delivery_estimate && <p className="preserve-lines">{product.delivery_estimate}</p>}
+          {product.warranty_type === "warranty" && product.warranty_days != null && <p>Warranty: {product.warranty_days} days</p>}
+          {product.checkout_unavailable_reason && <p role="status">{product.checkout_unavailable_reason}</p>}
 
-          {isVolumeDiscountEnabled && (
-            <div className="volume-discount-widget">
-              <span className="volume-title">
-                <Zap size={14} />
-                {t("volumeTierTitle")}
-              </span>
-              <div className="volume-chips-row">
-                <button
-                  type="button"
-                  className={`volume-chip ${quantity === 1 ? "active" : ""}`}
-                  onClick={() => setQuantity(1)}
-                >
-                  {t("volume1x")}
-                </button>
-                <button
-                  type="button"
-                  className={`volume-chip ${quantity >= 3 && quantity < 5 ? "active" : ""}`}
-                  onClick={() => setQuantity(3)}
-                >
-                  {lang === "bn"
-                    ? `৩টি+: ${String(volumeConfig.tier3Pct).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[Number(d)])}% ছাড়`
-                    : `3+ items: ${volumeConfig.tier3Pct}% OFF`}
-                </button>
-                <button
-                  type="button"
-                  className={`volume-chip ${quantity >= 5 ? "active" : ""}`}
-                  onClick={() => setQuantity(5)}
-                >
-                  {lang === "bn"
-                    ? `৫টি+: ${String(volumeConfig.tier5Pct).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[Number(d)])}% ছাড়`
-                    : `5+ items: ${volumeConfig.tier5Pct}% OFF`}
-                </button>
-              </div>
-            </div>
-          )}
 
           <div className="product-purchase-box">
             <div className="product-purchase-total" aria-live="polite" aria-atomic="true">
               <span>
                 {lang === "bn" ? "মোট মূল্য" : "Total price"} <small>{lang === "bn" ? `${quantity}টি আইটেম` : `For ${quantity} ${quantity === 1 ? "item" : "items"}`}</small>
-                {discountPct > 0 && (
-                  <span className="volume-savings-badge">
-                    {discountPct}% OFF
-                  </span>
-                )}
               </span>
               <div className="total-price-display">
-                {discountPct > 0 && rawTotal && (
-                  <span className="original-price-strike">{money(rawTotal)}</span>
-                )}
-                <strong>{total !== null ? money(total) : "—"}</strong>
+                <strong>{total !== null ? money(total, product.currency) : "—"}</strong>
               </div>
             </div>
             <div className="product-purchase-actions">
@@ -2644,9 +2559,7 @@ function ProductPage() {
           {canBuy && selected ? (
             <Link
               className="button primary buy-now"
-              to={`/checkout/${product.id}?variant=${selected.id}&quantity=${quantity}${
-                discountPct > 0 ? `&coupon=VOLUME${discountPct}` : ""
-              }`}
+              to={`/checkout/${product.id}?variant=${selected.id}&quantity=${quantity}`}
             >
               {lang === "bn" ? "এখনই কিনুন" : "Buy now"}
               <ArrowRight size={18} />
@@ -2689,7 +2602,8 @@ function ProductPage() {
                 "No additional description is available. Contact the seller if you need more information."}
             </p>}
           {section === "delivery" && <>
-            <p>{product.delivery_mode === "automatic"
+            <p>{!digital ? "Enter your delivery address at checkout to confirm the seller’s shipping charge. Track your shipment in My purchases."
+              : product.delivery_mode === "automatic"
               ? "Once your payment is verified, open My purchases to access your items privately."
               : product.delivery_estimate || "Once your payment is verified, the seller prepares your items. Follow your order in My purchases for updates."}</p>
             {product.delivery_note &&
@@ -2778,6 +2692,10 @@ function Checkout() {
     email: session?.user?.email || "",
     phone: "",
     note: "",
+    address: "",
+    district: "",
+    landmark: "",
+    alt_phone: "",
   });
   const [quantity, setQuantity] = useState(() => checkoutQuantity(params.get("quantity"))),
     [provider, setProvider] = useState("");
@@ -2788,10 +2706,13 @@ function Checkout() {
     [error, setError] = useState("");
   const key = useRef(crypto.randomUUID());
   useEffect(() => {
-    if (shop) setProvider(shop.payment_methods?.[0] || "");
-  }, [shop?.id]);
+    if (shop && product) setProvider(productPayments(product, shop)[0] || "");
+  }, [shop?.id, product?.id]);
   if (!catalog) return <Loading />;
   if (!product || !variant || !shop) return <NotFound />;
+  const digital = productFulfilment(product) === "digital";
+  const paymentMethods = productPayments(product, shop);
+  if (!canCheckout(product, shop)) return <main id="main" className="container section"><h1>Checkout unavailable</h1><p>{product.checkout_unavailable_reason || "Contact the seller to confirm how to order this product."}</p><Link className="button secondary" to={productPath(product, catalog)}>Back to product</Link></main>;
   const required = new Set(["name", ...product.required_buyer_fields]);
   const estimatedTotal = checkoutTotal(variant.price, quantity);
   const validQuantity = estimatedTotal !== null && quantity <= Math.min(variant.stock, 100);
@@ -2849,7 +2770,7 @@ function Checkout() {
         <h1>{quote ? (lang === "bn" ? "অর্ডারটি রিভিউ করুন" : "Review your order") : (lang === "bn" ? "চেকআউট" : "Checkout")}</h1>
         <p>
           {quote
-            ? (lang === "bn" ? "পেমেন্ট রিকোয়েস্ট তৈরির আগে পণ্যের বর্তমান মূল্য এবং বিক্রেতার শর্তাবলী মিলিয়ে দেখুন।" : "Review the current price and seller terms before creating your payment request.")
+            ? (digital ? (lang === "bn" ? "পেমেন্ট রিকোয়েস্ট তৈরির আগে পণ্যের বর্তমান মূল্য এবং বিক্রেতার শর্তাবলী মিলিয়ে দেখুন।" : "Review the current price and seller terms before creating your payment request.") : "Review the delivery address, shipping charge and order total before confirming.")
             : (lang === "bn" ? "আপনার যোগাযোগের তথ্য লিখুন এবং পেমেন্ট মাধ্যম নির্বাচন করুন।" : "Enter your details and choose a payment method.")}
         </p>
         <ol className="checkout-progress" aria-label="Checkout progress">
@@ -2906,10 +2827,19 @@ function Checkout() {
                     />
                   </label>
                 ))}
+              {!digital && (["address", "district", "landmark", "alt_phone"] as const).filter(field => required.has(field)).map(field => (
+                <label className="field" key={field}>
+                  {({address: "Full delivery address", district: "District", landmark: "Nearby landmark", alt_phone: "Alternative mobile number"})[field]}
+                  <input name={field} required autoComplete={field === "address" ? "street-address" : field === "district" ? "address-level2" : field === "alt_phone" ? "tel" : "off"}
+                    type={field === "alt_phone" ? "tel" : "text"} maxLength={field === "address" ? 4000 : field === "alt_phone" ? 32 : 128}
+                    value={fields[field]} onChange={e => setFields({...fields, [field]: e.target.value})} />
+                </label>
+              ))}
               <label className="field">
-                {product.delivery_mode === "manual"
+                {!digital && <span>Order note (optional)</span>}
+                {digital && (product.delivery_mode === "manual"
                   ? "Delivery details (optional)"
-                  : "Order note (optional)"}
+                  : "Order note (optional)")}
                 <textarea
                   name="note"
                   rows={2}
@@ -2971,13 +2901,13 @@ function Checkout() {
                   value={quantity}
                   onChange={(e) => setQuantity(Number(e.target.value))}
                 />
-                <small id="checkout-quantity-hint">{money(variant.price)} each · Up to {Math.min(variant.stock, 100)} per order</small>
+                <small id="checkout-quantity-hint">{money(variant.price, product.currency)} each · Up to {Math.min(variant.stock, 100)} per order</small>
               </label>
               <fieldset className="checkout-payment">
                 <legend>{lang === "bn" ? "পেমেন্ট মাধ্যম" : "Payment method"}</legend>
                 <p className="form-hint muted">{lang === "bn" ? `কীভাবে ${shop.name}-কে পেমেন্ট করবেন তা নির্বাচন করুন।` : `Choose how you’ll pay ${shop.name}.`}</p>
                 <div className="payment-options">
-                {shop.payment_methods?.map((method) => (
+                {paymentMethods.map((method) => (
                   <label
                     key={method}
                     className={
@@ -3006,7 +2936,7 @@ function Checkout() {
                   </label>
                 ))}
               </div>
-              {!shop.payment_methods?.length && <ErrorBox message="This seller has no payment method available. Please contact the seller." />}
+              {!paymentMethods.length && <ErrorBox message="This seller has no payment method available. Please contact the seller." />}
               <p className="form-hint muted">
                 You’ll get payment instructions after reviewing and confirming your order.
               </p>
@@ -3014,6 +2944,7 @@ function Checkout() {
             </>
           ) : (
             <>
+              {!digital && <div className="review-row"><span>Delivery address</span><strong className="preserve-lines">{quote.snapshot.buyer?.address || fields.address}, {quote.snapshot.buyer?.district || fields.district}</strong></div>}
               <div className="review-row">
                 <span>Customer</span>
                 <strong>{fields.name}</strong>
@@ -3043,17 +2974,18 @@ function Checkout() {
               {quote.snapshot.coupon_code && Number(quote.snapshot.discount || "0") > 0 && (
                 <div className="review-row discount-row">
                   <span>Coupon discount ({quote.snapshot.coupon_code})</span>
-                  <strong className="discount-value">- {money(quote.snapshot.discount!)}</strong>
+                  <strong className="discount-value">- {money(quote.snapshot.discount!, product.currency)}</strong>
                 </div>
               )}
               <div className="terms-box">
+                {!digital && Number(quote.snapshot.advance_amount || 0) > 0 && <p>Required advance: {money(quote.snapshot.advance_amount!, product.currency)}. The seller verifies payment before dispatch. Further verification may be required after the source checks the order.</p>}
                 <h3>Seller’s purchase terms</h3>
                 <p className="preserve-lines">
-                  {quote.snapshot.digital_config.purchase_terms}
+                  {quote.snapshot.digital_config?.purchase_terms || product.purchase_terms || "Contact the seller for purchase terms."}
                 </p>
                 <h3>Delivery</h3>
                 <p className="preserve-lines">
-                  {quote.snapshot.digital_config.delivery_note}
+                  {digital ? quote.snapshot.digital_config?.delivery_note : "Delivery to the address shown above. Shipping charges are included in the confirmed total."}
                 </p>
               </div>
               <label className="checkbox-label">
@@ -3070,7 +3002,7 @@ function Checkout() {
           {error && <ErrorBox message={error} />}
           <div className="checkout-payable" aria-live="polite" aria-atomic="true">
             <span>{quote ? (lang === "bn" ? "মোট প্রদেয় টাকা" : "Total to pay") : (lang === "bn" ? "মোট আনুমানিক মূল্য" : "Estimated total")}<small>BDT · {quote?.snapshot.quantity ?? quantity} {lang === "bn" ? "টি আইটেম" : `item${(quote?.snapshot.quantity ?? quantity) === 1 ? "" : "s"}`}</small></span>
-            <strong>{total !== null ? money(total) : "—"}</strong>
+            <strong>{total !== null ? money(total, product.currency) : "—"}</strong>
           </div>
           <button
             className="button primary full-width"
@@ -3110,7 +3042,7 @@ function Checkout() {
         <aside className="panel order-summary" aria-label="Order summary">
           <Art product={product} />
           <div className="order-summary-content">
-            <span className="eyebrow">From {shop.name}</span>
+            <span className="eyebrow">From {shop.name} · {shopType(shop)}</span>
             <h2>{quote?.snapshot.name ?? product.name}</h2>
             {product.variants.length > 1 && <p>{quote?.snapshot.variant ?? variant.name}</p>}
             <div className="summary-line">
@@ -3119,11 +3051,11 @@ function Checkout() {
             </div>
             {!quote && <div className="summary-line">
               <span>Price per item</span>
-              <strong>{money(variant.price)}</strong>
+              <strong>{money(variant.price, product.currency)}</strong>
             </div>}
             <div className="summary-line">
               <span>Delivery</span>
-              <strong>Digital · no shipping</strong>
+              <strong>{digital ? "Digital · no shipping" : quote?.snapshot.delivery_charge !== undefined ? money(quote.snapshot.delivery_charge, product.currency) : "Calculated at review"}</strong>
             </div>
             {quote?.snapshot.discount && Number(quote.snapshot.discount) > 0 ? (
               <>
@@ -3140,9 +3072,9 @@ function Checkout() {
               </>
             ) : null}
             <div className="summary-total" aria-live="polite" aria-atomic="true">
-              <span>{quote ? "Total to pay" : "Estimated total"}</span>
-              <strong>{total !== null ? money(total) : "—"}</strong>
-              <small>{quote ? "Current price confirmed by the seller." : "Price and availability are confirmed at review."}</small>
+              <span>{quote ? (digital ? "Total to pay" : "Order total") : (digital ? "Estimated total" : "Products subtotal")}</span>
+              <strong>{total !== null ? money(total, product.currency) : "—"}</strong>
+              <small>{quote ? "Current price confirmed by the seller." : digital ? "Price and availability are confirmed at review." : "Shipping and any required advance are confirmed by the source at review."}</small>
             </div>
           </div>
         </aside>
@@ -3169,7 +3101,7 @@ function Purchases() {
       <div className="page-intro">
         <h1>{t("myPurchases")}</h1>
         <p>
-          {lang === "bn" ? "পেমেন্ট ট্র্যাক করুন, ডেলিভারি স্ট্যাটাস চেক করুন এবং আপনার ডিজিটাল পণ্য অ্যাক্সেস করুন।" : "Track payments, check delivery status, and access your digital items."}
+          {lang === "bn" ? "পেমেন্ট, ডেলিভারি স্ট্যাটাস এবং আপনার অর্ডার দেখুন।" : "Track payments, check delivery status, and access your purchases."}
         </p>
       </div>
       {!session?.user && (
@@ -3210,7 +3142,7 @@ function Purchases() {
                 <h2>{order.name}</h2>
                 <span>
                   {order.quantity} {order.quantity === 1 ? (lang === "bn" ? "টি আইটেম" : "item") : (lang === "bn" ? "টি আইটেম" : "items")} ·{" "}
-                  {money(order.total)}
+                  {money(order.total, order.currency)}
                 </span>
               </div>
               <div className="purchase-status">
@@ -3280,31 +3212,6 @@ function CopyButton({
   );
 }
 
-export function getSellerPaymentAccountType(shopId?: string, provider?: string): "merchant" | "personal" {
-  if (!provider) return "personal";
-  const pKey = provider.toLowerCase();
-  try {
-    if (shopId) {
-      const specific = localStorage.getItem(`arise_payment_account_type_${shopId}_${pKey}`);
-      if (specific === "merchant" || specific === "personal") return specific;
-    }
-    const general = localStorage.getItem(`arise_payment_account_type_${pKey}`);
-    if (general === "merchant" || general === "personal") return general;
-  } catch {}
-  return "personal";
-}
-
-export function setSellerPaymentAccountType(shopId: string | undefined, provider: string, type: "merchant" | "personal") {
-  if (!provider) return;
-  const pKey = provider.toLowerCase();
-  try {
-    if (shopId) {
-      localStorage.setItem(`arise_payment_account_type_${shopId}_${pKey}`, type);
-    }
-    localStorage.setItem(`arise_payment_account_type_${pKey}`, type);
-  } catch {}
-}
-
 export function detectPaymentAccountType(payment: any, shop?: Shop | null): "merchant" | "personal" {
   if (!payment) return "personal";
 
@@ -3326,11 +3233,6 @@ export function detectPaymentAccountType(payment: any, shop?: Shop | null): "mer
   if (shop?.payment_account_types && payment.provider) {
     const val = shop.payment_account_types[payment.provider.toLowerCase()];
     if (val === "merchant" || val === "personal") return val;
-  }
-
-  // 4. Shop ID or general in localStorage
-  if (payment.provider) {
-    return getSellerPaymentAccountType(shop?.id, payment.provider);
   }
 
   return "personal";
@@ -3606,7 +3508,7 @@ function PurchasePage() {
             </p>
           </div>
           <div className="purchase-pricing-col">
-            <strong className="price">{money(order.total)}</strong>
+            <strong className="price">{money(order.total, order.currency)}</strong>
             {order.discount && Number(order.discount) > 0 && (
               <span className="purchase-discount-tag">{lang === "bn" ? "ছাড়: -" : "Discount: -"}{money(order.discount)}</span>
             )}
@@ -3716,7 +3618,15 @@ function PurchasePage() {
             </button>
           </div>
         )}
-        {paid && order.ready && !cancelled && (
+        {order.fulfilment_kind === "physical" && <section className="purchase-buyer-info" aria-label="Delivery details">
+          <h3>Delivery details</h3><p className="preserve-lines">{order.address}, {order.district}</p>
+          <p>Payment method: {paymentMethodLabel(order.payment_method || "cod")}</p>
+          {order.delivery_charge !== undefined && <p>Delivery charge: {money(order.delivery_charge, order.currency)}</p>}
+          {Number(order.advance_amount || 0) > 0 && <p>Required advance: {money(order.advance_amount!, order.currency)}. Contact the seller for verification.</p>}
+          {order.tracking ? <p>{order.tracking.provider} · Tracking number: {order.tracking.tracking} · {order.tracking.status}</p> : <p>Courier tracking will appear when the seller books delivery.</p>}
+          {order.tracking?.tracking_url?.startsWith("https://") && <a className="button secondary" href={order.tracking.tracking_url} target="_blank" rel="noopener noreferrer">Track with courier<ExternalLink size={16} /></a>}
+        </section>}
+        {order.fulfilment_kind !== "physical" && paid && order.ready && !cancelled && (
           <div className="private-delivery">
             <div>
               <LockKeyhole size={24} />
@@ -3796,30 +3706,7 @@ function PurchasePage() {
           </div>
         )}
       </div>
-        {paid && !cancelled && (
-          <div className="subscription-expiry-card">
-            <div className="expiry-header">
-              <span className="expiry-badge active">
-                <Zap size={14} />
-                {(() => {
-                  const expiryTime = new Date(order.created_at).getTime() + (30 * 86400000);
-                  const diffDays = Math.ceil((expiryTime - Date.now()) / 86400000);
-                  return diffDays > 0 ? `${diffDays} ${t("daysLeft")} (${t("warrantyActive")})` : t("expiredPlan");
-                })()}
-              </span>
-              <span className="expiry-date-label">
-                {lang === "bn" ? "মেয়াদ:" : "Valid until"} {new Date(new Date(order.created_at).getTime() + (30 * 86400000)).toLocaleDateString(lang === "bn" ? "bn-BD" : "en-GB", { day: "numeric", month: "short", year: "numeric" })}
-              </span>
-            </div>
-            <Link
-              to={`/checkout/${order.product_id}?coupon=RENEW10`}
-              className="button primary button-renew-plan"
-            >
-              <RefreshCw size={15} />
-              {t("oneClickRenew")}
-            </Link>
-          </div>
-        )}
+
       {(order.can_review || order.review) && <PurchaseReview key={order.id} order={order} />}
       <div className="purchase-support">
         <span>{lang === "bn" ? "এই অর্ডার সংক্রান্ত সহায়তার প্রয়োজন?" : "Need help with this order?"}</span>
@@ -3863,9 +3750,6 @@ function Seller() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
-  const [volumeDiscountEnabled, setVolumeDiscountEnabled] = useState(false);
-  const [volumeTier3Pct, setVolumeTier3Pct] = useState(5);
-  const [volumeTier5Pct, setVolumeTier5Pct] = useState(10);
   const [synced, setSynced] = useState("");
   useEffect(() => {
     if (!session?.user) return;
@@ -3907,10 +3791,6 @@ function Seller() {
     setSynced(
       new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     );
-    const vConfig = getShopVolumeConfig(selected, result.shop);
-    setVolumeDiscountEnabled(vConfig.enabled);
-    setVolumeTier3Pct(vConfig.tier3Pct);
-    setVolumeTier5Pct(vConfig.tier5Pct);
   };
   useEffect(() => {
     let current = true;
@@ -3940,10 +3820,6 @@ function Seller() {
               minute: "2-digit",
             }),
           );
-          const vConfig = getShopVolumeConfig(selected, result.shop);
-          setVolumeDiscountEnabled(vConfig.enabled);
-          setVolumeTier3Pct(vConfig.tier3Pct);
-          setVolumeTier5Pct(vConfig.tier5Pct);
         }
       })
       .catch((e) => {
@@ -3974,13 +3850,6 @@ function Seller() {
           ? "Your shop is published. Products, prices and stock are updated from AriseSell."
           : "Your shop is unpublished. Existing products and orders remain in AriseSell.",
       );
-      if (selected) {
-        saveShopVolumeConfig(selected, {
-          enabled: volumeDiscountEnabled,
-          tier3Pct: volumeTier3Pct,
-          tier5Pct: volumeTier5Pct,
-        });
-      }
       await reloadCatalog();
     } catch (e) {
       setError((e as Error).message);
@@ -3992,8 +3861,8 @@ function Seller() {
     <main id="main" className="container seller-page">
       <div className="page-intro">
         <p className="eyebrow">Seller workspace</p>
-        <h1>{session?.user ? "Manage your shop" : <>Sell digital products</>}</h1>
-        <p>{session?.user ? "Update your profile, choose products, and share your shop link." : "Connect your AriseSell account to publish your digital products here."}</p>
+        <h1>{session?.user ? "Manage your shop" : <>Sell your products</>}</h1>
+        <p>{session?.user ? "Update your profile, choose products, and share your shop link." : "Connect your AriseSell account to publish your products here."}</p>
       </div>
       <ol className="onboarding-steps">
         <li className={session?.user ? "complete" : "active"}>
@@ -4035,7 +3904,7 @@ function Seller() {
               </h2>
               <p>
                 Connect your AriseSell account to bring your shop here. Your
-                product catalog, payments, and digital stock stay where you
+                product catalog, payments, and stock stay where you
                 already manage them.
               </p>
               <a className="button primary" href="/api/auth/start">
@@ -4068,14 +3937,14 @@ function Seller() {
               <Store size={36} />
               <h2>Create a shop in AriseSell</h2>
               <p>
-                Your account is connected. Create a digital store in AriseSell,
+                Your account is connected. Create a store in AriseSell,
                 then return here to publish it.
               </p>
               <a
                 className="button primary"
                 href={`${session.source_web}/onboarding`}
               >
-                Create a digital shop
+                Create a shop
                 <ArrowRight size={17} />
               </a>
               <button
@@ -4131,6 +4000,7 @@ function Seller() {
                     className="panel store-link-panel"
                     aria-labelledby="store-link-title"
                   >
+                    <p className="eyebrow">{shopType(data.shop)}</p>
                     <div className="seller-panel-heading">
                       <div>
                         <span className="eyebrow">Your storefront</span>
@@ -4214,7 +4084,7 @@ function Seller() {
                           onChange={(e) =>
                             setForm({ ...form, description: e.target.value })
                           }
-                          placeholder="Describe the digital products you sell and who they are for."
+                          placeholder="Describe the products you sell and who they are for."
                         />
                         <small>{form.description.length}/1,500</small>
                       </label>
@@ -4282,220 +4152,12 @@ function Seller() {
                       </div>
                       <p className="muted">Use {data.shop.published ? "Save shop changes" : "Publish shop"} below to save this information with your shop.</p>
                     </section>
-                    <section className="panel seller-panel" aria-labelledby="shop-promotions-title">
-                      <div className="seller-panel-heading">
-                        <div>
-                          <span className="eyebrow">Marketing & Discounts</span>
-                          <h2 id="shop-promotions-title">Volume Discounts</h2>
-                        </div>
-                        <Zap size={24} aria-hidden="true" />
-                      </div>
-                      <p className="muted">
-                        Allow customers to receive tiered bulk discounts ({volumeDiscountEnabled ? `3+ items: ${volumeTier3Pct}% OFF, 5+ items: ${volumeTier5Pct}% OFF` : "3+ items: 5% OFF, 5+ items: 10% OFF"}) on your product pages.
-                      </p>
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={volumeDiscountEnabled}
-                          onChange={(e) => {
-                            const val = e.target.checked;
-                            setVolumeDiscountEnabled(val);
-                            if (selected) {
-                              saveShopVolumeConfig(selected, {
-                                enabled: val,
-                                tier3Pct: volumeTier3Pct,
-                                tier5Pct: volumeTier5Pct,
-                              });
-                            }
-                          }}
-                        />
-                        <span>Enable "Buy More, Save More" Volume Discounts for this shop</span>
-                      </label>
-                      {volumeDiscountEnabled && (
-                        <div className="volume-discount-settings-row">
-                          <div className="field">
-                            <label htmlFor="volume-tier-3">
-                              3+ items discount (% off)
-                            </label>
-                            <div className="volume-percent-input-group">
-                              <input
-                                id="volume-tier-3"
-                                type="number"
-                                min={1}
-                                max={90}
-                                step={1}
-                                value={volumeTier3Pct}
-                                disabled={busy}
-                                onChange={(e) => {
-                                  const val = Math.max(1, Math.min(90, Number(e.target.value) || 0));
-                                  setVolumeTier3Pct(val);
-                                  if (selected) {
-                                    saveShopVolumeConfig(selected, {
-                                      enabled: volumeDiscountEnabled,
-                                      tier3Pct: val,
-                                      tier5Pct: volumeTier5Pct,
-                                    });
-                                  }
-                                }}
-                              />
-                              <span className="percent-suffix">%</span>
-                              <div className="tier-quick-presets" role="group" aria-label="3+ items discount presets">
-                                {[5, 8, 10, 15].map((preset) => (
-                                  <button
-                                    key={preset}
-                                    type="button"
-                                    className={`preset-pill ${volumeTier3Pct === preset ? "active" : ""}`}
-                                    onClick={() => {
-                                      setVolumeTier3Pct(preset);
-                                      if (selected) {
-                                        saveShopVolumeConfig(selected, {
-                                          enabled: volumeDiscountEnabled,
-                                          tier3Pct: preset,
-                                          tier5Pct: volumeTier5Pct,
-                                        });
-                                      }
-                                    }}
-                                  >
-                                    {preset}%
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                            <span className="form-hint">Choose or type discount percentage for 3 or 4 items</span>
-                          </div>
-                          <div className="field">
-                            <label htmlFor="volume-tier-5">
-                              5+ items discount (% off)
-                            </label>
-                            <div className="volume-percent-input-group">
-                              <input
-                                id="volume-tier-5"
-                                type="number"
-                                min={1}
-                                max={90}
-                                step={1}
-                                value={volumeTier5Pct}
-                                disabled={busy}
-                                onChange={(e) => {
-                                  const val = Math.max(1, Math.min(90, Number(e.target.value) || 0));
-                                  setVolumeTier5Pct(val);
-                                  if (selected) {
-                                    saveShopVolumeConfig(selected, {
-                                      enabled: volumeDiscountEnabled,
-                                      tier3Pct: volumeTier3Pct,
-                                      tier5Pct: val,
-                                    });
-                                  }
-                                }}
-                              />
-                              <span className="percent-suffix">%</span>
-                              <div className="tier-quick-presets" role="group" aria-label="5+ items discount presets">
-                                {[10, 15, 20, 25].map((preset) => (
-                                  <button
-                                    key={preset}
-                                    type="button"
-                                    className={`preset-pill ${volumeTier5Pct === preset ? "active" : ""}`}
-                                    onClick={() => {
-                                      setVolumeTier5Pct(preset);
-                                      if (selected) {
-                                        saveShopVolumeConfig(selected, {
-                                          enabled: volumeDiscountEnabled,
-                                          tier3Pct: volumeTier3Pct,
-                                          tier5Pct: preset,
-                                        });
-                                      }
-                                    }}
-                                  >
-                                    {preset}%
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                            <span className="form-hint">Choose or type discount percentage for 5 or more items</span>
-                          </div>
-                        </div>
-                      )}
-                    </section>
+
                     <section className="panel seller-panel" aria-labelledby="shop-payment-settings-title">
-                      <div className="seller-panel-heading">
-                        <div>
-                          <span className="eyebrow">Payment Setup</span>
-                          <h2 id="shop-payment-settings-title">{t("sellerPaymentSettingsTitle")}</h2>
-                        </div>
-                        <Wallet size={24} aria-hidden="true" />
-                      </div>
-                      <p className="muted">
-                        {t("sellerPaymentSettingsDesc")}
-                      </p>
-                      <div className="seller-payment-methods-list">
-                        {(data.payment_methods.length ? data.payment_methods : ["bkash", "nagad", "rocket"]).map((providerKey) => {
-                          const pKey = providerKey.toLowerCase();
-                          const currentType = getSellerPaymentAccountType(selected, pKey);
-                          return (
-                            <div key={pKey} className="seller-payment-method-row">
-                              <div className="payment-method-header-bar">
-                                <div className="payment-method-info">
-                                  <span className={`provider-dot ${pKey}`} />
-                                  <strong>{paymentMethodLabel(pKey)}</strong>
-                                </div>
-                                <span className={`account-type-badge ${currentType}`}>
-                                  {currentType === "merchant" ? <Building2 size={13} /> : <UserCheck size={13} />}
-                                  {currentType === "merchant" ? t("merchantAccount") : t("personalAccount")}
-                                </span>
-                              </div>
-                              <div className="payment-type-selector" role="radiogroup" aria-label={`Account type for ${paymentMethodLabel(pKey)}`}>
-                                <button
-                                  type="button"
-                                  className={`type-toggle-pill ${currentType === "personal" ? "active" : ""}`}
-                                  onClick={() => {
-                                    setSellerPaymentAccountType(selected, pKey, "personal");
-                                    setPaymentAccountTypesUpdated((v) => v + 1);
-                                  }}
-                                >
-                                  <UserCheck size={15} />
-                                  <span>{t("personalSendMoneyLabel")}</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`type-toggle-pill ${currentType === "merchant" ? "active" : ""}`}
-                                  onClick={() => {
-                                    setSellerPaymentAccountType(selected, pKey, "merchant");
-                                    setPaymentAccountTypesUpdated((v) => v + 1);
-                                  }}
-                                >
-                                  <Building2 size={15} />
-                                  <span>{t("merchantPaymentLabel")}</span>
-                                </button>
-                              </div>
-                              <div className="payment-type-feedback-hint">
-                                {currentType === "merchant" ? (
-                                  <span className="feedback-text merchant">
-                                    ✓ {lang === "bn" ? "ক্রেতারা 'পেমেন্ট করুন' (Payment) নির্দেশনা ও সেন্ড মানি না করার স্পষ্ট সতর্কতা দেখতে পাবেন।" : "Buyers will be instructed to use 'Make Payment' and warned not to Send Money."}
-                                  </span>
-                                ) : (
-                                  <span className="feedback-text personal">
-                                    ✓ {lang === "bn" ? "ক্রেতারা 'সেন্ড মানি করুন' (Send Money) নির্দেশনা ও পেমেন্ট অপশন না ব্যবহারের সতর্কতা দেখতে পাবেন।" : "Buyers will be instructed to use 'Send Money' and warned not to use Payment."}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div className="sync-bar payment-sync-bar">
-                        <span className="muted form-hint">
-                          {lang === "bn" ? "একাউন্ট টাইপ তাৎক্ষণিকভাবে সেভ হয় এবং চেকআউটে প্রতিফলিত হয়।" : "Account types are saved instantly and reflected at customer checkout."}
-                        </span>
-                        <a
-                          className="text-link"
-                          href={`${session.source_web}/console/${data.shop.slug}/integrations`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {lang === "bn" ? "AriseSell-এ পেমেন্ট নম্বর ম্যানেজ করুন" : "Manage payment numbers in AriseSell"}
-                          <ExternalLink size={14} />
-                        </a>
-                      </div>
+                      <h2 id="shop-payment-settings-title">Payments and delivery</h2>
+                      <p>{data.payment_methods.length ? data.payment_methods.map(paymentMethodLabel).join(" · ") : "No source-supported payment method configured."}</p>
+                      <p className="muted">Your AriseSell shop controls payment accounts, shipping charges and fulfillment. Changes made there are used automatically.</p>
+                      <a className="text-link" href={`${session.source_web}/console/${data.shop.slug}/integrations`} target="_blank" rel="noreferrer">Manage in AriseSell<ExternalLink size={14} /></a>
                     </section>
                     <section className="panel seller-panel">
                       <div className="seller-panel-heading">
@@ -4519,7 +4181,7 @@ function Seller() {
                         Choose which products appear here. Edit products, stock,
                         prices, and delivery settings in AriseSell.
                       </p>
-                      <p className="publication-hint">To publish, select at least one product and connect a payment account in an active AriseSell shop.</p>
+                      <p className="publication-hint">Select products from your active AriseSell shop to publish. Customers can order when the source payment and delivery setup supports checkout.</p>
                       <div className="sync-bar">
                         <span>
                           <RefreshCw size={14} />
@@ -4568,14 +4230,13 @@ function Seller() {
                                 <strong>{product.name}</strong>
                                 <small>
                                   {product.sales_enabled
-                                    ? `${money(minimumPrice(product))} · ${stock(product)} available`
-                                    : "Paused in AriseSell"}
+                                    ? `${money(minimumPrice(product), product.currency)} · ${stock(product)} available`
+                                  : "Paused in AriseSell"}
                                 </small>
+                                {product.checkout_unavailable_reason && <small>{product.checkout_unavailable_reason}</small>}
                               </span>
                               <span className="delivery-tag">
-                                {product.delivery_mode === "automatic"
-                                  ? "Automatic"
-                                  : "Manual"}
+                                {productFulfilment(product) === "physical" ? "Physical delivery" : product.delivery_mode === "automatic" ? "Automatic" : "Manual"}
                               </span>
                             </label>
                           ))}
@@ -4583,7 +4244,7 @@ function Seller() {
                       ) : (
                         <Empty title="No products in your catalog">
                           <p>
-                            Add a digital product in AriseSell, then refresh
+                            Add a product in AriseSell, then refresh
                             here.
                           </p>
                         </Empty>
@@ -4598,7 +4259,6 @@ function Seller() {
                           disabled={
                             busy ||
                             !ids.length ||
-                            !data.payment_methods.length ||
                             !data.active
                           }
                         >
@@ -4654,7 +4314,7 @@ function Seller() {
               </li>
               <li>
                 <Check size={16} />
-                Automatic or manual delivery
+                Source-configured delivery
               </li>
             </ul>
           </section>
@@ -4669,7 +4329,7 @@ function Seller() {
                   "Shop profile ready",
                 ],
                 [ids.length > 0, "Products selected"],
-                [data.payment_methods.length > 0, "Payment account connected"],
+                [data.payment_methods.length > 0, "Source payment method configured"],
               ].map(([done, label]) => (
                 <p key={String(label)}>
                   <span className={done ? "check-done" : "check-pending"}>
@@ -4683,7 +4343,7 @@ function Seller() {
                   className="text-link"
                   href={`${session.source_web}/console/${data.shop.slug}/integrations`}
                 >
-                  Connect a payment account
+                  Configure payments in AriseSell
                 </a>
               )}
             </section>
@@ -4699,10 +4359,10 @@ function HowItWorks() {
       <div className="page-intro">
         <p className="eyebrow">How it works</p>
         <h1>
-          How to buy digital products
+          How to buy products
         </h1>
         <p>
-          Independent shops, digital products, and a straightforward way to make
+          Independent shops, products, and a straightforward way to make
           them yours.
         </p>
       </div>
@@ -4720,8 +4380,8 @@ function HowItWorks() {
           ],
           [
             Download,
-            "Access your digital items",
-            "After payment verification, automatic items become available in My purchases. Manual items are prepared by the seller.",
+            "Follow your order",
+            "Follow your order in My purchases. Physical orders show delivery and courier tracking. Digital items become available after verified payment and preparation.",
           ],
         ].map(([Icon, title, text]) => {
           const I = Icon as typeof Search;
@@ -4741,7 +4401,7 @@ function HowItWorks() {
         {[
           [
             "Who am I buying from?",
-            "You buy directly from the shop shown on the product page. Arise Digital Store helps you discover it; the seller’s AriseSell account manages the order, payment and delivery.",
+            "You buy directly from the shop shown on the product page. Arise Store helps you discover it; the seller’s AriseSell account manages the order, payment and delivery.",
           ],
           [
             "Do I need an account?",

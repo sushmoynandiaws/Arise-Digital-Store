@@ -9,6 +9,37 @@ function client(fetch=async()=>({ok:true,json:async()=>({ok:true})}), clock=Date
   const code=ts.transpileModule(fs.readFileSync("src/api.ts","utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
   vm.runInNewContext(code,{exports,fetch,Intl,Number,Date:clock});return exports;
 }
+
+test("checkout follows product fulfillment and source capability without treating unknown items as digital",()=>{
+  const {productFulfilment,productPayments,canCheckout,shopType}=client();
+  const shop={kind:"Fashion & Clothing",commerce_mode:"standard",payment_methods:["cod"]};
+  const physical={fulfilment_kind:"physical",delivery_mode:"shipping",payment_methods:["cod"],sales_enabled:true,checkout_available:true};
+  assert.equal(productFulfilment(physical),"physical");
+  assert.equal(canCheckout(physical,shop),true);
+  assert.equal(canCheckout({...physical,checkout_available:false},shop),false);
+  assert.equal(canCheckout({...physical,payment_methods:[]},shop),false);
+  assert.equal(productFulfilment({delivery_mode:"automatic"}),"digital");
+  assert.equal(productFulfilment({delivery_mode:"unrecognized"}),"unknown");
+  assert.equal(productFulfilment({fulfilment_kind:"service",delivery_mode:"automatic"}),"unknown");
+  assert.equal(canCheckout({delivery_mode:"unrecognized",sales_enabled:true},shop),false);
+  assert.equal(productPayments({...physical,payment_methods:undefined},shop).length,0);
+  assert.equal(shopType(shop),"Fashion & Clothing");
+  assert.equal(shopType({}),"Shop");
+});
+
+test("physical order status never offers digital access or treats COD delivery as verified payment",()=>{
+  const {purchaseMessage,paymentMethodLabel}=client();
+  const order={fulfilment_kind:"physical",payment_method:"cod",payment_status:"unpaid",delivery_status:"confirmed",ready:false};
+  assert.equal(purchaseMessage(order).title,"Order confirmed");
+  assert.match(purchaseMessage({...order,delivery_status:"in_transit"}).title,/In transit/);
+  const delivered=purchaseMessage({...order,delivery_status:"delivered"});
+  assert.match(delivered.description,/settlement has not been confirmed/);
+  assert.doesNotMatch(delivered.description,/digital|access/);
+  assert.equal(purchaseMessage({...order,payment_status:"refunded"}).title,"Payment refunded");
+  assert.equal(purchaseMessage({...order,delivery_status:"cancelled"}).title,"Order cancelled");
+  assert.match(purchaseMessage({...order,delivery_status:"awaiting_advance"}).description,/required advance/);
+  assert.equal(paymentMethodLabel("cod"),"Cash on delivery");
+});
 test("prices retain currency and decimals; availability comes from all actual variants",()=>{
   const helpers=client();assert.match(helpers.money("1290.50"),/1,290\.50/);assert.match(helpers.money("0.01"),/0\.01/);
   assert.equal(helpers.stock({variants:[{stock:2},{stock:0},{stock:7}]}),9);
