@@ -2398,7 +2398,6 @@ function ProductPage() {
     if (section) document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = previousOverflow; };
   }, [section, product?.id]);
-  useEffect(() => setQuantity(1), [product?.id]);
   useEffect(() => {
     if (!product || !catalog) return;
     const previousTitle = document.title;
@@ -4771,7 +4770,8 @@ function ScrollToTop() {
   return null;
 }
 export default function App() {
-  const adminRoute = /^\/admin(?:\/|$)/.test(useLocation().pathname);
+  const { pathname } = useLocation();
+  const adminRoute = /^\/admin(?:\/|$)/.test(pathname);
   const [catalog, setCatalog] = useState<Catalog | null>(null),
     [catalogError, setCatalogError] = useState("");
   const [session, setSession] = useState<Session | null>(null),
@@ -4852,8 +4852,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/products" element={<Products />} />
-          <Route path="/products/:id" element={<ProductPage />} />
-          <Route path="/shops/:slug/products/:productSlug" element={<ProductPage />} />
+          <Route path="/products/:id" element={<ProductPage key={pathname} />} />
+          <Route path="/shops/:slug/products/:productSlug" element={<ProductPage key={pathname} />} />
           <Route path="/shops" element={<Shops />} />
           <Route path="/shops/:slug" element={<ShopPage />} />
           <Route path="/shops/:slug/reviews" element={<ShopReviewsPage />} />

@@ -82,6 +82,7 @@ test("product options, quantity and total stay consistent through checkout", asy
   await expect(popup).toHaveAccessibleName("Purchase terms");
   await page.getByRole("button", { name: "Close product details" }).click();
   await quantity.fill("6");
+  await expect(buy).toHaveAttribute("href", "/checkout/product-test?variant=available&quantity=6");
   await buy.click();
   await expect(page.getByRole("spinbutton", { name: "Quantity", exact: true })).toHaveValue("6");
   await expect(page.locator(".summary-total strong")).toHaveText(/60\.00/);
