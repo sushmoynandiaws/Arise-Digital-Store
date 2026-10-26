@@ -27,7 +27,8 @@ type PlatformSettings = {
     Record<"privacy" | "returns" | "terms" | "about" | "contact", string>
   >;
 };
-type Promotions = { ads: SponsoredAd[]; settings: PlatformSettings };
+type PublicAd = Omit<SponsoredAd, "price_bdt" | "created_at" | "impressions" | "clicks">;
+type Promotions = { ads: PublicAd[]; settings: PlatformSettings };
 const PromotionsContext = createContext<Promotions>({ ads: [], settings: {} });
 export function PromotionsProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<Promotions>({ ads: [], settings: {} });
@@ -64,7 +65,7 @@ export function useSponsoredAds() {
 }
 export function getActiveAdsForSlot(
   slot: AdPlacementSlot,
-  ads: SponsoredAd[] = [],
+  ads: PublicAd[] = [],
 ) {
   return ads.filter(
     (ad) =>

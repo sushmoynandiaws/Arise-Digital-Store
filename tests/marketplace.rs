@@ -556,12 +556,33 @@ async fn pending_admin_migration_does_not_interrupt_public_storefront_or_reviews
     sqlx::raw_sql("DELETE FROM schema_version WHERE version=4; DROP TABLE review_moderation; DROP TABLE admin_documents; DROP TABLE admin_roles;")
         .execute(&state.db).await.unwrap();
     let app = router(state);
-    for path in ["/api/catalog", "/api/promotions", &format!("/api/products/{PRODUCT}/reviews"), "/api/session"] {
-        assert_eq!(app.clone().oneshot(admin_request("GET", path, &session, json!({}))).await.unwrap().status(), StatusCode::OK, "{path}");
+    for path in [
+        "/api/catalog",
+        "/api/promotions",
+        &format!("/api/products/{PRODUCT}/reviews"),
+        "/api/session",
+    ] {
+        assert_eq!(
+            app.clone()
+                .oneshot(admin_request("GET", path, &session, json!({})))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::OK,
+            "{path}"
+        );
     }
-    let response = app.oneshot(admin_request("GET", "/api/admin", &session, json!({}))).await.unwrap();
+    let response = app
+        .oneshot(admin_request("GET", "/api/admin", &session, json!({})))
+        .await
+        .unwrap();
     assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
-    assert!(body(response).await["error"].as_str().unwrap().contains("migration 005"));
+    assert!(
+        body(response).await["error"]
+            .as_str()
+            .unwrap()
+            .contains("migration 005")
+    );
     server.abort();
 }
 
@@ -571,12 +592,46 @@ async fn owner_can_restrict_only_existing_source_administrators_and_the_change_i
     let session = sign_in(&state, "admin").await;
     let app = router(state.clone());
     let target = "66666666-6666-4666-8666-666666666666";
-    let response = app.clone().oneshot(admin_request("PUT", &format!("/api/admin/access/{target}"), &session, json!({"role":"support"}))).await.unwrap();
+    let response = app
+        .clone()
+        .oneshot(admin_request(
+            "PUT",
+            &format!("/api/admin/access/{target}"),
+            &session,
+            json!({"role":"support"}),
+        ))
+        .await
+        .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(arise_digital_store::admin::role(&state, target).await.unwrap(), "support");
-    let unknown = app.clone().oneshot(admin_request("PUT", &format!("/api/admin/access/{PRODUCT}"), &session, json!({"role":"owner"}))).await.unwrap();
+    assert_eq!(
+        arise_digital_store::admin::role(&state, target)
+            .await
+            .ok()
+            .as_deref(),
+        Some("support")
+    );
+    let unknown = app
+        .clone()
+        .oneshot(admin_request(
+            "PUT",
+            &format!("/api/admin/access/{PRODUCT}"),
+            &session,
+            json!({"role":"owner"}),
+        ))
+        .await
+        .unwrap();
     assert_eq!(unknown.status(), StatusCode::UNPROCESSABLE_ENTITY);
-    let activity = body(app.oneshot(admin_request("GET", "/api/admin/activity", &session, json!({}))).await.unwrap()).await;
+    let activity = body(
+        app.oneshot(admin_request(
+            "GET",
+            "/api/admin/activity",
+            &session,
+            json!({}),
+        ))
+        .await
+        .unwrap(),
+    )
+    .await;
     assert_eq!(activity["activity"][0]["action"], "access.changed");
     server.abort();
 }
