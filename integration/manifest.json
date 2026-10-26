@@ -21,15 +21,16 @@
   "production_deployed": false,
   "store_types_extension": {
     "source_repository": "nazmulh0/arise-sell",
-    "base_revision": "a50c6cfef96db9d30db2c5fcd498162c4cdcc5ee",
+    "base_revision": "00f743d48c145dd2d9e9aef01e7c3367ec2cae2e",
     "patch": "arisesell-all-store-types.patch",
     "files": [
+      ".github/workflows/backend-postgres.yml",
       "backend/app/api/v1/marketplace.py",
+      "backend/app/services/marketplace_checkout.py",
       "backend/tests/test_marketplace.py",
       "frontend/app/marketplace/connect/page.tsx",
       "frontend/app/console/fulfilment/page.tsx",
-      "frontend/locales/bn.json",
-      "backend/app/services/marketplace_checkout.py"
+      "frontend/locales/bn.json"
     ],
     "production_deployed": false,
     "database_migration_required": false,

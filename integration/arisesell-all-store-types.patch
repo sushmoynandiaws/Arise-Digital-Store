@@ -1,3 +1,12 @@
+diff --git a/.github/workflows/backend-postgres.yml b/.github/workflows/backend-postgres.yml
+index e8da40a4..a8f27ba3 100644
+--- a/.github/workflows/backend-postgres.yml
++++ b/.github/workflows/backend-postgres.yml
+@@ -111,3 +111,4 @@ jobs:
+           tests/test_digital_sales.py tests/test_digital_chat.py tests/test_digital_ingress.py
+           tests/test_digital_ai.py tests/test_digital_reply_parity.py tests/test_digital_catalog_import.py
+           tests/test_digital_integration.py tests/test_digital_key_rotation.py tests/test_digital_key_bootstrap.py
++          tests/test_marketplace.py
 diff --git a/backend/app/api/v1/marketplace.py b/backend/app/api/v1/marketplace.py
 index d4ce2266..b3fc2296 100644
 --- a/backend/app/api/v1/marketplace.py
@@ -334,6 +343,167 @@ index d4ce2266..b3fc2296 100644
      business = await db.get(Business, order.business_id)
      if order.payment_status != "paid" or not active_store(business) or order.digital_status == "needs_attention":
          raise HTTPException(409, "Your items will be available after verified payment and preparation")
+diff --git a/backend/app/services/marketplace_checkout.py b/backend/app/services/marketplace_checkout.py
+new file mode 100644
+index 00000000..a408e388
+--- /dev/null
++++ b/backend/app/services/marketplace_checkout.py
+@@ -0,0 +1,155 @@
++"""Marketplace transport for the existing physical order confirmation service."""
++from datetime import datetime, timedelta
++from decimal import Decimal
++import secrets
++import uuid
++
++from fastapi import HTTPException
++from sqlalchemy import select
++from sqlalchemy.orm import selectinload
++
++from app.models.commerce import CheckoutDraft
++from app.models.product import Product, Variant
++from app.services.digital_inventory import active_store, fingerprint, utc, utcnow
++from app.services.courier_service import effective_shipping_rates
++from app.services.knowledge_checkout import checkout_discount, complete_address, valid_customer_name, required_advance
++
++
++def payment_methods(business):
++    from app.services.digital_inventory import receiving_accounts
++    from app.services.sales_reply import merchant_facts
++    if business.commerce_mode == "digital":
++        return list(receiving_accounts(business))
++    facts = merchant_facts(business.settings_data or {})
++    allowed = facts.get("cod_enabled") is True or facts.get("cod_policy") in {"full_cod", "selected_locations", "advance_delivery"}
++    return ["cod"] if allowed and facts.get("cod_enabled") is not False and facts.get("cod_policy") not in {"disabled", "prepaid", "advance_only"} else []
++
++
++def unavailable_reason(business, product):
++    if product.fulfilment_kind == "digital":
++        if business.commerce_mode != "digital":
++            return "This shop has not enabled digital checkout in AriseSell."
++        return "" if payment_methods(business) else "The seller needs to connect a receiving account in AriseSell."
++    if business.commerce_mode != "standard" or business.currency != "BDT":
++        return "This product's checkout is not supported by the source store configuration."
++    from app.services.custom_orders import config_for
++    try:
++        custom = config_for(product)
++    except ValueError:
++        return "The seller needs to review this product's custom order configuration in AriseSell."
++    if product.__dict__.get("_craft_conflict") or custom:
++        return "Contact the seller in AriseSell to complete this product's custom order requirements."
++    if not payment_methods(business):
++        return "The seller needs to configure a supported payment method in AriseSell."
++    rates = effective_shipping_rates(business.settings_data or {})
++    if not rates.get("free_delivery_min") and not any(rates.get(tier) is not None for tier in ("inside_dhaka", "sub_dhaka", "outside_dhaka")):
++        return "The seller needs to configure delivery charges in AriseSell."
++    return ""
++
++
++def buyer_fields(business):
++    cfg = business.settings_data or {}
++    return ["name", "phone", "address", "district"] + [field for field, snake, camel in (
++        ("landmark", "require_landmark", "requireLandmark"),
++        ("alt_phone", "require_alt_phone", "requireAltPhone")) if cfg.get(snake, cfg.get(camel, False))]
++
++
++async def snapshot(db, business, product_id, variant_id, quantity, buyer, coupon_code=None):
++    if not active_store(business):
++        raise HTTPException(409, "This shop is unavailable")
++    product = await db.scalar(select(Product).where(Product.id == product_id, Product.business_id == business.id,
++        Product.fulfilment_kind == "physical", Product.digital_archived.is_(False)).options(selectinload(Product.variants)))
++    if not product:
++        raise HTTPException(404, "Product not found")
++    from app.services.craft_knowledge import apply_knowledge
++    await apply_knowledge(db, business.id, [product])
++    reason = unavailable_reason(business, product)
++    if reason:
++        raise HTTPException(409, reason)
++    variant = await db.scalar(select(Variant).where(Variant.id == variant_id, Variant.product_id == product.id)
++        .with_for_update().execution_options(populate_existing=True))
++    if not variant or variant.stock < quantity:
++        raise HTTPException(409, "The selected option is unavailable or has insufficient stock")
++    from app.services.order_extractor import normalize_bd_phone, resolve_district_and_delivery_charge
++    from app.services.messaging_policy import optional_kyc_missing
++    phone = normalize_bd_phone(buyer.get("phone", ""))
++    district, _, tier = resolve_district_and_delivery_charge(buyer.get("address", ""), buyer.get("district", ""))
++    if not valid_customer_name(buyer["name"]) or not phone or not district or tier == "unknown" or not complete_address(buyer.get("address", ""), district):
++        raise HTTPException(422, "Provide your name, a valid mobile number, full delivery address and district")
++    details = {**buyer, "phone": phone, "district": district}
++    if optional_kyc_missing(details, business.settings_data or {}, "en"):
++        raise HTTPException(422, "Provide the seller's required landmark or alternative phone number")
++    unit_price = Decimal(str(variant.price))
++    if not unit_price.is_finite() or unit_price <= 0:
++        raise HTTPException(409, "The seller needs to review this product's price")
++    subtotal = unit_price * quantity
++    code, discount = checkout_discount(business.settings_data or {}, subtotal)
++    if coupon_code and coupon_code.strip().upper() != code:
++        raise HTTPException(409, "This coupon is not available for this order")
++    rates = effective_shipping_rates(business.settings_data or {})
++    free = Decimal(str(rates.get("free_delivery_min") or 0))
++    shipping = Decimal(0) if free > 0 and subtotal >= free else rates.get(tier)
++    if shipping is None:
++        raise HTTPException(409, "The seller has not configured delivery to this destination")
++    shipping = Decimal(str(shipping))
++    if not shipping.is_finite() or shipping < 0:
++        raise HTTPException(409, "The seller's delivery charge needs review")
++    total = subtotal - discount + shipping
++    advance = required_advance(business.settings_data or {}, tier, shipping, total)
++    return {"product_id": str(product.id), "variant_id": str(variant.id), "sku": variant.sku,
++        "name": product.name, "variant": variant.label, "quantity": quantity, "fulfilment_kind": "physical",
++        "unit_price": str(variant.price), "subtotal": str(subtotal), "discount": str(discount),
++        "coupon_code": code, "delivery_charge": str(shipping), "total": str(total), "advance_amount": str(advance),
++        "currency": business.currency, "buyer": details, "tier": tier, "payment_method": "cod"}
++
++
++async def create_quote(db, business, channel, conversation, identity, req):
++    if req.provider != "cod":
++        raise HTTPException(409, "Choose a source-supported payment method")
++    snap = await snapshot(db, business, req.product_id, req.variant_id, req.quantity, req.buyer.model_dump(), req.coupon_code)
++    draft = await db.scalar(select(CheckoutDraft).where(CheckoutDraft.business_id == business.id,
++        CheckoutDraft.channel_id == channel.id, CheckoutDraft.recipient == identity).with_for_update())
++    if not draft:
++        draft = CheckoutDraft(business_id=business.id, channel_id=channel.id, conversation_id=conversation.id, recipient=identity)
++        db.add(draft)
++    draft.data = {"physical": True, "snapshot": snap, "quote_hash": fingerprint({"snapshot": snap, "nonce": secrets.token_hex(16)}),
++        "quoted_at": utcnow().isoformat(), "provider": "cod"}
++    draft.order_id, draft.confirmation_token = None, secrets.token_hex(4)
++    await db.flush()
++    return draft
++
++
++async def accept_quote(db, business, channel, conversation, identity, draft, req):
++    data = draft.data
++    if not data.get("physical") or draft.business_id != business.id or draft.channel_id != channel.id or draft.conversation_id != conversation.id or draft.recipient != identity:
++        raise HTTPException(404, "Checkout not found")
++    if req.quote_hash != data["quote_hash"] or req.provider != "cod":
++        raise HTTPException(409, "The purchase changed; review the current quote")
++    if draft.order_id:
++        from app.models.order import Order
++        return await db.get(Order, draft.order_id)
++    if utcnow() - utc(datetime.fromisoformat(data["quoted_at"])) > timedelta(minutes=15):
++        raise HTTPException(409, "The quote expired; request a fresh quote")
++    snap = data["snapshot"]
++    current = await snapshot(db, business, uuid.UUID(snap["product_id"]), uuid.UUID(snap["variant_id"]), snap["quantity"], snap["buyer"])
++    if fingerprint(snap) != fingerprint(current):
++        raise HTTPException(409, "Price, delivery charge or terms changed; request a fresh quote")
++    variant = await db.get(Variant, uuid.UUID(snap["variant_id"]))
++    details = {**snap["buyer"], "customer_name": snap["buyer"]["name"], "subtotal": snap["subtotal"],
++        "total": snap["total"], "discount": snap["discount"], "coupon_code": snap["coupon_code"],
++        "delivery_charge": snap["delivery_charge"], "tier": snap["tier"], "quoted_at": data["quoted_at"],
++        "lines": [{"variant_id": snap["variant_id"], "sku": snap["sku"], "name": f"{snap['name']} — {snap['variant']}",
++            "qty": snap["quantity"], "unit_price": snap["unit_price"]}]}
++    from app.services.order_confirmation_service import _create_and_commit_order
++    cfg = business.settings_data or {}
++    reply = await _create_and_commit_order(db, business, channel, conversation, identity, "Confirm marketplace order",
++        draft, details, cfg, effective_shipping_rates(cfg), (cfg.get("couriers") or {}).get("default_provider", "steadfast"),
++        {str(variant.id): variant}, "en")
++    if not draft.order_id:
++        raise HTTPException(409, reply)
++    from app.models.order import Order, OrderLine
++    order = await db.get(Order, draft.order_id)
++    order.checkout_data = {**order.checkout_data, "marketplace_quote": snap, "buyer_fields": snap["buyer"], "marketplace_message": reply}
++    for line in await db.scalars(select(OrderLine).where(OrderLine.order_id == order.id)):
++        line.product_id, line.variant_id, line.item_snapshot = uuid.UUID(snap["product_id"]), variant.id, snap
++    return order
 diff --git a/backend/tests/test_marketplace.py b/backend/tests/test_marketplace.py
 index e6995ae3..f2a69c33 100644
 --- a/backend/tests/test_marketplace.py
@@ -541,163 +711,3 @@ index f4c00c1a..123da6ab 100644
 +  "This connection link is incomplete. Return to Arise Store and choose Continue with AriseSell again.": "সংযোগের লিংকটি অসম্পূর্ণ। Arise Store-এ ফিরে আবার Continue with AriseSell বেছে নিন।",
 +  "Continue to Arise Store": "Arise Store-এ এগিয়ে যান"
  }
-diff --git a/backend/app/services/marketplace_checkout.py b/backend/app/services/marketplace_checkout.py
-new file mode 100644
---- /dev/null
-+++ b/backend/app/services/marketplace_checkout.py
-@@ -0,0 +1,155 @@
-+"""Marketplace transport for the existing physical order confirmation service."""
-+from datetime import datetime, timedelta
-+from decimal import Decimal
-+import secrets
-+import uuid
-+
-+from fastapi import HTTPException
-+from sqlalchemy import select
-+from sqlalchemy.orm import selectinload
-+
-+from app.models.commerce import CheckoutDraft
-+from app.models.product import Product, Variant
-+from app.services.digital_inventory import active_store, fingerprint, utc, utcnow
-+from app.services.courier_service import effective_shipping_rates
-+from app.services.knowledge_checkout import checkout_discount, complete_address, valid_customer_name, required_advance
-+
-+
-+def payment_methods(business):
-+    from app.services.digital_inventory import receiving_accounts
-+    from app.services.sales_reply import merchant_facts
-+    if business.commerce_mode == "digital":
-+        return list(receiving_accounts(business))
-+    facts = merchant_facts(business.settings_data or {})
-+    allowed = facts.get("cod_enabled") is True or facts.get("cod_policy") in {"full_cod", "selected_locations", "advance_delivery"}
-+    return ["cod"] if allowed and facts.get("cod_enabled") is not False and facts.get("cod_policy") not in {"disabled", "prepaid", "advance_only"} else []
-+
-+
-+def unavailable_reason(business, product):
-+    if product.fulfilment_kind == "digital":
-+        if business.commerce_mode != "digital":
-+            return "This shop has not enabled digital checkout in AriseSell."
-+        return "" if payment_methods(business) else "The seller needs to connect a receiving account in AriseSell."
-+    if business.commerce_mode != "standard" or business.currency != "BDT":
-+        return "This product's checkout is not supported by the source store configuration."
-+    from app.services.custom_orders import config_for
-+    try:
-+        custom = config_for(product)
-+    except ValueError:
-+        return "The seller needs to review this product's custom order configuration in AriseSell."
-+    if product.__dict__.get("_craft_conflict") or custom:
-+        return "Contact the seller in AriseSell to complete this product's custom order requirements."
-+    if not payment_methods(business):
-+        return "The seller needs to configure a supported payment method in AriseSell."
-+    rates = effective_shipping_rates(business.settings_data or {})
-+    if not rates.get("free_delivery_min") and not any(rates.get(tier) is not None for tier in ("inside_dhaka", "sub_dhaka", "outside_dhaka")):
-+        return "The seller needs to configure delivery charges in AriseSell."
-+    return ""
-+
-+
-+def buyer_fields(business):
-+    cfg = business.settings_data or {}
-+    return ["name", "phone", "address", "district"] + [field for field, snake, camel in (
-+        ("landmark", "require_landmark", "requireLandmark"),
-+        ("alt_phone", "require_alt_phone", "requireAltPhone")) if cfg.get(snake, cfg.get(camel, False))]
-+
-+
-+async def snapshot(db, business, product_id, variant_id, quantity, buyer, coupon_code=None):
-+    if not active_store(business):
-+        raise HTTPException(409, "This shop is unavailable")
-+    product = await db.scalar(select(Product).where(Product.id == product_id, Product.business_id == business.id,
-+        Product.fulfilment_kind == "physical", Product.digital_archived.is_(False)).options(selectinload(Product.variants)))
-+    if not product:
-+        raise HTTPException(404, "Product not found")
-+    from app.services.craft_knowledge import apply_knowledge
-+    await apply_knowledge(db, business.id, [product])
-+    reason = unavailable_reason(business, product)
-+    if reason:
-+        raise HTTPException(409, reason)
-+    variant = await db.scalar(select(Variant).where(Variant.id == variant_id, Variant.product_id == product.id)
-+        .with_for_update().execution_options(populate_existing=True))
-+    if not variant or variant.stock < quantity:
-+        raise HTTPException(409, "The selected option is unavailable or has insufficient stock")
-+    from app.services.order_extractor import normalize_bd_phone, resolve_district_and_delivery_charge
-+    from app.services.messaging_policy import optional_kyc_missing
-+    phone = normalize_bd_phone(buyer.get("phone", ""))
-+    district, _, tier = resolve_district_and_delivery_charge(buyer.get("address", ""), buyer.get("district", ""))
-+    if not valid_customer_name(buyer["name"]) or not phone or not district or tier == "unknown" or not complete_address(buyer.get("address", ""), district):
-+        raise HTTPException(422, "Provide your name, a valid mobile number, full delivery address and district")
-+    details = {**buyer, "phone": phone, "district": district}
-+    if optional_kyc_missing(details, business.settings_data or {}, "en"):
-+        raise HTTPException(422, "Provide the seller's required landmark or alternative phone number")
-+    unit_price = Decimal(str(variant.price))
-+    if not unit_price.is_finite() or unit_price <= 0:
-+        raise HTTPException(409, "The seller needs to review this product's price")
-+    subtotal = unit_price * quantity
-+    code, discount = checkout_discount(business.settings_data or {}, subtotal)
-+    if coupon_code and coupon_code.strip().upper() != code:
-+        raise HTTPException(409, "This coupon is not available for this order")
-+    rates = effective_shipping_rates(business.settings_data or {})
-+    free = Decimal(str(rates.get("free_delivery_min") or 0))
-+    shipping = Decimal(0) if free > 0 and subtotal >= free else rates.get(tier)
-+    if shipping is None:
-+        raise HTTPException(409, "The seller has not configured delivery to this destination")
-+    shipping = Decimal(str(shipping))
-+    if not shipping.is_finite() or shipping < 0:
-+        raise HTTPException(409, "The seller's delivery charge needs review")
-+    total = subtotal - discount + shipping
-+    advance = required_advance(business.settings_data or {}, tier, shipping, total)
-+    return {"product_id": str(product.id), "variant_id": str(variant.id), "sku": variant.sku,
-+        "name": product.name, "variant": variant.label, "quantity": quantity, "fulfilment_kind": "physical",
-+        "unit_price": str(variant.price), "subtotal": str(subtotal), "discount": str(discount),
-+        "coupon_code": code, "delivery_charge": str(shipping), "total": str(total), "advance_amount": str(advance),
-+        "currency": business.currency, "buyer": details, "tier": tier, "payment_method": "cod"}
-+
-+
-+async def create_quote(db, business, channel, conversation, identity, req):
-+    if req.provider != "cod":
-+        raise HTTPException(409, "Choose a source-supported payment method")
-+    snap = await snapshot(db, business, req.product_id, req.variant_id, req.quantity, req.buyer.model_dump(), req.coupon_code)
-+    draft = await db.scalar(select(CheckoutDraft).where(CheckoutDraft.business_id == business.id,
-+        CheckoutDraft.channel_id == channel.id, CheckoutDraft.recipient == identity).with_for_update())
-+    if not draft:
-+        draft = CheckoutDraft(business_id=business.id, channel_id=channel.id, conversation_id=conversation.id, recipient=identity)
-+        db.add(draft)
-+    draft.data = {"physical": True, "snapshot": snap, "quote_hash": fingerprint({"snapshot": snap, "nonce": secrets.token_hex(16)}),
-+        "quoted_at": utcnow().isoformat(), "provider": "cod"}
-+    draft.order_id, draft.confirmation_token = None, secrets.token_hex(4)
-+    await db.flush()
-+    return draft
-+
-+
-+async def accept_quote(db, business, channel, conversation, identity, draft, req):
-+    data = draft.data
-+    if not data.get("physical") or draft.business_id != business.id or draft.channel_id != channel.id or draft.conversation_id != conversation.id or draft.recipient != identity:
-+        raise HTTPException(404, "Checkout not found")
-+    if req.quote_hash != data["quote_hash"] or req.provider != "cod":
-+        raise HTTPException(409, "The purchase changed; review the current quote")
-+    if draft.order_id:
-+        from app.models.order import Order
-+        return await db.get(Order, draft.order_id)
-+    if utcnow() - utc(datetime.fromisoformat(data["quoted_at"])) > timedelta(minutes=15):
-+        raise HTTPException(409, "The quote expired; request a fresh quote")
-+    snap = data["snapshot"]
-+    current = await snapshot(db, business, uuid.UUID(snap["product_id"]), uuid.UUID(snap["variant_id"]), snap["quantity"], snap["buyer"])
-+    if fingerprint(snap) != fingerprint(current):
-+        raise HTTPException(409, "Price, delivery charge or terms changed; request a fresh quote")
-+    variant = await db.get(Variant, uuid.UUID(snap["variant_id"]))
-+    details = {**snap["buyer"], "customer_name": snap["buyer"]["name"], "subtotal": snap["subtotal"],
-+        "total": snap["total"], "discount": snap["discount"], "coupon_code": snap["coupon_code"],
-+        "delivery_charge": snap["delivery_charge"], "tier": snap["tier"], "quoted_at": data["quoted_at"],
-+        "lines": [{"variant_id": snap["variant_id"], "sku": snap["sku"], "name": f"{snap['name']} — {snap['variant']}",
-+            "qty": snap["quantity"], "unit_price": snap["unit_price"]}]}
-+    from app.services.order_confirmation_service import _create_and_commit_order
-+    cfg = business.settings_data or {}
-+    reply = await _create_and_commit_order(db, business, channel, conversation, identity, "Confirm marketplace order",
-+        draft, details, cfg, effective_shipping_rates(cfg), (cfg.get("couriers") or {}).get("default_provider", "steadfast"),
-+        {str(variant.id): variant}, "en")
-+    if not draft.order_id:
-+        raise HTTPException(409, reply)
-+    from app.models.order import Order, OrderLine
-+    order = await db.get(Order, draft.order_id)
-+    order.checkout_data = {**order.checkout_data, "marketplace_quote": snap, "buyer_fields": snap["buyer"], "marketplace_message": reply}
-+    for line in await db.scalars(select(OrderLine).where(OrderLine.order_id == order.id)):
-+        line.product_id, line.variant_id, line.item_snapshot = uuid.UUID(snap["product_id"]), variant.id, snap
-+    return order

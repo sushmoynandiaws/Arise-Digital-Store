@@ -6,7 +6,7 @@ A Rust marketplace for independent AriseSell shops. Includes a responsive React/
 
 The storefront uses AriseSell's existing `Business.kind` and `commerce_mode` without a second category selection. All source store categories can publish products. Checkout follows each product's `fulfilment_kind`, not its shop label. Existing digital bridge responses remain compatible through their original automatic/manual delivery modes; unrecognized contracts cannot open checkout.
 
-The companion source changes are in `integration/arisesell-all-store-types.patch`, based on source revision recorded in `integration/manifest.json`. They are also implemented, uncommitted, in the local `marketplace-admin-prod-release` AriseSell worktree. Apply the companion patch only to a compatible checkout that does not already contain these changes, using `git apply --check` before applying it. No new environment variables or database migrations are required. Roll out the source bridge before the storefront when deployment is separately authorized.
+The companion source changes are in `integration/arisesell-all-store-types.patch`, based on source revision recorded in `integration/manifest.json`. The same changes are implemented in the companion AriseSell repository. Apply the companion patch only to a compatible checkout that does not already contain these changes, using `git apply --check` before applying it. No new environment variables or database migrations are required. Roll out the source bridge before the storefront when deployment is separately authorized.
 
 - Digital checkout retains AriseSell's reservation, payment verification and private fulfillment services.
 - Physical checkout adapts AriseSell's existing order-confirmation service, including source prices, stock locks, shipping rates, discounts, address/KYC requirements, fraud/advance holds, order numbering and courier jobs. The browser never supplies order totals or delivery charges.
@@ -15,7 +15,7 @@ The companion source changes are in `integration/arisesell-all-store-types.patch
 - Purchases remain bound to their original customer/account. Physical orders show source courier tracking; shipped/delivered COD is not labeled paid without source payment evidence. Reviews still require verified payment and the existing eligible delivery state.
 - Shop category search/filters use actual source values. Marketplace branding says Arise Store; internal audience/channel IDs, old shop links, source credentials and database names stay compatible.
 
-**The store-type extension is implemented locally and has not been deployed.** The included preview is explicitly labeled sample data and runs the real AriseSell digital commerce services against an isolated development database. It never sends money or uses real stock.
+The included local preview is explicitly labeled sample data and runs the real AriseSell digital commerce services against an isolated development database. It never sends money or uses real stock.
 
 ## Architecture
 
