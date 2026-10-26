@@ -2052,7 +2052,7 @@ function Products({ shop }: { shop?: Shop }) {
               checked={inStock}
               onChange={(e) => setInStock(e.target.checked)}
             />
-            <span>{lang === "bn" ? "শুধুমাত্র স্টকে আছে" : "In stock only"}</span>
+            {lang === "bn" ? "শুধুমাত্র স্টকে আছে" : "In stock only"}
           </label>
         </div>
       </div>
