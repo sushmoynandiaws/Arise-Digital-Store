@@ -1,4 +1,10 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  type ReactNode,
+} from "react";
 import { Link } from "react-router-dom";
 import {
   CheckCircle2,
@@ -12,9 +18,14 @@ import { api } from "./api.js";
 import type { SponsoredAd, AdPlacementSlot } from "./types.js";
 
 type PlatformSettings = {
-  announcement?: string; announcement_url?: string; support_email?: string;
-  hero_title?: string; hero_description?: string;
-  pages?: Partial<Record<"privacy" | "returns" | "terms" | "about" | "contact", string>>;
+  announcement?: string;
+  announcement_url?: string;
+  support_email?: string;
+  hero_title?: string;
+  hero_description?: string;
+  pages?: Partial<
+    Record<"privacy" | "returns" | "terms" | "about" | "contact", string>
+  >;
 };
 type Promotions = { ads: SponsoredAd[]; settings: PlatformSettings };
 const PromotionsContext = createContext<Promotions>({ ads: [], settings: {} });
@@ -22,34 +33,75 @@ export function PromotionsProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<Promotions>({ ads: [], settings: {} });
   useEffect(() => {
     let current = true;
-    const load = () => api<Promotions>("/promotions").then(value => { if (current) setData(value); }).catch(() => {});
+    const load = () =>
+      api<Promotions>("/promotions")
+        .then((value) => {
+          if (current) setData(value);
+        })
+        .catch(() => {});
     void load();
     const interval = window.setInterval(load, 30000);
     window.addEventListener("arise_ads_updated", load);
     window.addEventListener("focus", load);
-    return () => { current = false; window.clearInterval(interval); window.removeEventListener("arise_ads_updated", load); window.removeEventListener("focus", load); };
+    return () => {
+      current = false;
+      window.clearInterval(interval);
+      window.removeEventListener("arise_ads_updated", load);
+      window.removeEventListener("focus", load);
+    };
   }, []);
-  return <PromotionsContext.Provider value={data}>{children}</PromotionsContext.Provider>;
+  return (
+    <PromotionsContext.Provider value={data}>
+      {children}
+    </PromotionsContext.Provider>
+  );
 }
-export function usePlatformSettings() { return useContext(PromotionsContext).settings; }
-export function useSponsoredAds() { return useContext(PromotionsContext); }
-export function getActiveAdsForSlot(slot: AdPlacementSlot, ads: SponsoredAd[] = []) {
-  return ads.filter(ad => ad.placement === slot && ad.status === "active" && Date.parse(ad.start_date) <= Date.now() && Date.now() < Date.parse(ad.end_date) + 86400000);
+export function usePlatformSettings() {
+  return useContext(PromotionsContext).settings;
+}
+export function useSponsoredAds() {
+  return useContext(PromotionsContext);
+}
+export function getActiveAdsForSlot(
+  slot: AdPlacementSlot,
+  ads: SponsoredAd[] = [],
+) {
+  return ads.filter(
+    (ad) =>
+      ad.placement === slot &&
+      ad.status === "active" &&
+      Date.parse(ad.start_date) <= Date.now() &&
+      Date.now() < Date.parse(ad.end_date) + 86400000,
+  );
 }
 function recordAdImpression(id: string) {
   const node = document.querySelector(`[data-ad-id="${id}"]`);
   if (!node) return;
-  const observer = new IntersectionObserver(entries => {
-    if (entries.some(entry => entry.isIntersecting && entry.intersectionRatio >= 0.5)) {
-      void api(`/promotions/${id}/events`, { method: "POST", body: JSON.stringify({ kind: "impression" }) }).catch(() => {});
-      observer.disconnect();
-    }
-  }, { threshold: 0.5 });
+  const observer = new IntersectionObserver(
+    (entries) => {
+      if (
+        entries.some(
+          (entry) => entry.isIntersecting && entry.intersectionRatio >= 0.5,
+        )
+      ) {
+        void api(`/promotions/${id}/events`, {
+          method: "POST",
+          body: JSON.stringify({ kind: "impression" }),
+        }).catch(() => {});
+        observer.disconnect();
+      }
+    },
+    { threshold: 0.5 },
+  );
   observer.observe(node);
   return () => observer.disconnect();
 }
 function recordAdClick(id: string) {
-  void api(`/promotions/${id}/events`, { method: "POST", body: JSON.stringify({ kind: "click" }), keepalive: true }).catch(() => {});
+  void api(`/promotions/${id}/events`, {
+    method: "POST",
+    body: JSON.stringify({ kind: "click" }),
+    keepalive: true,
+  }).catch(() => {});
 }
 
 /** Home Hero Sponsored Banner */
@@ -67,7 +119,11 @@ export function HomeHeroSponsoredAd() {
   const isExternal = ad.target_url.startsWith("http");
 
   return (
-    <section data-ad-id={ad.id} className="container sponsored-hero-banner-wrap" aria-label="Featured Promotion">
+    <section
+      data-ad-id={ad.id}
+      className="container sponsored-hero-banner-wrap"
+      aria-label="Featured Promotion"
+    >
       <div className="sponsored-hero-banner">
         <div className="sponsored-hero-content">
           <div className="sponsored-hero-badges">
@@ -238,14 +294,20 @@ export function FeaturedShopSponsoredAd() {
   if (!ad) return null;
 
   return (
-    <div data-ad-id={ad.id} className="featured-shop-spotlight panel" aria-label="Featured Partner">
+    <div
+      data-ad-id={ad.id}
+      className="featured-shop-spotlight panel"
+      aria-label="Featured Partner"
+    >
       <div className="featured-shop-content">
         <div className="featured-shop-header">
           <span className="sponsored-pill purple">
             <Star size={13} />
             {ad.badge_text || "Featured Partner"}
           </span>
-          <span className="featured-advertiser-title">{ad.advertiser_name}</span>
+          <span className="featured-advertiser-title">
+            {ad.advertiser_name}
+          </span>
         </div>
         <h3>{ad.title}</h3>
         <Link
@@ -294,7 +356,12 @@ export function StickyBottomSponsoredStrip() {
   const isExternal = ad.target_url.startsWith("http");
 
   return (
-    <aside data-ad-id={ad.id} className="sticky-bottom-ad-strip" role="complementary" aria-label="Sponsored Announcement">
+    <aside
+      data-ad-id={ad.id}
+      className="sticky-bottom-ad-strip"
+      role="complementary"
+      aria-label="Sponsored Announcement"
+    >
       <div className="container sticky-bottom-ad-inner">
         <div className="sticky-ad-left">
           <span className="sponsored-pill sm">
@@ -336,4 +403,3 @@ export function StickyBottomSponsoredStrip() {
     </aside>
   );
 }
-

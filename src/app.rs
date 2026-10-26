@@ -693,7 +693,7 @@ async fn product_reviews(
     {
         return Err(AppError::new(StatusCode::NOT_FOUND, "Product not found."));
     }
-    let admin_ready=crate::admin::schema_ready(&state).await?;
+    let admin_ready = crate::admin::schema_ready(&state).await?;
     let summary = sqlx::query(if admin_ready {"SELECT COUNT(*) AS count,CAST(COALESCE(SUM(rating),0) AS BIGINT) AS total FROM reviews WHERE product_id=$1 AND id NOT IN (SELECT review_id FROM review_moderation WHERE hidden=1)"} else {"SELECT COUNT(*) AS count,CAST(COALESCE(SUM(rating),0) AS BIGINT) AS total FROM reviews WHERE product_id=$1"})
         .bind(&id).fetch_one(&state.db).await.map_err(|_| AppError::internal())?;
     let count: i64 = summary.try_get("count").map_err(|_| AppError::internal())?;

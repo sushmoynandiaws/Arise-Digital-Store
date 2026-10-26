@@ -19,9 +19,12 @@ pub struct AdminIdentity {
     pub role: String,
 }
 pub async fn schema_ready(state: &AppState) -> Result<bool> {
-    let version: Option<i64> = sqlx::query_scalar("SELECT version FROM schema_version WHERE version=4")
-        .fetch_optional(&state.db).await.map_err(|_|AppError::internal())?;
-    Ok(version==Some(4))
+    let version: Option<i64> =
+        sqlx::query_scalar("SELECT version FROM schema_version WHERE version=4")
+            .fetch_optional(&state.db)
+            .await
+            .map_err(|_| AppError::internal())?;
+    Ok(version == Some(4))
 }
 pub fn permissions(role: &str) -> Vec<&'static str> {
     match role {
@@ -43,7 +46,9 @@ pub fn permissions(role: &str) -> Vec<&'static str> {
     }
 }
 pub async fn role(state: &AppState, id: &str) -> Result<String> {
-    if !schema_ready(state).await? { return Ok("owner".into()); }
+    if !schema_ready(state).await? {
+        return Ok("owner".into());
+    }
     Ok(
         sqlx::query_scalar("SELECT role FROM admin_roles WHERE user_id=$1")
             .bind(id)
@@ -72,7 +77,10 @@ pub async fn authorize(
         return Err(denied());
     }
     if !schema_ready(state).await? {
-        return Err(AppError::new(StatusCode::SERVICE_UNAVAILABLE,"Administrator workspace requires marketplace migration 005. The storefront remains available."));
+        return Err(AppError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Administrator workspace requires marketplace migration 005. The storefront remains available.",
+        ));
     }
     let actor = me["user"]["id"]
         .as_str()
@@ -429,7 +437,9 @@ async fn save_document(
     ))
 }
 async fn promotions(State(state): State<AppState>) -> Result<Json<Value>> {
-    if !schema_ready(&state).await? { return Ok(Json(json!({"ads":[],"settings":{}}))); }
+    if !schema_ready(&state).await? {
+        return Ok(Json(json!({"ads":[],"settings":{}})));
+    }
     let campaigns = read_document(&state, "campaigns").await?;
     let ads: Vec<Value> = campaigns["content"]
         .as_array()
@@ -606,11 +616,22 @@ struct NoteInput {
     content: String,
 }
 #[derive(Deserialize)]
-struct NoteQuery { target_type: String, target_id: String }
-async fn notes(State(state): State<AppState>, headers: HeaderMap, Query(query): Query<NoteQuery>) -> Result<Json<Value>> {
+struct NoteQuery {
+    target_type: String,
+    target_id: String,
+}
+async fn notes(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<NoteQuery>,
+) -> Result<Json<Value>> {
     authorize(&state, &headers, "reports").await?;
-    if !["report","order"].contains(&query.target_type.as_str()) { return Err(invalid("Choose a report or order.")); }
-    if query.target_type=="order" { authorize(&state,&headers,"orders").await?; }
+    if !["report", "order"].contains(&query.target_type.as_str()) {
+        return Err(invalid("Choose a report or order."));
+    }
+    if query.target_type == "order" {
+        authorize(&state, &headers, "orders").await?;
+    }
     crate::app::uuid(&query.target_id)?;
     let rows=sqlx::query("SELECT id,target_type,target_id,actor,content,created_at FROM admin_notes WHERE target_type=$1 AND target_id=$2 ORDER BY created_at DESC,id DESC LIMIT 200").bind(query.target_type).bind(query.target_id).fetch_all(&state.db).await.map_err(|_|AppError::internal())?;
     let mut values = Vec::new();
@@ -704,9 +725,15 @@ async fn save_role(
     // Serialize owner changes and recheck after locking, so two owners cannot block each other concurrently.
     sqlx::query("INSERT INTO admin_documents(key,content,revision,updated_at) VALUES('access_lock','{}',0,$1) ON CONFLICT(key) DO UPDATE SET revision=admin_documents.revision+1")
         .bind(now()).execute(&mut *tx).await.map_err(|_|AppError::internal())?;
-    let current: Option<String> = sqlx::query_scalar("SELECT role FROM admin_roles WHERE user_id=$1")
-        .bind(&admin.actor).fetch_optional(&mut *tx).await.map_err(|_|AppError::internal())?;
-    if current.as_deref().is_some_and(|role|role!="owner") { return Err(denied()); }
+    let current: Option<String> =
+        sqlx::query_scalar("SELECT role FROM admin_roles WHERE user_id=$1")
+            .bind(&admin.actor)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|_| AppError::internal())?;
+    if current.as_deref().is_some_and(|role| role != "owner") {
+        return Err(denied());
+    }
     sqlx::query("INSERT INTO admin_roles VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET role=excluded.role").bind(&id).bind(&input.role).execute(&mut *tx).await.map_err(|_|AppError::internal())?;
     audit(&mut tx, &admin.actor, "access.changed", &id, &input.role).await?;
     tx.commit().await.map_err(|_| AppError::internal())?;

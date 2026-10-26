@@ -2429,24 +2429,13 @@ function ProductPage() {
     product.variants.find((v) => v.stock > 0) || product.variants[0];
   const available = Boolean(product.sales_enabled && selected && selected.stock > 0);
   const maximum = Math.min(selected?.stock ?? 0, 100);
-  const volumeConfig = useMemo(() => {
-    return getShopVolumeConfig(shop?.id || product?.shop_id, shop);
-  }, [shop, product]);
+  const volumeConfig = getShopVolumeConfig(shop.id || product.shop_id, shop);
   const isVolumeDiscountEnabled = volumeConfig.enabled;
   const rawTotal = selected ? checkoutTotal(selected.price, quantity) : null;
-  const discountPct = useMemo(() => {
-    if (!isVolumeDiscountEnabled) return 0;
-    if (quantity >= 5) return volumeConfig.tier5Pct;
-    if (quantity >= 3) return volumeConfig.tier3Pct;
-    return 0;
-  }, [isVolumeDiscountEnabled, volumeConfig, quantity]);
-  const discountedTotal = useMemo(() => {
-    if (!rawTotal) return null;
-    if (discountPct <= 0) return rawTotal;
-    const num = Number(rawTotal);
-    const discounted = num * (1 - discountPct / 100);
-    return discounted.toFixed(2);
-  }, [rawTotal, discountPct]);
+  const discountPct = !isVolumeDiscountEnabled ? 0
+    : quantity >= 5 ? volumeConfig.tier5Pct : quantity >= 3 ? volumeConfig.tier3Pct : 0;
+  const discountedTotal = rawTotal === null ? null
+    : discountPct > 0 ? (Number(rawTotal) * (1 - discountPct / 100)).toFixed(2) : rawTotal;
   const total = discountedTotal;
   const canBuy = available && total !== null && quantity <= maximum;
   return (
