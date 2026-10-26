@@ -1101,42 +1101,6 @@ function ShopContactContent({ shop, lang, support }: { shop: Shop; lang: "bn" | 
         </div>
       )}
 
-      <div className="contact-guidelines-box">
-        <h3 className="guidelines-title">
-          {lang === "bn" ? "কীভাবে দ্রুততম সময়ে সহায়তা পাবেন?" : "How to get the fastest resolution?"}
-        </h3>
-        <div className="guidelines-grid">
-          <div className="guideline-item">
-            <span className="guideline-icon">🕒</span>
-            <div>
-              <strong>{lang === "bn" ? "সাপোর্ট কর্মঘণ্টা" : "Support Hours"}</strong>
-              <p>{lang === "bn" ? "প্রতিদিন সকাল ১০:০০ AM - রাত ১২:০০ AM (বাংলাদেশ সময়)" : "Daily 10:00 AM - 12:00 AM (BD Time)"}</p>
-            </div>
-          </div>
-          <div className="guideline-item">
-            <span className="guideline-icon">📌</span>
-            <div>
-              <strong>{lang === "bn" ? "অর্ডার আইডি সাথে রাখুন" : "Keep Order ID Ready"}</strong>
-              <p>{lang === "bn" ? "ইতিমধ্যে অর্ডার করা থাকলে মেসেজে আপনার Order Ref (যেমন ORD-XXXXX) বা পেমেন্ট ট্রানজেকশন আইডি দিন।" : "Include your Order Ref (e.g. ORD-XXXXX) or Transaction ID in your message for instant resolution."}</p>
-            </div>
-          </div>
-          <div className="guideline-item">
-            <span className="guideline-icon">⚡</span>
-            <div>
-              <strong>{lang === "bn" ? "ইনস্ট্যান্ট ডেলিভারি" : "Instant Delivery"}</strong>
-              <p>{lang === "bn" ? "পেমেন্ট সম্পন্ন হওয়ার ৪৫ সেকেন্ডের মধ্যেই My purchases পেজে আপনার পণ্য অ্যাক্টিভ হয়ে যায়।" : "Digital access is automatically delivered to My purchases within 45s of verified payment."}</p>
-            </div>
-          </div>
-          <div className="guideline-item">
-            <span className="guideline-icon">🛡️</span>
-            <div>
-              <strong>{lang === "bn" ? "পূর্ণ মেয়াদি রিপ্লেসমেন্ট ওয়ারেন্টি" : "Full Term Warranty"}</strong>
-              <p>{lang === "bn" ? "ক্রয়কৃত পণ্যের মেয়াদ থাকা পর্যন্ত যেকোনো সমস্যায় সেলার রিপ্লেসমেন্ট সাপোর্ট প্রদান করবে।" : "Sellers provide replacements or assistance throughout the product guarantee term."}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {shop.social_links && Object.values(shop.social_links).some(Boolean) && (
         <div className="contact-social-channels">
           <h4>{lang === "bn" ? "কমিউনিটি ও সোশ্যাল মিডিয়া চ্যানেল" : "Community & Social Channels"}</h4>
