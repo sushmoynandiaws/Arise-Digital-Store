@@ -110,9 +110,9 @@ const paymentLogos: Record<string, string> = {
 function useRouteShop() {
   const { catalog } = useMarket();
   const { pathname } = useLocation();
-  const shopSlug = matchPath("/shops/:slug", pathname)?.params.slug ||
-    matchPath("/shops/:slug/products/:productSlug", pathname)?.params.slug ||
-    matchPath("/shops/:slug/info/:section", pathname)?.params.slug;
+  const shopSlug =
+    matchPath("/shops/:slug/*", pathname)?.params.slug ||
+    matchPath("/shops/:slug", pathname)?.params.slug;
   if (shopSlug)
     return catalog?.shops.find(
       (shop) => shop.slug === shopSlug || shop.id === shopSlug,
@@ -2230,15 +2230,8 @@ function ShopPage() {
           <span>/</span>
           <Link to="/shops">{lang === "bn" ? "স্বাধীন শপসমূহ" : "Shops"}</Link>
           <span>/</span>
-          <span aria-current="page">{shop.name}</span>
+          <h1 className="breadcrumb-current" aria-current="page">{shop.name}</h1>
         </nav>
-        <div className="shop-hero-header-row">
-          <h1>{shop.name}</h1>
-          <div className="shop-online-indicator">
-            <span className="online-dot" />
-            <span>{lang === "bn" ? "ভেরিফাইড ডিজিটাল শপ" : "Verified Digital Shop"}</span>
-          </div>
-        </div>
       </section>
       <Products shop={shop} />
       <WhatsAppFloatingButton shop={shop} />
