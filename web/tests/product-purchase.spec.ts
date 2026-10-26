@@ -9,6 +9,7 @@ test("product options, quantity and total stay consistent through checkout", asy
     variants: [{ id: "sold-out", name: "Starter", price: "5.00", stock: 0 }, { id: "available", name: "Full course", price: "10.00", stock: 9 }],
   };
   await page.route("**/api/**", route => {
+    if (new URL(route.request().url()).pathname === "/api/promotions") return route.fulfill({ json: { ads: [], settings: {} } });
     const endpoint = new URL(route.request().url()).pathname;
     if (endpoint === "/api/session") return route.fulfill({ json: { user: null, csrf: "test-csrf", demo: false, source_web: "" } });
     if (endpoint.endsWith("/reviews")) return route.fulfill({ json: { count: 0, average: null, has_more: false, reviews: [] } });

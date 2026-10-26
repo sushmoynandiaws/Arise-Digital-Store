@@ -1,0 +1,77 @@
+name: Admin console validation
+on:
+  push:
+    branches: [codex/admin-console-validation]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: local-test-only
+          POSTGRES_DB: arise_marketplace_test
+        ports: ['55438:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d arise_marketplace_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      MARKETPLACE_TEST_DATABASE_URL: postgresql://marketplace_test:local-test-only@127.0.0.1:55438/arise_marketplace_test
+      PG_ADMIN_URL: postgresql://postgres:local-test-only@127.0.0.1:55438/arise_marketplace_test
+      CARGO_BUILD_JOBS: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update stable && rustup default stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Format Rust and retain reviewable source
+        run: |
+          cargo fmt
+          mkdir -p artifacts/admin-validation/formatted/src artifacts/admin-validation/formatted/tests
+          cp src/admin.rs src/app.rs src/db.rs src/lib.rs artifacts/admin-validation/formatted/src/
+          cp tests/marketplace.rs artifacts/admin-validation/formatted/tests/
+          git diff -- src tests > artifacts/admin-validation/rustfmt.patch
+      - name: Prepare disposable PostgreSQL metadata
+        run: |
+          psql "$PG_ADMIN_URL" -v ON_ERROR_STOP=1 -f migrations/002_postgres.sql -f migrations/003_reviews.sql -f migrations/004_shop_pages.sql -f migrations/005_admin_console.sql
+          psql "$PG_ADMIN_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE marketplace_test LOGIN PASSWORD 'local-test-only'; GRANT USAGE ON SCHEMA arise_marketplace TO marketplace_test; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA arise_marketplace TO marketplace_test; CREATE TABLE public.commerce_sentinel(id integer);"
+      - name: Rust integration and restricted PostgreSQL checks
+        run: |
+          cargo test --locked
+          cargo test --locked -- --ignored --test-threads=1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Frontend checks and build
+        working-directory: web
+        run: npm ci && npm test && npm run build
+      - name: Browser dependencies
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - name: Browser acceptance
+        working-directory: web
+        env:
+          CI: 'true'
+          BASE_URL: http://127.0.0.1:5173
+        run: |
+          npm run dev -- --port 5173 --strictPort > ../artifacts/admin-validation/vite.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:5173/ >/dev/null && break; sleep 1; done
+          npx playwright test tests/admin-console.spec.ts tests/payment-countdown.spec.ts tests/shop-pages.spec.ts tests/shop-support.spec.ts tests/product-purchase.spec.ts tests/checkout.spec.ts tests/reviews.spec.ts --workers=1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: admin-validation-evidence
+          path: |
+            artifacts/
+            web/test-results/

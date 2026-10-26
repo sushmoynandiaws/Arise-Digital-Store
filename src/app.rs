@@ -693,11 +693,12 @@ async fn product_reviews(
     {
         return Err(AppError::new(StatusCode::NOT_FOUND, "Product not found."));
     }
-    let summary = sqlx::query("SELECT COUNT(*) AS count,CAST(COALESCE(SUM(rating),0) AS BIGINT) AS total FROM reviews WHERE product_id=$1 AND id NOT IN (SELECT review_id FROM review_moderation WHERE hidden=1)")
+    let admin_ready=crate::admin::schema_ready(&state).await?;
+    let summary = sqlx::query(if admin_ready {"SELECT COUNT(*) AS count,CAST(COALESCE(SUM(rating),0) AS BIGINT) AS total FROM reviews WHERE product_id=$1 AND id NOT IN (SELECT review_id FROM review_moderation WHERE hidden=1)"} else {"SELECT COUNT(*) AS count,CAST(COALESCE(SUM(rating),0) AS BIGINT) AS total FROM reviews WHERE product_id=$1"})
         .bind(&id).fetch_one(&state.db).await.map_err(|_| AppError::internal())?;
     let count: i64 = summary.try_get("count").map_err(|_| AppError::internal())?;
     let total: i64 = summary.try_get("total").map_err(|_| AppError::internal())?;
-    let reviews = sqlx::query("SELECT id,CAST(rating AS BIGINT) AS rating,display_name,comment,created_at FROM reviews WHERE product_id=$1 AND id NOT IN (SELECT review_id FROM review_moderation WHERE hidden=1) ORDER BY created_at DESC,id DESC LIMIT 20 OFFSET $2")
+    let reviews = sqlx::query(if admin_ready {"SELECT id,CAST(rating AS BIGINT) AS rating,display_name,comment,created_at FROM reviews WHERE product_id=$1 AND id NOT IN (SELECT review_id FROM review_moderation WHERE hidden=1) ORDER BY created_at DESC,id DESC LIMIT 20 OFFSET $2"} else {"SELECT id,CAST(rating AS BIGINT) AS rating,display_name,comment,created_at FROM reviews WHERE product_id=$1 ORDER BY created_at DESC,id DESC LIMIT 20 OFFSET $2"})
         .bind(id).bind(i64::from(page.offset)).fetch_all(&state.db).await.map_err(|_| AppError::internal())?
         .into_iter().map(public_review).collect::<Result<Vec<_>>>()?;
     Ok(Json(

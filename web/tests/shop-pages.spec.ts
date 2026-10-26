@@ -17,6 +17,7 @@ async function fixture(page: Page) {
   let failSave = false;
   const product = { id: "product", shop_id: shop.id, name: "Digital guide", category: "Education", description: "A digital guide", image_url: "", currency: "BDT", delivery_mode: "manual", delivery_estimate: "", delivery_note: "", purchase_terms: "", required_buyer_fields: [], sales_enabled: true, selected: true, variants: [{ id: "variant", name: "Guide", price: "100.00", stock: 3 }] };
   await page.route("**/api/**", route => {
+    if (new URL(route.request().url()).pathname === "/api/promotions") return route.fulfill({ json: { ads: [], settings: {} } });
     const endpoint = new URL(route.request().url()).pathname;
     if (endpoint === "/api/session") return route.fulfill({ json: { user: { id: "seller", name: "Seller", admin: false }, csrf: "csrf", demo: false, source_web: "https://example.test" } });
     if (endpoint === "/api/catalog") return route.fulfill({ json: { shops: [shop, other], products: [product], synced_at: new Date().toISOString() } });

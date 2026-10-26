@@ -9,6 +9,7 @@ test("verified customers can publish and edit one review, and products show real
   let failReviews = false;
   let submissions = 0;
   await page.route("**/api/**", route => {
+    if (new URL(route.request().url()).pathname === "/api/promotions") return route.fulfill({ json: { ads: [], settings: {} } });
     const endpoint = new URL(route.request().url()).pathname;
     if (endpoint === "/api/session") return route.fulfill({ json: { user: null, csrf: "test-csrf", demo: false, source_web: "" } });
     if (endpoint === "/api/catalog") return route.fulfill({ json: { products: [product], shops: [shop], synced_at: new Date().toISOString() } });
@@ -75,6 +76,7 @@ test("many reviews scroll within a bounded keyboard-accessible list and paginati
   const reviews = Array.from({ length: 12 }, (_, index) => ({ id: `review-${index}`, rating: 5, display_name: `Customer ${index + 1}`, comment: `Review ${index + 1}: The digital course was helpful and easy to follow.`, created_at: 1792886400 }));
   const offsets: number[] = [];
   await page.route("**/api/**", route => {
+    if (new URL(route.request().url()).pathname === "/api/promotions") return route.fulfill({ json: { ads: [], settings: {} } });
     const url = new URL(route.request().url());
     if (url.pathname === "/api/session") return route.fulfill({ json: { user: null, csrf: "test-csrf", demo: false, source_web: "" } });
     if (url.pathname === "/api/catalog") return route.fulfill({ json: { products: [product], shops: [shop], synced_at: new Date().toISOString() } });

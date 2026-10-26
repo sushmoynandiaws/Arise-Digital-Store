@@ -24,6 +24,7 @@ const readyOrder: Purchase = { id: "sample-order", ref: "SAMPLE-001", shop, name
 async function preview(page: Page, options: { signedIn?: boolean; admin?: boolean; empty?: boolean; failure?: boolean } = {}) {
   await page.route("https://example.test/**", route => route.fulfill({ status: 200, contentType: "text/html", body: "" }));
   await page.route("**/api/**", async route => {
+    if (new URL(route.request().url()).pathname === "/api/promotions") return route.fulfill({ json: { ads: [], settings: {} } });
     const endpoint = new URL(route.request().url()).pathname;
     if (endpoint === "/api/session") return route.fulfill({ json: { user: options.signedIn ? { id: "sample-user", name: "Sample Seller", email: "seller@example.test", admin: !!options.admin } : null, csrf: "sample-csrf", demo: true, source_web: "https://example.test" } });
     if (endpoint === "/api/catalog") return route.fulfill(options.failure ? { status: 503, json: { error: "The catalog is temporarily unavailable. Try again." } } : { json: options.empty ? { ...catalog, products: [], shops: [] } : catalog });
@@ -33,7 +34,7 @@ async function preview(page: Page, options: { signedIn?: boolean; admin?: boolea
     if (endpoint === "/api/orders/sample-order/reveal") return route.fulfill({ json: { items: [{ item: 1, content: "SAMPLE PRIVATE ITEM — NOT A REAL CREDENTIAL" }] } });
     if (endpoint === "/api/seller") return route.fulfill({ json: { shops: [shop, otherShop] } });
     if (endpoint.startsWith("/api/seller/stores/")) return route.fulfill({ json: { shop, products, payment_methods: shop.payment_methods, active: true } });
-    if (endpoint === "/api/admin") return route.fulfill({ json: { catalog, reports: [{ id: "sample-report", product_id: products[0].id, reason: "Sample report for marketplace review.", resolved: false, created_at: 1792922400 }], moderation: [] } });
+    if (endpoint === "/api/admin") return route.fulfill({ json: { catalog, permissions: ["catalog", "moderate", "reports"], role: "owner", checked_at: 1793016000, reports: [{ id: "sample-report", product_id: products[0].id, reason: "Sample report for marketplace review.", resolved: false, created_at: 1792922400 }], moderation: [] } });
     if (endpoint.endsWith("/reviews")) return route.fulfill({ json: { count: 0, average: null, has_more: false, reviews: [] } });
     throw new Error(`Unexpected UI request: ${endpoint}`);
   });
@@ -108,11 +109,11 @@ test("keyboard menu, FAQ and moderation dialogs preserve focus", async ({ page }
   const question = page.locator(".faq-section summary").first();
   await question.focus(); await page.keyboard.press("Enter");
   await expect(page.locator(".faq-section details").first()).toHaveAttribute("open", "");
-  await page.goto("/admin");
+  await page.goto("/admin/products");
   const hide = page.getByRole("button", { name: "Hide listing", exact: true }).first();
   await hide.click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toHaveAccessibleName(`Hide ${products[0].name}`);
+  await expect(dialog).toHaveAccessibleName("Hide listing");
   await expect(page.getByLabel("Reason for this action")).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(page.getByRole("button", { name: "Close moderation" })).toBeFocused();
@@ -189,14 +190,14 @@ test("moderation errors stay inside the dialog and a successful retry updates th
   await preview(page, { signedIn: true, admin: true });
   let hidden = false;
   let attempts = 0;
-  await page.route("**/api/admin", route => route.fulfill({ json: { catalog, reports: [], moderation: hidden ? [{ kind: "product", target_id: products[0].id, hidden, reason: "Review sample listing" }] : [] } }));
+  await page.route("**/api/admin", route => route.fulfill({ json: { catalog, permissions: ["catalog", "moderate", "reports"], role: "owner", checked_at: 1793016000, reports: [], moderation: hidden ? [{ kind: "product", target_id: products[0].id, hidden, reason: "Review sample listing" }] : [] } }));
   await page.route("**/api/admin/moderation", route => {
     expect(route.request().postDataJSON()).toEqual({ kind: "product", target_id: products[0].id, hidden: true, reason: "Review sample listing" });
     if (++attempts === 1) return route.fulfill({ status: 503, json: { error: "Could not save this change. Try again." } });
     hidden = true;
     return route.fulfill({ json: {} });
   });
-  await page.goto("/admin");
+  await page.goto("/admin/products");
   const row = page.locator(".admin-row").filter({ hasText: products[0].name });
   await row.getByRole("button", { name: "Hide listing" }).click();
   const dialog = page.getByRole("dialog");

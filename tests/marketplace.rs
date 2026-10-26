@@ -132,7 +132,7 @@ async fn admin_routes_reject_regular_accounts_even_with_forged_local_role() {
     let session=sign_in(&state,"seller-source-access").await;
     sqlx::query("INSERT INTO admin_roles VALUES('user-1','owner')").execute(&state.db).await.unwrap();
     let app=router(state.clone());
-    for path in ["/api/admin","/api/admin/orders","/api/admin/access","/api/admin/activity","/api/admin/reviews","/api/admin/notes","/api/admin/health","/api/admin/documents/settings","/api/admin/documents/campaigns"] {
+    for path in ["/api/admin","/api/admin/orders","/api/admin/access","/api/admin/activity","/api/admin/reviews","/api/admin/notes?target_type=report&target_id=22222222-2222-4222-8222-222222222222","/api/admin/health","/api/admin/documents/settings","/api/admin/documents/campaigns"] {
         assert_eq!(app.clone().oneshot(admin_request("GET",path,&session,json!({}))).await.unwrap().status(),StatusCode::FORBIDDEN,"{path}");
     }
     for (method,path,data) in [

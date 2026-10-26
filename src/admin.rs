@@ -18,6 +18,11 @@ pub struct AdminIdentity {
     pub actor: String,
     pub role: String,
 }
+pub async fn schema_ready(state: &AppState) -> Result<bool> {
+    let version: Option<i64> = sqlx::query_scalar("SELECT version FROM schema_version WHERE version=4")
+        .fetch_optional(&state.db).await.map_err(|_|AppError::internal())?;
+    Ok(version==Some(4))
+}
 pub fn permissions(role: &str) -> Vec<&'static str> {
     match role {
         "owner" => vec![
@@ -38,6 +43,7 @@ pub fn permissions(role: &str) -> Vec<&'static str> {
     }
 }
 pub async fn role(state: &AppState, id: &str) -> Result<String> {
+    if !schema_ready(state).await? { return Ok("owner".into()); }
     Ok(
         sqlx::query_scalar("SELECT role FROM admin_roles WHERE user_id=$1")
             .bind(id)
@@ -64,6 +70,9 @@ pub async fn authorize(
         .await?;
     if me["user"]["admin"] != true {
         return Err(denied());
+    }
+    if !schema_ready(state).await? {
+        return Err(AppError::new(StatusCode::SERVICE_UNAVAILABLE,"Administrator workspace requires marketplace migration 005. The storefront remains available."));
     }
     let actor = me["user"]["id"]
         .as_str()
@@ -420,6 +429,7 @@ async fn save_document(
     ))
 }
 async fn promotions(State(state): State<AppState>) -> Result<Json<Value>> {
+    if !schema_ready(&state).await? { return Ok(Json(json!({"ads":[],"settings":{}}))); }
     let campaigns = read_document(&state, "campaigns").await?;
     let ads: Vec<Value> = campaigns["content"]
         .as_array()
