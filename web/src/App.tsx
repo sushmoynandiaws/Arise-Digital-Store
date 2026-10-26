@@ -1302,22 +1302,25 @@ function ShopInformationPage() {
         <p className="eyebrow">{shopName}</p>
         <h1>{title}</h1>
       </div>
-      {section.key === "contact" && shop ? (
-        <ShopContactContent shop={shop} lang={lang} support={support} />
-      ) : (
-        <article className="panel shop-policy-content">
-          {text ? <p className="preserve-lines">{text}</p> :
-            <p className="muted">{lang === "bn"
-              ? "এই তথ্য এখনও যোগ করা হয়নি। বিস্তারিত জানতে যোগাযোগ করুন।"
-              : "This information has not been added yet. Contact support for details."}</p>}
-          {section.key === "contact" && shop && <ShopContactChips shop={shop} />}
-          {support && <div className="shop-policy-support">
-            <a className="button secondary" href={supportHref(support)}>
-              <Phone size={16} aria-hidden="true" />{lang === "bn" ? "সাপোর্টে যোগাযোগ করুন" : "Contact support"}<ArrowRight size={16} aria-hidden="true" />
-            </a>
-          </div>}
-        </article>
-      )}
+      <article className="panel shop-policy-content">
+        {text ? <p className="preserve-lines">{text}</p> : (
+          (!shop || section.key !== "contact") && <p className="muted">{lang === "bn"
+            ? "এই তথ্য এখনও যোগ করা হয়নি। বিস্তারিত জানতে যোগাযোগ করুন।"
+            : "This information has not been added yet. Contact support for details."}</p>
+        )}
+        {section.key === "contact" && shop ? (
+          <ShopContactContent shop={shop} lang={lang} support={support} />
+        ) : (
+          <>
+            {section.key === "contact" && shop && <ShopContactChips shop={shop} />}
+            {support && <div className="shop-policy-support">
+              <a className="button secondary" href={supportHref(support)}>
+                <Phone size={16} aria-hidden="true" />{lang === "bn" ? "সাপোর্টে যোগাযোগ করুন" : "Contact support"}<ArrowRight size={16} aria-hidden="true" />
+              </a>
+            </div>}
+          </>
+        )}
+      </article>
     </main>
   );
 }
