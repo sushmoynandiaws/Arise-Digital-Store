@@ -784,11 +784,11 @@ function Header() {
             placeholder={
               shop
                 ? (lang === "bn" ? `${shop.name}-এর প্রোডাক্ট খুঁজুন...` : `Search in ${shop.name}...`)
-                : (lang === "bn" ? "প্রোডাক্ট, শপ বা ক্যাটাগরি খুঁজুন..." : "Search Tools, Subscriptions, Shops...")
+                : (lang === "bn" ? "পণ্য, দোকান বা ক্যাটাগরি খুঁজুন..." : "Search products, shops, categories...")
             }
             value={headerSearch}
             onChange={(e) => onSearchChange(e.target.value)}
-            aria-label={shop ? `Search ${shop.name} products` : "Search tools"}
+            aria-label={shop ? `Search ${shop.name} products` : "Search products"}
           />
           {headerSearch && (
             <button
@@ -1912,7 +1912,7 @@ function Home() {
       <main id="main">
         <section className="hero container">
           <div className="hero-copy">
-            <p className="eyebrow">{lang === "bn" ? "ডিজিটাল মার্কেটপ্লেস" : "THE DIGITAL MARKETPLACE"}</p>
+            <p className="eyebrow">{lang === "bn" ? "মাল্টি-ভেন্ডর মার্কেটপ্লেস" : "MULTI-CATEGORY MARKETPLACE"}</p>
             <h1>
               {platform.hero_title || (lang === "bn" ? (
                 <>স্বাধীন শপ থেকে<br />আপনার পছন্দের পণ্য</>
@@ -1922,7 +1922,7 @@ function Home() {
             </h1>
             <p className="hero-description">
               {platform.hero_description || (lang === "bn"
-                ? "স্বাধীন শপের সফটওয়্যার, টেমপ্লেট, ডিজাইন অ্যাসেট ও কোর্স—সব এক জায়গায়।"
+                ? "স্বাধীন শপগুলোর ফ্যাশন, গ্যাজেট, নিত্যপণ্য ও ডিজিটাল সেবা—সব এক জায়গায়।"
                 : "Find software, templates, design assets and courses from independent shops.")}
             </p>
             <form
@@ -1998,7 +1998,7 @@ function Home() {
         </section>
         <section className="container section products-section">
           <SectionTitle
-            title={lang === "bn" ? "আপনার পরের ডিজিটাল প্রোডাক্ট" : "Find your next digital essential"}
+            title={lang === "bn" ? "সকল ক্যাটাগরির বিশ্বস্ত প্রোডাক্ট" : "Explore products across all categories"}
             link={lang === "bn" ? "সব প্রোডাক্ট দেখুন" : "View all products"}
             to="/products"
           />
@@ -2131,7 +2131,7 @@ function Products({ shop }: { shop?: Shop }) {
       )}
       <div className="catalog-search-row">
         <label className="catalog-search"><Search size={18} /><span className="sr-only">{shop ? `Search ${shop.name} catalog` : "Search the catalog"}</span><input type="search" value={query} placeholder={lang === "bn" ? "প্রোডাক্ট বা ক্যাটাগরি খুঁজুন" : "Search products or categories"} onChange={event => update("q", event.target.value)} /></label>
-        <p className="catalog-context">{shop ? shop.name : (lang === "bn" ? "স্বাধীন বিক্রেতাদের ডিজিটাল প্রোডাক্ট" : "Digital products from independent sellers")}</p>
+        <p className="catalog-context">{shop ? shop.name : (lang === "bn" ? "স্বাধীন বিক্রেতাদের পণ্যসমূহ" : "Products from independent sellers")}</p>
       </div>
       <div className="catalog-toolbar-row">
         {!shop && <label className="field">Shop type<select value={storeType} onChange={e => update("store_type", e.target.value)}>
@@ -3923,11 +3923,16 @@ function Seller() {
     setError("");
     setMessage("");
     try {
+      let supportPayload = form.support.trim();
+      const bdPhone = supportPayload.replace(/\D/g, "").match(/^(?:88)?(01[3-9]\d{8})$/);
+      if (bdPhone) {
+        supportPayload = `https://wa.me/88${bdPhone[1]}`;
+      }
       const result = await api<{ shop: Shop }>(
         `/seller/stores/${selected}/listing`,
         {
           method: "PUT",
-          body: JSON.stringify({ ...form, published, product_ids: ids }),
+          body: JSON.stringify({ ...form, support: supportPayload, published, product_ids: ids }),
         },
       );
       setData((previous) =>
@@ -4177,7 +4182,7 @@ function Seller() {
                         <small>{form.description.length}/1,500</small>
                       </label>
                       <label className="field">
-                        Support email or website
+                        Support email, WhatsApp or website
                         <input
                           required
                           maxLength={255}
@@ -4185,8 +4190,13 @@ function Seller() {
                           onChange={(e) =>
                             setForm({ ...form, support: e.target.value })
                           }
-                          placeholder="hello@yourshop.com or https://…"
+                          placeholder="hello@yourshop.com, 01XXXXXXXXX or https://wa.me/…"
                         />
+                        <span className="form-hint">
+                          {lang === "bn"
+                            ? "কাস্টমার সাপোর্টের জন্য আপনার ইমেইল, হোয়াটসঅ্যাপ নম্বর বা লিঙ্ক দিন।"
+                            : "Enter your support email, WhatsApp number, or support link."}
+                        </span>
                       </label>
                       <details className="branding-details">
                         <summary>
