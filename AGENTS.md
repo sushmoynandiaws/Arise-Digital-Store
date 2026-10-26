@@ -7,3 +7,8 @@ For all UI copy, follow `design-system/arise-digital-store/content-style-guide.m
 Product pages follow a two-column image and purchase layout, with a short seller description, source-owned options and stock, quantity controls, a live total, and a single Buy now action. On mobile, stack these regions. Full description, delivery details and purchase terms open in an accessible modal dialog when clicked; do not add large information panels below the product. Prices, payment methods, delivery promises and stock come from AriseSell. Do not invent sales counts, viewers, discounts or reviews.
 
 Reviews are stored in marketplace metadata and are allowed only for an owned AriseSell purchase with verified payment and sent/delivered status. Keep one editable review per order; publish only the chosen public name, rating, comment and date. Review averages/counts must come from the actual stored reviews. Never import or invent third-party testimonials without a configured source.
+
+## Execution & Communication Style
+
+During any coding task, command execution, or debugging workflow, provide real-time, concise step-by-step progress notes, architectural decisions, and findings in Bengali before and between tool executions (Codex-style execution updates). Explain what you are checking, what you discovered, the reasoning behind changes, and file edits/commands executed, keeping the user continuously informed of every step in clear, short notes.
+
