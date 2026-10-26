@@ -3280,9 +3280,12 @@ function CopyButton({
   );
 }
 
-export function getSellerPaymentAccountType(shopId?: string, provider?: string): "merchant" | "personal" {
+export function getSellerPaymentAccountType(shopId?: string, provider?: string, shop?: Shop | null): "merchant" | "personal" {
   if (!provider) return "personal";
   const pKey = provider.toLowerCase();
+  if (shop?.payment_account_types && shop.payment_account_types[pKey]) {
+    return shop.payment_account_types[pKey];
+  }
   try {
     if (shopId) {
       const specific = localStorage.getItem(`arise_payment_account_type_${shopId}_${pKey}`);
@@ -3308,29 +3311,34 @@ export function setSellerPaymentAccountType(shopId: string | undefined, provider
 export function detectPaymentAccountType(payment: any, shop?: Shop | null): "merchant" | "personal" {
   if (!payment) return "personal";
 
-  // 1. Direct explicit property
-  const direct = (payment.account_type || payment.type || "").toString().toLowerCase();
+  // 1. Direct explicit property from AriseSell
+  const direct = (payment.account_type || payment.type || payment.wallet_type || payment.number_type || "").toString().toLowerCase();
   if (direct.includes("merchant") || direct.includes("payment")) return "merchant";
-  if (direct.includes("personal") || direct.includes("send_money")) return "personal";
+  if (direct.includes("personal") || direct.includes("send_money") || direct.includes("uddokta")) return "personal";
 
-  // 2. Instructions or note text
+  // 2. Account name or title (e.g. "Nagad Personal / Uddokta Number" as in AriseSell integration)
+  const name = (payment.account_name || payment.title || payment.label || payment.name || "").toString().toLowerCase();
+  if (name.includes("merchant") || name.includes("মার্চেন্ট")) return "merchant";
+  if (name.includes("personal") || name.includes("uddokta") || name.includes("পার্সোনাল") || name.includes("উদ্যোক্তা")) return "personal";
+
+  // 3. Instructions or note text from AriseSell
   const text = (payment.instructions || payment.note || "").toString().toLowerCase();
   if (text.includes("merchant") || text.includes("মার্চেন্ট") || text.includes("make payment") || text.includes("পেমেন্ট")) {
     return "merchant";
   }
-  if (text.includes("personal") || text.includes("পার্সোনাল") || text.includes("send money") || text.includes("সেন্ড মানি")) {
+  if (text.includes("personal") || text.includes("পার্সোনাল") || text.includes("send money") || text.includes("সেন্ড মানি") || text.includes("uddokta") || text.includes("উদ্যোক্তা")) {
     return "personal";
   }
 
-  // 3. Shop metadata
+  // 4. Shop metadata from AriseSell
   if (shop?.payment_account_types && payment.provider) {
     const val = shop.payment_account_types[payment.provider.toLowerCase()];
     if (val === "merchant" || val === "personal") return val;
   }
 
-  // 4. Shop ID or general in localStorage
+  // 5. Shop ID or general in localStorage
   if (payment.provider) {
-    return getSellerPaymentAccountType(shop?.id, payment.provider);
+    return getSellerPaymentAccountType(shop?.id, payment.provider, shop);
   }
 
   return "personal";
@@ -4419,63 +4427,55 @@ function Seller() {
                     <section className="panel seller-panel" aria-labelledby="shop-payment-settings-title">
                       <div className="seller-panel-heading">
                         <div>
-                          <span className="eyebrow">Payment Setup</span>
-                          <h2 id="shop-payment-settings-title">{t("sellerPaymentSettingsTitle")}</h2>
+                          <span className="eyebrow">{lang === "bn" ? "পেমেন্ট সেটআপ · AriseSell অটো-সিঙ্ক" : "Payment Setup · AriseSell Auto-Sync"}</span>
+                          <h2 id="shop-payment-settings-title">{lang === "bn" ? "সংযুক্ত পেমেন্ট একাউন্ট ও নির্দেশনা" : "Connected Payment Accounts & Instructions"}</h2>
                         </div>
                         <Wallet size={24} aria-hidden="true" />
                       </div>
                       <p className="muted">
-                        {t("sellerPaymentSettingsDesc")}
+                        {lang === "bn"
+                          ? "আপনার ওয়ালেটের ধরন (পার্সোনাল নাকি মার্চেন্ট) AriseSell থেকে স্বয়ংক্রিয়ভাবে শনাক্ত ও সিঙ্ক করা হয়েছে। আলাদাভাবে সিলেক্ট করার প্রয়োজন নেই—চেকআউটে ক্রেতারা সরাসরি সঠিক নির্দেশনা দেখতে পাবেন।"
+                          : "Wallet types (Personal vs Merchant) are automatically detected and synced from your connected AriseSell store. No manual selection required—customers automatically receive the exact instructions during checkout."}
                       </p>
                       <div className="seller-payment-methods-list">
                         {(data.payment_methods.length ? data.payment_methods : ["bkash", "nagad", "rocket"]).map((providerKey) => {
                           const pKey = providerKey.toLowerCase();
-                          const currentType = getSellerPaymentAccountType(selected, pKey);
+                          const currentType = getSellerPaymentAccountType(selected, pKey, data.shop);
                           return (
                             <div key={pKey} className="seller-payment-method-row">
                               <div className="payment-method-header-bar">
                                 <div className="payment-method-info">
                                   <span className={`provider-dot ${pKey}`} />
                                   <strong>{paymentMethodLabel(pKey)}</strong>
+                                  <span className="arisesell-sync-tag">
+                                    <Check size={12} />
+                                    {lang === "bn" ? "AriseSell থেকে অটো-ডিটেক্টেড" : "Auto-synced from AriseSell"}
+                                  </span>
                                 </div>
                                 <span className={`account-type-badge ${currentType}`}>
                                   {currentType === "merchant" ? <Building2 size={13} /> : <UserCheck size={13} />}
                                   {currentType === "merchant" ? t("merchantAccount") : t("personalAccount")}
                                 </span>
                               </div>
-                              <div className="payment-type-selector" role="radiogroup" aria-label={`Account type for ${paymentMethodLabel(pKey)}`}>
-                                <button
-                                  type="button"
-                                  className={`type-toggle-pill ${currentType === "personal" ? "active" : ""}`}
-                                  onClick={() => {
-                                    setSellerPaymentAccountType(selected, pKey, "personal");
-                                    setPaymentAccountTypesUpdated((v) => v + 1);
-                                  }}
-                                >
-                                  <UserCheck size={15} />
-                                  <span>{t("personalSendMoneyLabel")}</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`type-toggle-pill ${currentType === "merchant" ? "active" : ""}`}
-                                  onClick={() => {
-                                    setSellerPaymentAccountType(selected, pKey, "merchant");
-                                    setPaymentAccountTypesUpdated((v) => v + 1);
-                                  }}
-                                >
-                                  <Building2 size={15} />
-                                  <span>{t("merchantPaymentLabel")}</span>
-                                </button>
-                              </div>
-                              <div className="payment-type-feedback-hint">
+                              <div className="payment-type-auto-info">
                                 {currentType === "merchant" ? (
-                                  <span className="feedback-text merchant">
-                                    ✓ {lang === "bn" ? "ক্রেতারা 'পেমেন্ট করুন' (Payment) নির্দেশনা ও সেন্ড মানি না করার স্পষ্ট সতর্কতা দেখতে পাবেন।" : "Buyers will be instructed to use 'Make Payment' and warned not to Send Money."}
-                                  </span>
+                                  <div className="auto-detected-hint merchant">
+                                    <Building2 size={15} />
+                                    <span>
+                                      {lang === "bn"
+                                        ? "মার্চেন্ট একাউন্ট হিসেবে শনাক্ত। চেকআউটে ক্রেতারা স্বয়ংক্রিয়ভাবে 'পেমেন্ট করুন' (Make Payment) নির্দেশনা ও সেন্ড মানি না করার স্পষ্ট সতর্কতা দেখতে পাবেন।"
+                                        : "Detected as Merchant Account in AriseSell. Buyers are automatically instructed to use 'Make Payment' and warned not to Send Money."}
+                                    </span>
+                                  </div>
                                 ) : (
-                                  <span className="feedback-text personal">
-                                    ✓ {lang === "bn" ? "ক্রেতারা 'সেন্ড মানি করুন' (Send Money) নির্দেশনা ও পেমেন্ট অপশন না ব্যবহারের সতর্কতা দেখতে পাবেন।" : "Buyers will be instructed to use 'Send Money' and warned not to use Payment."}
-                                  </span>
+                                  <div className="auto-detected-hint personal">
+                                    <UserCheck size={15} />
+                                    <span>
+                                      {lang === "bn"
+                                        ? "পার্সোনাল / উদ্যোক্তা নম্বর হিসেবে শনাক্ত। চেকআউটে ক্রেতারা স্বয়ংক্রিয়ভাবে 'সেন্ড মানি করুন' (Send Money) নির্দেশনা ও পেমেন্ট অপশন না ব্যবহারের সতর্কতা দেখতে পাবেন।"
+                                        : "Detected as Personal / Uddokta Number in AriseSell. Buyers are automatically instructed to use 'Send Money' and warned not to use Payment."}
+                                    </span>
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -4484,7 +4484,9 @@ function Seller() {
                       </div>
                       <div className="sync-bar payment-sync-bar">
                         <span className="muted form-hint">
-                          {lang === "bn" ? "একাউন্ট টাইপ তাৎক্ষণিকভাবে সেভ হয় এবং চেকআউটে প্রতিফলিত হয়।" : "Account types are saved instantly and reflected at customer checkout."}
+                          {lang === "bn"
+                            ? "পেমেন্ট নম্বর পরিবর্তন বা ওয়ালেট সেটিংস পরিচালনা করতে AriseSell ড্যাশবোর্ড ব্যবহার করুন।"
+                            : "Payment numbers and account credentials are managed directly inside AriseSell."}
                         </span>
                         <a
                           className="text-link"
@@ -4492,7 +4494,7 @@ function Seller() {
                           target="_blank"
                           rel="noreferrer"
                         >
-                          {lang === "bn" ? "AriseSell-এ পেমেন্ট নম্বর ম্যানেজ করুন" : "Manage payment numbers in AriseSell"}
+                          {lang === "bn" ? "AriseSell-এ পেমেন্ট নম্বর ও ওয়ালেট ম্যানেজ করুন" : "Manage payment numbers in AriseSell"}
                           <ExternalLink size={14} />
                         </a>
                       </div>

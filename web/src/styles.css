@@ -2827,6 +2827,44 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
   gap: 14px;
   margin-top: 16px;
 }
+
+.arisesell-sync-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary);
+  background: var(--surface-hover);
+  border: 1px solid var(--border-subtle);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+.payment-type-auto-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.auto-detected-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.auto-detected-hint.personal {
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+.auto-detected-hint.merchant {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
 .seller-payment-method-row {
   padding: 16px;
   border-radius: 10px;
