@@ -19,7 +19,7 @@ cd /opt/arise-digital-store/deploy/pgbouncer
 docker compose up -d --build --wait
 ```
 
-Provisioning applies the additive migrations through `005_admin_console.sql`, creates the restricted role, and verifies it has no role memberships or commerce-table privileges. Existing credentials and certificates are retained on repeated runs. Do not recreate a missing `database-password` file when the role already exists: recover it from the private backup or deliberately rotate the role and Vercel configuration together.
+Provisioning applies the additive `002_postgres.sql`, `003_reviews.sql` and `004_shop_pages.sql` migrations, creates the restricted role, and verifies it has no role memberships or commerce-table privileges. Existing credentials and certificates are retained on repeated runs. Do not recreate a missing `database-password` file when the role already exists: recover it from the private backup or deliberately rotate the role and Vercel configuration together.
 
 Private credentials and the CA signing key live under `/root/.arise-marketplace` (root access only). The container receives only its server certificate/key, public CA, and the runtime role's SCRAM verifier. Preserve an encrypted, access-controlled backup of this directory. No private certificates, passwords, keys, or complete connection URLs belong in Git.
 

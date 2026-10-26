@@ -1,7 +1,5 @@
 import {
   createContext,
-  lazy,
-  Suspense,
   useContext,
   useEffect,
   useMemo,
@@ -83,8 +81,7 @@ import { productForRoute, productPath, productSection, type ProductSection } fro
 import { ProductReviews, PurchaseReview, ShopReviews } from "./Reviews";
 import { shopPageSections } from "./shopPages";
 import {
-  PromotionsProvider,
-  usePlatformSettings,
+  AdminSponsoredAdsManager,
   HomeHeroSponsoredAd,
   TopFlashSponsoredAd,
   SponsoredProductCard,
@@ -619,7 +616,6 @@ export function TrackOrderPage() {
 
 
 function TopAnnouncementBar() {
-  const platform = usePlatformSettings();
   const shop = useRouteShop();
   const { lang } = useLang();
 
@@ -651,12 +647,14 @@ function TopAnnouncementBar() {
       <div className="site-top-bar" aria-label="Announcement & seller contact">
       <div className="site-top-bar-inner container">
         <div className="top-bar-announcement">
-          <Link to={shop ? `/shops/${shop.slug}` : (platform.announcement_url || "/products")} className="announcement-pill-link">
+          <Link to={shop ? `/shops/${shop.slug}` : "/products"} className="announcement-pill-link">
             <span className="announcement-flash">⚡</span>
             <span>
               {shop
                 ? (shop.tagline || (lang === "bn" ? `${shop.name}-এর স্টকে থাকা ডিজিটাল প্রোডাক্ট দেখুন` : `${shop.name} · Verified Digital Products In Stock`))
-                : (platform.announcement || (lang === "bn" ? "ডিজিটাল পণ্য ও সাবস্ক্রিপশন দেখুন" : "Browse digital products and subscriptions"))}
+                : (lang === "bn"
+                  ? "ইউটিউব প্রিমিয়াম, চ্যাটজিপিটি ও অফিস এখন স্টকে! এখনই কিনুন"
+                  : "YouTube Premium, ChatGPT, Office In Stock Now!! Buy Now")}
             </span>
             <span className="announcement-arrow">→</span>
           </Link>
@@ -1058,7 +1056,6 @@ function IconYouTube({ size = 18 }: { size?: number }) {
 }
 
 function ShopInformationPage() {
-  const platform = usePlatformSettings();
   const { slug, section: sectionKey } = useParams();
   const { catalog, catalogError, reloadCatalog } = useMarket();
   const shop = useRouteShop();
@@ -1075,8 +1072,8 @@ function ShopInformationPage() {
   if (slug && catalogError) return <main id="main" className="container section"><ErrorBox message={catalogError} retry={() => void reloadCatalog()} /></main>;
   if (slug && !catalog) return <Loading />;
   if (!section || (slug && !shop)) return <NotFound />;
-  const text = (shop ? shop.pages?.[section.key]?.trim() || (section.key === "about" ? shop.description : "") : platform.pages?.[section.key]?.trim());
-  const support = shop?.support || (!shop ? platform.support_email || "" : "");
+  const text = shop?.pages?.[section.key]?.trim() || (section.key === "about" ? shop?.description : "");
+  const support = shop?.support || (!shop ? "support@arisesell.com" : "");
   return (
     <main id="main" className="container narrow-page shop-policy-page">
       <Link className="text-link" to={shop ? `/shops/${shop.slug}` : "/"}>
@@ -1814,7 +1811,6 @@ function SectionTitle({
   );
 }
 function Home() {
-  const platform = usePlatformSettings();
   const { catalog, catalogError, reloadCatalog } = useMarket();
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
@@ -1827,10 +1823,12 @@ function Home() {
         <section className="hero container">
           <div className="hero-copy">
             <h1>
-              {platform.hero_title || <>Digital products<br />from independent shops</>}
+              Digital products
+              <br />
+              from independent shops
             </h1>
             <p className="hero-description">
-              {platform.hero_description || "Browse software, templates, design assets and courses. Check each seller’s product details and terms before ordering."}
+              Browse software, templates, design assets and courses. Check each seller’s product details and terms before ordering.
             </p>
             <form
               className="hero-search"
@@ -2052,7 +2050,7 @@ function Products({ shop }: { shop?: Shop }) {
               checked={inStock}
               onChange={(e) => setInStock(e.target.checked)}
             />
-            <span>{lang === "bn" ? "শুধুমাত্র স্টকে আছে" : "In stock only"}</span>
+            {lang === "bn" ? "শুধুমাত্র স্টকে আছে" : "In stock only"}
           </label>
         </div>
       </div>
@@ -3989,6 +3987,28 @@ function Seller() {
           </a>
         </div>
       )}
+      {session?.user?.admin && (
+        <section className="panel admin-seller-highlight-card">
+          <div className="admin-seller-header">
+            <div className="admin-badge-icon">
+              <ShieldCheck size={24} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <span className="eyebrow">Platform Administration</span>
+              <h2>AriseSell Administrator Dashboard</h2>
+              <p className="muted">
+                {lang === "bn"
+                  ? "আপনি একজন অনুমোদিত AriseSell অ্যাডমিনিস্ট্রেটর হিসেবে লগইন করেছেন। আপনি সরাসরি এখান থেকেই মার্কেটপ্লেস স্পন্সরড অ্যাড ও ক্যাম্পেইন পরিচালনা করতে পারবেন।"
+                  : "Signed in with an authorized AriseSell administrator account. You have full control over marketplace sponsored ads, earnings, and monetization directly here."}
+              </p>
+            </div>
+            <Link to="/admin" className="button secondary small">
+              {lang === "bn" ? "সম্পূর্ণ অ্যাডমিন পেজ →" : "Full Admin Page →"}
+            </Link>
+          </div>
+          <AdminSponsoredAdsManager />
+        </section>
+      )}
       <div className="seller-layout">
         <div>
           {!session ? (
@@ -4750,12 +4770,237 @@ function HowItWorks() {
     </main>
   );
 }
-const AdminConsole = lazy(() => import("./Admin"));
-function AdminEntry() {
-  const { session, sessionError, refreshSession, reloadCatalog } = useMarket();
-  if (!session) return <main id="main" className="container section">{sessionError ? <ErrorBox message={sessionError} retry={() => void refreshSession()} /> : <Loading />}</main>;
-  if (!session.user?.admin) return <main id="main" className="container section"><Empty title="Administrator access required" heading="h1"><p>Continue with an authorized AriseSell administrator account.</p><a className="button primary" href="/api/auth/start?return_to=/admin">Continue with AriseSell</a><Link className="text-link" to="/">Return to marketplace</Link></Empty></main>;
-  return <Suspense fallback={<Loading />}><AdminConsole key={session.user.id} user={session.user} sourceWeb={session.source_web} reloadCatalog={reloadCatalog} onSignOut={async () => { await api("/auth/logout", { method: "POST" }); await refreshSession(); }} /></Suspense>;
+type AdminData = {
+  catalog: Catalog;
+  reports: {
+    id: string;
+    product_id: string;
+    reason: string;
+    resolved: boolean;
+    created_at: number;
+  }[];
+  moderation: {
+    kind: string;
+    target_id: string;
+    hidden: boolean;
+    reason: string;
+  }[];
+};
+function Admin() {
+  const { session, reloadCatalog } = useMarket();
+  const [data, setData] = useState<AdminData | null>(null),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false),
+    [reason, setReason] = useState(""),
+    [target, setTarget] = useState<{
+      kind: string;
+      id: string;
+      name: string;
+      hidden: boolean;
+    } | null>(null);
+  const moderationDialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (!target) return;
+    const dialog = moderationDialog.current;
+    dialog?.showModal();
+    dialog?.querySelector("textarea")?.focus();
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = overflow; };
+  }, [target]);
+  const load = () =>
+    api<AdminData>("/admin")
+      .then(setData)
+      .catch((e) => setError(e.message));
+  useEffect(() => {
+    if (session?.user) void load();
+  }, [session?.user?.id]);
+  if (!session) return <Loading />;
+  if (!session.user?.admin)
+    return (
+      <main id="main" className="container section">
+        <Empty title="Administrator access required" heading="h1">
+          <p>Continue with an authorized AriseSell administrator account.</p>
+          <a className="button primary" href="/api/auth/start">
+            Continue with AriseSell
+          </a>
+        </Empty>
+      </main>
+    );
+  return (
+    <main id="main" className="container listing-page">
+      <div className="page-intro">
+        <h1>Marketplace administration</h1>
+        <p>Review published shops, product listings, and customer reports.</p>
+      </div>
+      {error && !target && <ErrorBox message={error} retry={() => void load()} />}
+      <div role="status">{busy && <p>Saving moderation changes…</p>}</div>
+      <AdminSponsoredAdsManager />
+      {data ? (
+        <>
+          <section className="panel admin-panel">
+            <h2>Published shops</h2>
+            {data.catalog.shops.map((shop) => {
+              const hidden = data.moderation.some(
+                (m) => m.kind === "shop" && m.target_id === shop.id && m.hidden,
+              );
+              return (
+                <div className="admin-row" key={shop.id}>
+                  <div>
+                    <strong>{shop.name}</strong>
+                    <p>{shop.description}</p>
+                  </div>
+                  <span className="pill">{hidden ? "Hidden" : "Visible"}</span>
+                  <button
+                    className="button secondary small"
+                    onClick={() => {
+                      setReason("");
+                      setTarget({
+                        kind: "shop",
+                        id: shop.id,
+                        name: shop.name,
+                        hidden: !hidden,
+                      });
+                    }}
+                  >
+                    {hidden ? "Restore" : "Hide shop"}
+                  </button>
+                </div>
+              );
+            })}
+          </section>
+          <section className="panel admin-panel">
+            <h2>Product listings</h2>
+            {data.catalog.products.map((product) => {
+              const hidden = data.moderation.some(
+                (m) =>
+                  m.kind === "product" &&
+                  m.target_id === product.id &&
+                  m.hidden,
+              );
+              return (
+                <div className="admin-row" key={product.id}>
+                  <strong>{product.name}</strong>
+                  <span className="pill">{hidden ? "Hidden" : "Visible"}</span>
+                  <button
+                    className="button secondary small"
+                    onClick={() => {
+                      setReason("");
+                      setTarget({
+                        kind: "product",
+                        id: product.id,
+                        name: product.name,
+                        hidden: !hidden,
+                      });
+                    }}
+                  >
+                    {hidden ? "Restore" : "Hide listing"}
+                  </button>
+                </div>
+              );
+            })}
+          </section>
+          <section className="panel admin-panel">
+            <h2>Customer reports</h2>
+            {!data.reports.length ? (
+              <p>No reports have been submitted.</p>
+            ) : (
+              data.reports.map((report) => (
+                <div className="admin-row" key={report.id}>
+                  <div>
+                    <strong>
+                      {data.catalog.products.find(
+                        (p) => p.id === report.product_id,
+                      )?.name || report.product_id}
+                    </strong>
+                    <p>{report.reason}</p>
+                  </div>
+                  <button
+                    className="button secondary small"
+                    disabled={report.resolved || busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      try {
+                        await api(`/admin/reports/${report.id}/resolve`, {
+                          method: "POST",
+                        });
+                        await load();
+                      } catch (e) {
+                        setError((e as Error).message);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    {report.resolved ? "Resolved" : "Resolve report"}
+                  </button>
+                </div>
+              ))
+            )}
+          </section>
+        </>
+      ) : (
+        <Loading />
+      )}
+      {target && (
+        <dialog ref={moderationDialog} className="moderation-form" aria-labelledby="moderation-title" onClose={() => setTarget(null)} onClick={event => { if (!busy && event.target === event.currentTarget) moderationDialog.current?.close(); }} onCancel={event => { if (busy) event.preventDefault(); }}>
+          <div className="product-info-header"><h2 id="moderation-title">
+            {target.hidden ? "Hide" : "Restore"} {target.name}
+          </h2><button className="icon-button" type="button" aria-label="Close moderation" disabled={busy} onClick={() => moderationDialog.current?.close()}><X size={20} /></button></div>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setBusy(true);
+              setError("");
+              try {
+                await api("/admin/moderation", {
+                  method: "PUT",
+                  body: JSON.stringify({
+                    kind: target.kind,
+                    target_id: target.id,
+                    hidden: target.hidden,
+                    reason,
+                  }),
+                });
+                moderationDialog.current?.close();
+                await Promise.all([load(), reloadCatalog()]);
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <p className="moderation-description">{target.hidden ? `This hides the ${target.kind === "shop" ? "shop and its listings" : "listing"} from the marketplace. Existing orders and inventory are not deleted.` : "This removes the marketplace restriction. The seller’s publication and availability settings still apply."}</p>
+            <label className="field">
+              Reason for this action
+              <textarea
+                minLength={5}
+                maxLength={1000}
+                required
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </label>
+            {error && <ErrorBox message={error} />}
+            <div className="button-row">
+              <button className="button primary" disabled={busy}>
+                {busy ? "Saving…" : target.hidden ? (target.kind === "shop" ? "Hide shop" : "Hide listing") : "Restore"}
+              </button>
+              <button
+                className="button secondary"
+                type="button"
+                disabled={busy}
+                onClick={() => moderationDialog.current?.close()}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </dialog>
+      )}
+    </main>
+  );
 }
 function NotFound() {
   return (
@@ -4782,7 +5027,6 @@ function ScrollToTop() {
   return null;
 }
 export default function App() {
-  const adminRoute = /^\/admin(?:\/|$)/.test(useLocation().pathname);
   const [catalog, setCatalog] = useState<Catalog | null>(null),
     [catalogError, setCatalogError] = useState("");
   const [session, setSession] = useState<Session | null>(null),
@@ -4836,7 +5080,6 @@ export default function App() {
   }, []);
   return (
     <LangProvider>
-      <PromotionsProvider>
       <Context.Provider
         value={{
           catalog,
@@ -4851,8 +5094,8 @@ export default function App() {
           Skip to content
         </a>
         <ScrollToTop />
-        {!adminRoute && <Header />}
-        {!adminRoute && sessionError && (
+        <Header />
+        {sessionError && (
           <div className="container">
             <ErrorBox
               message={sessionError}
@@ -4875,13 +5118,13 @@ export default function App() {
           <Route path="/purchases" element={<Purchases />} />
           <Route path="/purchases/:id" element={<PurchasePage />} />
           <Route path="/seller" element={<Seller />} />
-          <Route path="/admin/*" element={<AdminEntry />} />
+          <Route path="/admin" element={<Admin />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-        {!adminRoute && <><Footer /><StickyBottomSponsoredStrip /></>}
+        <Footer />
+        <StickyBottomSponsoredStrip />
       </Context.Provider>
-      </PromotionsProvider>
     </LangProvider>
   );
 }

@@ -165,7 +165,7 @@ test("App.tsx integrates all advanced e-commerce components and routes", () => {
   assert.ok(appCode.includes("<PaymentInstructionCard order={order} session={session} remainingSeconds={remainingSeconds} />"));
 
   // Sponsored Ads & Monetization Management
-  assert.ok(appCode.includes('import("./Admin")'));
+  assert.ok(appCode.includes("AdminSponsoredAdsManager"));
   assert.ok(appCode.includes("HomeHeroSponsoredAd"));
   assert.ok(appCode.includes("TopFlashSponsoredAd"));
   assert.ok(appCode.includes("SponsoredProductCard"));

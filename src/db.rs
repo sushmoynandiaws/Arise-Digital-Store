@@ -58,14 +58,14 @@ pub async fn connect_pool(value: &str) -> std::result::Result<AnyPool, String> {
         .map_err(|_| "Could not connect to the marketplace metadata database")?;
     if postgres {
         let version: Option<i64> = sqlx::query_scalar(
-            "SELECT version FROM arise_marketplace.schema_version WHERE version=4",
+            "SELECT version FROM arise_marketplace.schema_version WHERE version=3",
         )
         .fetch_optional(&pool)
         .await
-        .map_err(|_| "Apply marketplace migrations through migrations/005_admin_console.sql before starting the marketplace")?;
-        if version != Some(4) {
+        .map_err(|_| "Apply marketplace migrations through migrations/004_shop_pages.sql before starting the marketplace")?;
+        if version != Some(3) {
             return Err(
-                "Apply migrations/005_admin_console.sql before starting the marketplace".into(),
+                "Apply migrations/004_shop_pages.sql before starting the marketplace".into(),
             );
         }
     } else {
@@ -73,12 +73,6 @@ pub async fn connect_pool(value: &str) -> std::result::Result<AnyPool, String> {
             .execute(&pool)
             .await
             .map_err(|_| "Could not apply local marketplace migrations")?;
-        sqlx::raw_sql(
-            &include_str!("../migrations/005_admin_console.sql").replace("arise_marketplace.", ""),
-        )
-        .execute(&pool)
-        .await
-        .map_err(|_| "Could not apply local admin migrations")?;
     }
     Ok(pool)
 }
