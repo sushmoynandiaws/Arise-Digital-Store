@@ -27,6 +27,9 @@ async function preview(page: Page, options: { signedIn?: boolean; admin?: boolea
   await page.route("**/api/**", async route => {
     if (new URL(route.request().url()).pathname === "/api/promotions") return route.fulfill({ json: { ads: [], settings: {} } });
     const endpoint = new URL(route.request().url()).pathname;
+    if (endpoint === "/api/traffic") return route.fulfill({json:{ok:true}});
+    if (endpoint.endsWith("/questions")) return route.fulfill({json:{questions:[],has_more:false}});
+    if (endpoint.endsWith("/offers")) return route.fulfill({json:{offers:[],revision:"a".repeat(64)}});
     if (endpoint === "/api/session") return route.fulfill({ json: { user: options.signedIn ? { id: "sample-user", name: "Sample Seller", email: "seller@example.test", admin: !!options.admin } : null, csrf: "sample-csrf", demo: true, source_web: "https://example.test" } });
     if (endpoint === "/api/catalog") return route.fulfill(options.failure ? { status: 503, json: { error: "The catalog is temporarily unavailable. Try again." } } : { json: options.empty ? { ...catalog, products: [], shops: [] } : catalog });
     if (endpoint === "/api/orders") return route.fulfill({ json: { orders: options.empty ? [] : [readyOrder] } });

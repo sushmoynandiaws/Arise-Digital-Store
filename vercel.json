@@ -24,6 +24,9 @@
     { "source": "/api", "destination": { "service": "app" } },
     { "source": "/api/(.*)", "destination": { "service": "app" } },
     { "source": "/health", "destination": { "service": "app" } },
+    { "source": "/shops/:slug/products/:product", "destination": { "service": "app" } },
+    { "source": "/shops/:slug", "destination": { "service": "app" } },
+    { "source": "/products/:id", "destination": { "service": "app" } },
     { "source": "/(.*)", "destination": { "service": "web" } }
   ]
 }

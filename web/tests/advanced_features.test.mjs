@@ -57,45 +57,6 @@ test("Bangladeshi phone normalization handles 01, +880, 880, and spaces", () => 
   assert.equal(normalizeBdPhone("+8801305087389"), "+8801305087389");
 });
 
-test("Volume discount calculation logic matches backend rules", () => {
-  function calculateVolumeDiscount(unitPrice, quantity) {
-    const rawTotal = unitPrice * quantity;
-    let discountCode = null;
-    let discountAmount = 0;
-    if (quantity >= 5) {
-      discountCode = "VOLUME10";
-      discountAmount = Math.round(rawTotal * 0.10);
-    } else if (quantity >= 3) {
-      discountCode = "VOLUME5";
-      discountAmount = Math.round(rawTotal * 0.05);
-    }
-    return {
-      rawTotal,
-      discountCode,
-      discountAmount,
-      finalTotal: rawTotal - discountAmount,
-    };
-  }
-
-  // 1 item: No discount
-  const q1 = calculateVolumeDiscount(1000, 1);
-  assert.equal(q1.discountCode, null);
-  assert.equal(q1.discountAmount, 0);
-  assert.equal(q1.finalTotal, 1000);
-
-  // 3 items: 5% discount
-  const q3 = calculateVolumeDiscount(1000, 3);
-  assert.equal(q3.discountCode, "VOLUME5");
-  assert.equal(q3.discountAmount, 150);
-  assert.equal(q3.finalTotal, 2850);
-
-  // 5 items: 10% discount
-  const q5 = calculateVolumeDiscount(1000, 5);
-  assert.equal(q5.discountCode, "VOLUME10");
-  assert.equal(q5.discountAmount, 500);
-  assert.equal(q5.finalTotal, 4500);
-});
-
 test("Subscription expiry calculation evaluates remaining days correctly", () => {
   const now = Date.now();
   

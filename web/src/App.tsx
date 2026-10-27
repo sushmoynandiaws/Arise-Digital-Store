@@ -88,6 +88,7 @@ import type { Catalog, Shop, Product, Session, Quote, Purchase } from "./types";
 import { productForRoute, productPath, productSection, type ProductSection } from "./product";
 import { ProductReviews, PurchaseReview, ShopReviews } from "./Reviews";
 import { shopPageSections } from "./shopPages";
+import { LiveTracking, CourierStatus, CartProvider, CartButton, useCart, rememberProduct, RecentlyViewed, ShopBadge, FlashDeals, VisitTracker, ProductQuestions, SellerQuestions, OffersEditor } from "./Commerce";
 import {
   PromotionsProvider,
   usePlatformSettings,
@@ -461,6 +462,7 @@ export function TrackOrderPage() {
   const startAgain = () => { setStep("email"); setOtp(""); setDemoOtp(""); setError(""); };
   return (
     <main id="main" className="container track-order-page">
+      <LiveTracking ready={!!session}/>
       <header className="page-intro track-intro">
         <p className="eyebrow">{lang === "bn" ? "অর্ডার ও ডেলিভারি" : "Orders & delivery"}</p>
         <h1>{t("trackTitle")}</h1>
@@ -803,6 +805,7 @@ function Header() {
         </form>
 
         <div className="header-actions">
+          <CartButton />
           <button
             type="button"
             className="header-wishlist-btn icon-button"
@@ -1894,7 +1897,7 @@ function ShopCard({ shop, heading: Heading = "h3" }: { shop: Shop; heading?: "h2
     <Link to={`/shops/${shop.slug}`} className="shop-card">
       <ShopAvatar shop={shop} />
       <div>
-        <Heading>{shop.name}</Heading>
+        <Heading>{shop.name}</Heading><ShopBadge shop={shop}/>
         <small>{shopType(shop)}</small>
         <p>
           {count} {count === 1 ? "product" : "products"}
@@ -1946,9 +1949,10 @@ function Home() {
   return (
     <>
       <main id="main">
+        <FlashDeals catalog={catalog}/>
         <section className="hero container">
           <div className="hero-copy">
-            <p className="eyebrow">{lang === "bn" ? "ডিজিটাল মার্কেটপ্লেস" : "THE DIGITAL MARKETPLACE"}</p>
+            <p className="eyebrow">{lang === "bn" ? "স্বাধীন শপের মার্কেটপ্লেস" : "INDEPENDENT SHOP MARKETPLACE"}</p>
             <h1>
               {platform.hero_title || (lang === "bn" ? (
                 <>স্বাধীন শপ থেকে<br />আপনার পছন্দের পণ্য</>
@@ -1958,8 +1962,8 @@ function Home() {
             </h1>
             <p className="hero-description">
               {platform.hero_description || (lang === "bn"
-                ? "স্বাধীন শপের সফটওয়্যার, টেমপ্লেট, ডিজাইন অ্যাসেট ও কোর্স—সব এক জায়গায়।"
-                : "Find software, templates, design assets and courses from independent shops.")}
+                ? "স্বাধীন শপ থেকে পছন্দের পণ্য খুঁজুন। অপশন বেছে অর্ডার করুন, পেমেন্ট ও ডেলিভারির আপডেট দেখুন।"
+                : "Browse products from independent shops, choose your options and follow your order from checkout to delivery.")}
             </p>
             <form
               className="hero-search"
@@ -2354,6 +2358,7 @@ function ShopPage() {
           <h1 className="breadcrumb-current" aria-current="page">{shop.name}</h1>
         </nav>
       </section>
+      <div className="container"><ShopBadge shop={shop}/></div><FlashDeals catalog={catalog} shopId={shop.id}/>
       <Products shop={shop} />
       <WhatsAppFloatingButton shop={shop} />
     </main>
@@ -2505,11 +2510,13 @@ function ProductPage() {
   const { wishlist, toggleWishlist, isWishlisted } = useWishlist();
   const [variant, setVariant] = useState("");
   const [quantity, setQuantity] = useState(1);
+  const cart = useCart();
   const [report, setReport] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const product = catalog ? productForRoute(catalog, route) : undefined;
+  useEffect(() => { if(product) rememberProduct(product.id); },[product?.id]);
   useEffect(() => {
     const dialog = infoDialog.current;
     if (!dialog) return;
@@ -2575,6 +2582,7 @@ function ProductPage() {
             <span className="product-category">{product.category}</span>
           </div>
           <h1>{product.name}</h1>
+          <ShopBadge shop={shop}/>
           <Link className="by-shop" to={`/shops/${shop.slug}`}>
             <span className="tiny-avatar">{shop.name.slice(0, 1)}</span>
             {shop.name}
@@ -2669,10 +2677,11 @@ function ProductPage() {
                 <button type="button" aria-label="Increase quantity" disabled={!available || quantity >= maximum}
                   onClick={() => setQuantity(Math.min(maximum, quantity + 1))}>+</button>
               </div>
+          <button type="button" className="button secondary" disabled={!canBuy} onClick={() => selected && cart.add(product,selected.id,quantity)}>{lang === "bn" ? "ব্যাগে যোগ করুন" : "Add to bag"}</button>
           {canBuy && selected ? (
             <Link
               className="button primary buy-now"
-              to={`/checkout/${product.id}?variant=${selected.id}&quantity=${quantity}`}
+              to={`/checkout/${product.id}?variant=${selected.id}&quantity=${quantity}${new URLSearchParams(location.search).get("coupon") ? `&coupon=${encodeURIComponent(new URLSearchParams(location.search).get("coupon")!)}` : ""}`}
             >
               {lang === "bn" ? "এখনই কিনুন" : "Buy now"}
               <ArrowRight size={18} />
@@ -2789,6 +2798,7 @@ function ProductPage() {
             )}
           </details>
         </aside>
+        <ProductQuestions productId={product.id}/>
         <WhatsAppFloatingButton shop={shop} product={product} />
     </main>
   );
@@ -2798,6 +2808,8 @@ function Checkout() {
   const { catalog, session } = useMarket();
   const { lang, t } = useLang();
   const [params] = useSearchParams();
+  const cart = useCart();
+  const [bagItems] = useState(() => params.get("cart") === "1" ? cart.items : []);
   const navigate = useNavigate();
   const product = catalog?.products.find((p) => p.id === id);
   const variant =
@@ -2823,16 +2835,23 @@ function Checkout() {
     [error, setError] = useState("");
   const key = useRef(crypto.randomUUID());
   useEffect(() => {
-    if (shop && product) setProvider(productPayments(product, shop)[0] || "");
+    if (shop && product) setProvider(productPayments(product, shop).find(method => bagItems.every(item => {
+      const selected = catalog?.products.find(p => p.id === item.product_id);
+      return selected && productPayments(selected, shop).includes(method);
+    })) || "");
   }, [shop?.id, product?.id]);
   if (!catalog) return <Loading />;
   if (!product || !variant || !shop) return <NotFound />;
   const digital = productFulfilment(product) === "digital";
-  const paymentMethods = productPayments(product, shop);
+  const cartRows = bagItems.map(item => ({...item, product: catalog.products.find(p=>p.id===item.product_id)}));
+  const paymentMethods = productPayments(product, shop).filter(method=>cartRows.every(row=>row.product&&productPayments(row.product,shop).includes(method)));
+  if(params.get("cart")==="1" && (!bagItems.length || cartRows.some(row=>!row.product||row.product.shop_id!==shop.id||productFulfilment(row.product)!==productFulfilment(product)))) return <main id="main" className="container section"><h1>Update your bag</h1><p>Use products from one shop and fulfillment type.</p><button className="button secondary" onClick={cart.open}>Open bag</button></main>;
   if (!canCheckout(product, shop)) return <main id="main" className="container section"><h1>Checkout unavailable</h1><p>{product.checkout_unavailable_reason || "Contact the seller to confirm how to order this product."}</p><Link className="button secondary" to={productPath(product, catalog)}>Back to product</Link></main>;
-  const required = new Set(["name", ...product.required_buyer_fields]);
-  const estimatedTotal = checkoutTotal(variant.price, quantity);
-  const validQuantity = estimatedTotal !== null && quantity <= Math.min(variant.stock, 100);
+  const required = new Set(["name", ...product.required_buyer_fields, ...cartRows.flatMap(row=>row.product?.required_buyer_fields || [])]);
+  const cartTotal = bagItems.length ? bagItems.reduce((sum,item)=>{const p=catalog.products.find(p=>p.id===item.product_id),v=p?.variants.find(v=>v.id===item.variant_id);return sum+Number(checkoutTotal(v?.price||"0",item.quantity)||0);},0).toFixed(2) : null;
+  const estimatedTotal = cartTotal ?? checkoutTotal(variant.price, quantity);
+  const validQuantity = estimatedTotal !== null && paymentMethods.length > 0 && (bagItems.length ? bagItems.every(item=>{const p=catalog.products.find(p=>p.id===item.product_id),v=p?.variants.find(v=>v.id===item.variant_id);return !!p&&!!v&&canCheckout(p,shop)&&item.quantity<=Math.min(v.stock,100);}) : quantity <= Math.min(variant.stock, 100));
+  const displayQuantity = bagItems.length ? bagItems.reduce((sum,item)=>sum+item.quantity,0) : quantity;
   const total = quote?.snapshot.total ?? (validQuantity ? estimatedTotal : null);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -2847,7 +2866,8 @@ function Checkout() {
             shop_id: shop.id,
             product_id: product.id,
             variant_id: variant.id,
-            quantity,
+            quantity: bagItems[0]?.quantity ?? quantity,
+            items: bagItems.length ? bagItems : undefined,
             provider,
             coupon_code: couponCode.trim().toUpperCase() || undefined,
             buyer: fields,
@@ -2868,6 +2888,7 @@ function Checkout() {
             accepted: true,
           }),
         });
+        if(bagItems.length)cart.purchased(bagItems);
         navigate(`/purchases/${result.id}`, { replace: true });
       }
     } catch (e) {
@@ -2897,6 +2918,7 @@ function Checkout() {
       </div>
       <div className="checkout-grid">
         <form onSubmit={submit} className="panel checkout-form">
+          {bagItems.length>0&&<div className="checkout-cart-lines"><h2>Items in this order</h2>{bagItems.map(item=>{const p=catalog.products.find(p=>p.id===item.product_id),v=p?.variants.find(v=>v.id===item.variant_id);return <p key={item.variant_id}>{p?.name} · {v?.name} × {item.quantity}</p>;})}</div>}
           <div className="step-heading">
             <span>{quote ? "02" : "01"}</span>
             <h2>{quote ? (lang === "bn" ? "অর্ডারের বিবরণ" : "Order details") : (lang === "bn" ? "যোগাযোগের তথ্য" : "Contact details")}</h2>
@@ -3005,7 +3027,7 @@ function Checkout() {
                 </div>
                 <small className="form-hint">Discounts are calculated and verified when you click Review order.</small>
               </label>
-              <label className="field">
+              {!bagItems.length && <label className="field">
                 Quantity
                 <input
                   type="number"
@@ -3019,7 +3041,7 @@ function Checkout() {
                   onChange={(e) => setQuantity(Number(e.target.value))}
                 />
                 <small id="checkout-quantity-hint">{money(variant.price, product.currency)} each · Up to {Math.min(variant.stock, 100)} per order</small>
-              </label>
+              </label>}
               <fieldset className="checkout-payment">
                 <legend>{lang === "bn" ? "পেমেন্ট মাধ্যম" : "Payment method"}</legend>
                 <p className="form-hint muted">{lang === "bn" ? `কীভাবে ${shop.name}-কে পেমেন্ট করবেন তা নির্বাচন করুন।` : `Choose how you’ll pay ${shop.name}.`}</p>
@@ -3088,6 +3110,7 @@ function Checkout() {
                 <span>Payment method</span>
                 <strong>{paymentMethodLabel(provider)}</strong>
               </div>
+              {quote.snapshot.items?.map(item=><div key={item.variant_id} className="order-cart-item"><strong>{item.name} · {item.variant} × {item.quantity}</strong><p>{item.digital_config?.purchase_terms || catalog.products.find(p=>p.id===item.product_id)?.purchase_terms}</p></div>)}
               {quote.snapshot.coupon_code && Number(quote.snapshot.discount || "0") > 0 && (
                 <div className="review-row discount-row">
                   <span>Coupon discount ({quote.snapshot.coupon_code})</span>
@@ -3118,7 +3141,7 @@ function Checkout() {
           )}
           {error && <ErrorBox message={error} />}
           <div className="checkout-payable" aria-live="polite" aria-atomic="true">
-            <span>{quote ? (lang === "bn" ? "মোট প্রদেয় টাকা" : "Total to pay") : (lang === "bn" ? "মোট আনুমানিক মূল্য" : "Estimated total")}<small>BDT · {quote?.snapshot.quantity ?? quantity} {lang === "bn" ? "টি আইটেম" : `item${(quote?.snapshot.quantity ?? quantity) === 1 ? "" : "s"}`}</small></span>
+            <span>{quote ? (lang === "bn" ? "মোট প্রদেয় টাকা" : "Total to pay") : (lang === "bn" ? "মোট আনুমানিক মূল্য" : "Estimated total")}<small>BDT · {quote?.snapshot.quantity ?? displayQuantity} {lang === "bn" ? "টি আইটেম" : `item${(quote?.snapshot.quantity ?? displayQuantity) === 1 ? "" : "s"}`}</small></span>
             <strong>{total !== null ? money(total, product.currency) : "—"}</strong>
           </div>
           <button
@@ -3160,11 +3183,11 @@ function Checkout() {
           <Art product={product} />
           <div className="order-summary-content">
             <span className="eyebrow">From {shop.name} · {shopType(shop)}</span>
-            <h2>{quote?.snapshot.name ?? product.name}</h2>
+            <h2>{quote?.snapshot.name ?? (bagItems.length ? `${displayQuantity} items from ${shop.name}` : product.name)}</h2>
             {product.variants.length > 1 && <p>{quote?.snapshot.variant ?? variant.name}</p>}
             <div className="summary-line">
               <span>Quantity</span>
-              <strong>{quote?.snapshot.quantity ?? quantity}</strong>
+              <strong>{quote?.snapshot.quantity ?? displayQuantity}</strong>
             </div>
             {!quote && <div className="summary-line">
               <span>Price per item</span>
@@ -3540,7 +3563,7 @@ function PurchasePage() {
     [error, setError] = useState(""),
     [trx, setTrx] = useState(""),
     [busy, setBusy] = useState(false),
-    [items, setItems] = useState<{ item: number; content: string }[] | null>(
+    [items, setItems] = useState<{ item: number; content: string; name?: string; variant?: string }[] | null>(
       null,
     );
   const navigate = useNavigate();
@@ -3747,7 +3770,7 @@ function PurchasePage() {
           <p>Payment method: {paymentMethodLabel(order.payment_method || "cod")}</p>
           {order.delivery_charge !== undefined && <p>Delivery charge: {money(order.delivery_charge, order.currency)}</p>}
           {Number(order.advance_amount || 0) > 0 && <p>Required advance: {money(order.advance_amount!, order.currency)}. Contact the seller for verification.</p>}
-          {order.tracking ? <p>{order.tracking.provider} · Tracking number: {order.tracking.tracking} · {order.tracking.status}</p> : <p>Courier tracking will appear when the seller books delivery.</p>}
+          <CourierStatus order={order}/>
           {order.tracking?.tracking_url?.startsWith("https://") && <a className="button secondary" href={order.tracking.tracking_url} target="_blank" rel="noopener noreferrer">Track with courier<ExternalLink size={16} /></a>}
         </section>}
         {order.fulfilment_kind !== "physical" && paid && order.ready && !cancelled && (
@@ -3766,7 +3789,7 @@ function PurchasePage() {
                   return (
                     <div key={item.item} className="private-item">
                       <div className="private-item-header">
-                        <strong>{lang === "bn" ? `আইটেম ${item.item}` : `Item ${item.item}`}</strong>
+                        <strong>{lang === "bn" ? `আইটেম ${item.item}` : `Item ${item.item}`}{item.name ? ` · ${item.name}${item.variant ? ` — ${item.variant}` : ""}` : ""}</strong>
                         <CopyButton value={item.content} />
                       </div>
                       {downloadLinks.length > 0 && (
@@ -3804,7 +3827,7 @@ function PurchasePage() {
                   setError("");
                   try {
                     const result = await api<{
-                      items: { item: number; content: string }[];
+                      items: { item: number; content: string; name?: string; variant?: string }[];
                     }>(`/orders/${id}/reveal`, { method: "POST" });
                     setItems(result.items);
                     await load();
@@ -4544,6 +4567,7 @@ function Seller() {
           )}
         </aside>
       </div>
+      {session?.user && data && <><SellerQuestions key={`questions-${data.shop.id}`} shopId={data.shop.id}/><OffersEditor key={`offers-${data.shop.id}`} shopId={data.shop.id} products={data.products} onSaved={() => void reloadCatalog()}/></>}
     </main>
   );
 }
@@ -4734,6 +4758,8 @@ export default function App() {
           refreshSession,
         }}
       >
+        <CartProvider catalog={catalog}>
+        <VisitTracker catalog={catalog} ready={!!session}/>
         <a className="skip-link" href="#main">
           Skip to content
         </a>
@@ -4767,7 +4793,8 @@ export default function App() {
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-        {!adminRoute && <><Footer /><StickyBottomSponsoredStrip /></>}
+        {!adminRoute && <><RecentlyViewed catalog={catalog} renderProduct={product => <ProductCard product={product}/>}/><Footer /><StickyBottomSponsoredStrip /></>}
+        </CartProvider>
       </Context.Provider>
       </PromotionsProvider>
     </LangProvider>

@@ -1,0 +1,1190 @@
+diff --git a/.github/workflows/backend-postgres.yml b/.github/workflows/backend-postgres.yml
+index a8f27ba3..54c13a7c 100644
+--- a/.github/workflows/backend-postgres.yml
++++ b/.github/workflows/backend-postgres.yml
+@@ -94,11 +94,12 @@ jobs:
+           CREATE TABLE public.commerce_sentinel(id INTEGER);
+           CREATE ROLE arise_marketplace_runtime NOLOGIN;
+           SQL
+-          psql "$MARKETPLACE_MIGRATION_TEST_URL" -v ON_ERROR_STOP=1 -f scripts/marketplace_reviews.sql -f scripts/marketplace_admin_console.sql -f scripts/marketplace_admin_console_grants.sql
+-          psql "$MARKETPLACE_MIGRATION_TEST_URL" -v ON_ERROR_STOP=1 -f scripts/marketplace_reviews.sql -f scripts/marketplace_admin_console.sql -f scripts/marketplace_admin_console_grants.sql
++          psql "$MARKETPLACE_MIGRATION_TEST_URL" -v ON_ERROR_STOP=1 -f scripts/marketplace_reviews.sql -f scripts/marketplace_admin_console.sql -f scripts/marketplace_admin_console_grants.sql -f scripts/marketplace_growth.sql
++          psql "$MARKETPLACE_MIGRATION_TEST_URL" -v ON_ERROR_STOP=1 -f scripts/marketplace_reviews.sql -f scripts/marketplace_admin_console.sql -f scripts/marketplace_admin_console_grants.sql -f scripts/marketplace_growth.sql
+           psql "$MARKETPLACE_MIGRATION_TEST_URL" -v ON_ERROR_STOP=1 <<'SQL'
+           DO $$ BEGIN
+-            IF (SELECT max(version) FROM arise_marketplace.schema_version) != 4 THEN RAISE EXCEPTION 'expected marketplace schema version 4'; END IF;
++            IF (SELECT max(version) FROM arise_marketplace.schema_version) != 5 THEN RAISE EXCEPTION 'expected marketplace schema version 5'; END IF;
++            IF NOT has_table_privilege('arise_marketplace_runtime','arise_marketplace.product_questions','SELECT,INSERT,UPDATE,DELETE') OR NOT has_table_privilege('arise_marketplace_runtime','arise_marketplace.traffic_events','SELECT,INSERT,UPDATE,DELETE') THEN RAISE EXCEPTION 'growth metadata permissions missing'; END IF;
+             IF NOT has_table_privilege('arise_marketplace_runtime','arise_marketplace.admin_documents','SELECT,INSERT,UPDATE,DELETE') THEN RAISE EXCEPTION 'admin document permissions missing'; END IF;
+             IF NOT has_table_privilege('arise_marketplace_runtime','arise_marketplace.admin_activity','SELECT,INSERT') OR has_table_privilege('arise_marketplace_runtime','arise_marketplace.admin_activity','UPDATE,DELETE') THEN RAISE EXCEPTION 'audit history permissions are not append-only'; END IF;
+             IF has_table_privilege('arise_marketplace_runtime','public.commerce_sentinel','SELECT,INSERT,UPDATE,DELETE') THEN RAISE EXCEPTION 'runtime role can access commerce'; END IF;
+@@ -112,3 +113,4 @@ jobs:
+           tests/test_digital_ai.py tests/test_digital_reply_parity.py tests/test_digital_catalog_import.py
+           tests/test_digital_integration.py tests/test_digital_key_rotation.py tests/test_digital_key_bootstrap.py
+           tests/test_marketplace.py
++          tests/test_marketplace_growth.py
+diff --git a/.github/workflows/deploy-vps.yml b/.github/workflows/deploy-vps.yml
+index 6f422d12..412e603e 100644
+--- a/.github/workflows/deploy-vps.yml
++++ b/.github/workflows/deploy-vps.yml
+@@ -67,11 +67,12 @@ jobs:
+             # Apply marketplace metadata only when this VPS hosts its schema.
+             if docker compose exec -T postgres sh -c 'psql -X -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "$1"' sh "SELECT EXISTS(SELECT FROM pg_namespace WHERE nspname='arise_marketplace') AND EXISTS(SELECT FROM pg_roles WHERE rolname='arise_marketplace_runtime')" | grep -qx t; then
+               schema_v4=$(docker compose exec -T postgres sh -c 'psql -X -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "$1"' sh "SELECT EXISTS(SELECT FROM arise_marketplace.schema_version WHERE version=4)")
+-              if [ "$schema_v4" != t ]; then
++              schema_v5=$(docker compose exec -T postgres sh -c 'psql -X -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "$1"' sh "SELECT EXISTS(SELECT FROM arise_marketplace.schema_version WHERE version=5)")
++              if [ "$schema_v4" != t ] || [ "$schema_v5" != t ]; then
+                 umask 077
+                 backup_dir=/root/.arise-marketplace/backups
+                 install -d -m 700 "$backup_dir"
+-                backup_path="$backup_dir/marketplace-admin-pre-005-$(date -u +%Y%m%dT%H%M%SZ).dump"
++                backup_path="$backup_dir/marketplace-growth-pre-006-$(date -u +%Y%m%dT%H%M%SZ).dump"
+                 docker compose exec -T postgres sh -c 'pg_dump -Fc -n arise_marketplace -U "$POSTGRES_USER" "$POSTGRES_DB"' > "$backup_path"
+                 test -s "$backup_path"
+                 docker compose exec -T postgres pg_restore --list < "$backup_path" > /dev/null
+@@ -81,8 +82,9 @@ jobs:
+                 docker compose exec -T postgres sh -c 'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < scripts/marketplace_admin_console.sql
+               fi
+               docker compose exec -T postgres sh -c 'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < scripts/marketplace_admin_console_grants.sql
++              docker compose exec -T postgres sh -c 'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < scripts/marketplace_growth.sql
+               schema_version=$(docker compose exec -T postgres sh -c 'psql -X -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "$1"' sh "SELECT max(version) FROM arise_marketplace.schema_version")
+-              test "$schema_version" = 4
++              test "$schema_version" = 5
+               admin_permissions=$(docker compose exec -T postgres sh -c 'psql -X -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "$1"' sh "SELECT has_table_privilege('arise_marketplace_runtime','arise_marketplace.admin_documents','SELECT,INSERT,UPDATE,DELETE') AND has_table_privilege('arise_marketplace_runtime','arise_marketplace.admin_activity','SELECT,INSERT') AND NOT has_table_privilege('arise_marketplace_runtime','arise_marketplace.admin_activity','UPDATE,DELETE')")
+               test "$admin_permissions" = t
+             fi
+diff --git a/backend/app/api/v1/marketplace.py b/backend/app/api/v1/marketplace.py
+index b3fc2296..33d977a3 100644
+--- a/backend/app/api/v1/marketplace.py
++++ b/backend/app/api/v1/marketplace.py
+@@ -119,10 +119,17 @@ class BuyerFields(Input):
+         return str(TypeAdapter(EmailStr).validate_python(value)) if value else value
+ 
+ 
++class MarketLine(Input):
++    product_id: uuid.UUID
++    variant_id: uuid.UUID
++    quantity: int = Field(ge=1, le=100, strict=True)
++
++
+ class MarketQuote(QuoteRequest):
+     provider: str = Field(pattern=r"^(bkash|nagad|rocket|cod)$")
+     shop_id: uuid.UUID
+     buyer: BuyerFields
++    items: list[MarketLine] | None = Field(default=None, min_length=1, max_length=20)
+ 
+ 
+ class TrackOtpRequest(Input):
+@@ -141,6 +148,26 @@ class MarketAccept(AcceptRequest):
+     draft_id: uuid.UUID
+ 
+ 
++class StoreOffer(Input):
++    code: str = Field(pattern=r"^[A-Z0-9_-]{3,64}$")
++    title: str = Field(min_length=2, max_length=100)
++    benefit: str = Field(pattern=r"^\d{1,7}(\.\d{1,2})?%?$")
++    min_spend: str = Field(default="0", pattern=r"^\d{1,9}(\.\d{1,2})?$")
++    starts_at: str = Field(max_length=64)
++    expires_at: str = Field(max_length=64)
++    active: bool = True
++    flash: bool = False
++    product_ids: list[uuid.UUID] = Field(default_factory=list, max_length=500)
++
++
++class StoreOffers(Input):
++    revision: str = Field(pattern=r"^[a-f0-9]{64}$")
++    offer: StoreOffer | None = None
++    remove_code: str | None = Field(default=None, pattern=r"^[A-Z0-9_-]{3,64}$")
++    active_code: str | None = Field(default=None, pattern=r"^[A-Z0-9_-]{3,64}$")
++    enabled: bool | None = None
++
++
+ @router.post("/authorize")
+ async def authorize(req: Authorization, response: Response, user=Depends(get_current_active_user),
+                     payload=Depends(get_current_user_payload)):
+@@ -322,6 +349,98 @@ async def me(user=Depends(market_user), db=Depends(get_db)):
+         "shops": [shop_json(b) for b in businesses if is_store_owner(user, b)]}
+ 
+ 
++async def offer_store(db, user, shop_id):
++    business = await lock_business(db, shop_id)
++    if not business or (not user.is_superadmin and not is_store_owner(user, business)):
++        raise HTTPException(404, "Store not found")
++    return business
++
++
++def offers_response(offers):
++    from app.services.store_promotions import offer_code
++    if any(not isinstance(offer, dict) for offer in offers):
++        raise HTTPException(409, "Review the stored coupon configuration in AriseSell before editing offers")
++    return {"revision": fingerprint(offers), "offers": [{**offer, "code": offer_code(offer),
++        "title": offer.get("title") or offer_code(offer),
++        "benefit": str(offer.get("benefit") or offer.get("coupon_benefit") or offer.get("discount") or ""),
++        "min_spend": str(offer.get("min_spend") or offer.get("minSpend") or offer.get("coupon_min_spend") or "0"),
++        "active": not any(offer.get(key) is False for key in ("active", "is_active", "enabled")),
++        "starts_at": offer.get("starts_at") or "", "expires_at": offer.get("expires_at") or "",
++        "flash": bool(offer.get("flash")), "product_ids": offer.get("product_ids") or []} for offer in offers]}
++
++
++@router.get("/stores/{shop_id}/offers", dependencies=[Depends(bridge)])
++async def store_offers(shop_id: uuid.UUID, user=Depends(market_user), db=Depends(get_db)):
++    business = await offer_store(db, user, shop_id)
++    from app.services.store_promotions import offers_for
++    offers = offers_for(business.settings_data or {})
++    return offers_response(offers)
++
++
++@router.put("/stores/{shop_id}/offers", dependencies=[Depends(bridge)])
++async def save_store_offers(shop_id: uuid.UUID, req: StoreOffers, user=Depends(market_user), db=Depends(get_db)):
++    from datetime import datetime
++    from decimal import Decimal
++    business = await offer_store(db, user, shop_id)
++    from app.services.store_promotions import offers_for, offer_code
++    current = offers_for(business.settings_data or {})
++    offers_response(current)
++    if fingerprint(current) != req.revision:
++        raise HTTPException(409, "Offers changed. Reload before saving again.")
++    if sum(value is not None for value in (req.offer, req.remove_code, req.active_code)) != 1:
++        raise HTTPException(422, "Choose one offer action")
++    offers = list(current)
++    if req.offer:
++        offer = req.offer
++        products = set(await db.scalars(select(Product.id).where(Product.business_id == business.id)))
++        try:
++            start, end = (utc(datetime.fromisoformat(value.replace("Z", "+00:00"))) for value in (offer.starts_at, offer.expires_at))
++        except (ValueError, TypeError):
++            raise HTTPException(422, "Choose valid offer dates") from None
++        if end <= start or not set(offer.product_ids).issubset(products):
++            raise HTTPException(422, "Check offer dates and products belonging to this shop")
++        value = Decimal(offer.benefit.rstrip("%"))
++        if value <= 0 or (offer.benefit.endswith("%") and value >= 100):
++            raise HTTPException(422, "Use a positive discount below 100 percent")
++        offers = [item for item in current if offer_code(item) != offer.code]
++        offers.append({**offer.model_dump(mode="json"), "manual_only": True})
++        if len(offers) > 100:
++            raise HTTPException(422, "Use at most 100 offers per shop")
++    elif req.remove_code:
++        offers = [item for item in current if offer_code(item) != req.remove_code]
++    else:
++        if req.enabled is None:
++            raise HTTPException(422, "Choose the offer's active state")
++        offers = [{**item, "active": req.enabled, "is_active": req.enabled, "enabled": req.enabled}
++            if offer_code(item) == req.active_code else item for item in current]
++    business.settings_data = {**(business.settings_data or {}), "coupons": offers}
++    await db.commit()
++    return offers_response(offers)
++
++
++@router.get("/admin/analytics", dependencies=[Depends(bridge)])
++async def marketplace_analytics(user=Depends(market_user), db=Depends(get_db)):
++    if not user.is_superadmin:
++        raise HTTPException(403, "Administrator access is required")
++    from sqlalchemy import case
++    from app.models.order import OrderLine
++    # Aggregate in the source database; no customer details or order copies leave it.
++    totals = select(OrderLine.order_id, func.sum(OrderLine.qty * OrderLine.unit_price).label("subtotal")).group_by(OrderLine.order_id).subquery()
++    paid = Order.payment_status == "paid"
++    placed = func.timezone("UTC", Order.placed_at) if db.bind.dialect.name == "postgresql" else Order.placed_at
++    day = func.date(placed)
++    since = utcnow().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=29)
++    rows = (await db.execute(select(Order.business_id, Business.name, day.label("day"),
++        Order.currency, func.count().label("orders"), func.sum(case((paid, 1), else_=0)).label("paid_orders"),
++        func.sum(case((paid, totals.c.subtotal - Order.discount + Order.delivery_charge), else_=0)).label("paid_total"))
++        .join(Business, Business.id == Order.business_id).join(totals, totals.c.order_id == Order.id)
++        .where(Order.checkout_data["marketplace_buyer"].as_string().is_not(None), Order.placed_at >= since)
++        .group_by(Order.business_id, Business.name, day, Order.currency))).mappings().all()
++    return {"sales": [{"shop_id": str(row.business_id), "shop_name": row.name, "day": str(row.day),
++        "currency": row.currency, "orders": row.orders, "paid_orders": row.paid_orders or 0,
++        "paid_total": str(row.paid_total or 0)} for row in rows], "checked_at": utcnow().isoformat()}
++
++
+ @router.get("/admin/orders", dependencies=[Depends(bridge)])
+ async def admin_marketplace_orders(user=Depends(market_user), db=Depends(get_db),
+                                   offset: int = Query(0, ge=0, le=100000),
+@@ -394,13 +513,28 @@ async def save_listing(shop_id: uuid.UUID, req: Listing, user=Depends(market_use
+ @router.get("/feed", dependencies=[Depends(bridge)])
+ async def feed(db=Depends(get_db)):
+     businesses = list(await db.scalars(select(Business)))
+-    shops, products = [], []
++    from app.services.store_promotions import public_offers
++    shops, products, offers = [], [], []
+     for business in businesses:
+         if not active_store(business) or not shop_json(business)["published"]:
+             continue
+         shops.append({**shop_json(business), "payment_methods": physical.payment_methods(business)})
+         products.extend(await products_json(db, business, published=True))
+-    return {"shops": shops, "products": products, "synced_at": utcnow().isoformat()}
++        offers.extend({**offer, "shop_id": str(business.id)} for offer in public_offers(business))
++    import unicodedata
++    import re
++    for product in products:
++        name = unicodedata.normalize("NFKC", product["name"]).lower().replace("'", "").replace("’", "")
++        slug = re.sub("-+", "-", "".join(c if unicodedata.category(c)[0] in "LMN" else "-" for c in name)).strip("-") or "digital-product"
++        product["url_slug"] = slug
++    counts = {}
++    for product in products:
++        key = (product["shop_id"], product["url_slug"])
++        counts[key] = counts.get(key, 0) + 1
++    for product in products:
++        if counts[(product["shop_id"], product["url_slug"])] > 1:
++            product["url_slug"] += "~" + product["id"]
++    return {"shops": shops, "products": products, "offers": offers, "synced_at": utcnow().isoformat()}
+ 
+ 
+ def buyer_id(request):
+@@ -448,13 +582,24 @@ async def create_quote(req: MarketQuote, request: Request, user=Depends(optional
+     product = await db.get(Product, req.product_id)
+     if not product or product.business_id != business.id:
+         raise HTTPException(404, "Product not found")
++    if req.items:
++        if req.items[0].product_id != req.product_id or req.items[0].variant_id != req.variant_id:
++            raise HTTPException(422, "The first cart item must match the checkout selection")
++        if len({item.variant_id for item in req.items}) != len(req.items):
++            raise HTTPException(422, "Combine duplicate variants into one cart line")
++        for item in req.items:
++            await public_product(db, business.id, item.product_id)
++            selected = await db.get(Product, item.product_id)
++            if not selected or selected.business_id != business.id or selected.fulfilment_kind != product.fulfilment_kind:
++                raise HTTPException(409, "Use one shop and fulfillment type per checkout")
+     if product.fulfilment_kind == "physical":
+         draft = await physical.create_quote(db, business, channel, conversation, identity, req)
+     else:
+         if req.provider not in receiving_accounts(business):
+             raise HTTPException(409, "Choose a source-supported payment method")
+         draft = await checkout.create_quote(db, business, channel, conversation, identity,
+-            QuoteRequest(**req.model_dump(include={"product_id", "variant_id", "quantity", "provider", "coupon_code"})))
++            QuoteRequest(**req.model_dump(include={"product_id", "variant_id", "quantity", "provider", "coupon_code"})),
++            items=[item.model_dump() for item in req.items] if req.items else None)
+     buyer_fields = req.buyer.model_dump(exclude={"address", "district", "landmark", "alt_phone"}) if product.fulfilment_kind == "digital" else req.buyer.model_dump()
+     draft.data = {**draft.data, "buyer_fields": buyer_fields, "marketplace_buyer": identity,
+         "marketplace_user_id": str(user.id) if user else None}
+@@ -462,6 +607,18 @@ async def create_quote(req: MarketQuote, request: Request, user=Depends(optional
+     return {"draft_id": str(draft.id), "quote_hash": draft.data["quote_hash"], "snapshot": draft.data["snapshot"]}
+ 
+ 
++@router.get("/checkout/{draft_id}/scope", dependencies=[Depends(bridge)])
++async def checkout_scope(draft_id: uuid.UUID, request: Request, user=Depends(optional_user), db=Depends(get_db)):
++    draft = await db.get(CheckoutDraft, draft_id)
++    data = draft.data if draft else {}
++    started_by = data.get("marketplace_user_id")
++    if not draft or data.get("marketplace_buyer") != buyer_id(request) or (started_by and (not user or started_by != str(user.id))):
++        raise HTTPException(404, "Checkout not found")
++    snap = data["snapshot"]
++    return {"shop_id": str(draft.business_id), "product_id": snap["product_id"],
++        "items": [{"product_id": item["product_id"]} for item in snap.get("items") or []]}
++
++
+ @router.post("/checkout/accept", dependencies=[Depends(bridge)])
+ async def accept_quote(req: MarketAccept, request: Request, user=Depends(optional_user), db=Depends(get_db)):
+     identity = buyer_id(request)
+@@ -470,6 +627,8 @@ async def accept_quote(req: MarketAccept, request: Request, user=Depends(optiona
+     draft = await db.scalar(select(CheckoutDraft).where(CheckoutDraft.id == req.draft_id).with_for_update())
+     if not draft or (draft.data or {}).get("snapshot", {}).get("product_id") != str(req.product_id):
+         raise HTTPException(404, "Checkout not found")
++    for item in (draft.data or {}).get("snapshot", {}).get("items") or []:
++        await public_product(db, business.id, item["product_id"])
+     started_by = (draft.data or {}).get("marketplace_user_id")
+     if started_by and (not user or str(user.id) != started_by):
+         raise HTTPException(409, "Sign in with the account that started this checkout")
+@@ -525,23 +684,28 @@ async def order_json(db, order):
+             "buyer_name": order.customer_name, "buyer_phone": order.phone, "buyer_email": (data.get("buyer_fields") or {}).get("email"),
+             "buyer_fields": data.get("buyer_fields"), "address": order.address, "district": order.district,
+             "advance_amount": data.get("advance_amount", "0"), "seller_message": data.get("marketplace_message", ""),
++            "items": quote.get("items"),
+             "tracking": {"provider": booking.provider, "status": booking.status, "tracking": booking.tracking_number,
+-                "tracking_url": tracking_url(booking)} if booking else None,
++                "tracking_url": tracking_url(booking), "updated_at": utc(booking.updated_at).isoformat(),
++                "poll_delayed": bool(booking.poll_failures)} if booking else None,
+             "created_at": utc(order.placed_at).isoformat(), "ready": False, "payment": None}
+     payment = await checkout.payment_request_for(db, order)
+     business = await db.get(Business, order.business_id)
+     quote = (order.checkout_data or {}).get("digital_quote") or {}
+     units = await checkout.units_for(db, order)
++    ready_units = [unit for unit in units if unit.stock_unit_id and unit.status in {"queued", "accepted", "delivered"}]
++    if order.payment_status != "paid" or not active_store(business) or order.digital_status == "needs_attention":
++        ready_units = []
+     buyer_fields = (order.checkout_data or {}).get("buyer_fields") or {}
+     return {"id": str(order.id), "ref": order.ref, "shop": shop_json(business), "name": quote.get("name"),
+         "product_id": quote.get("product_id"), "fulfilment_kind": "digital", "buyer_name": order.customer_name,
+         "buyer_email": buyer_fields.get("email"), "buyer_phone": order.phone, "buyer_fields": buyer_fields,
+-        "quantity": quote.get("quantity"), "total": quote.get("total"), "discount": str(order.discount),
++        "quantity": quote.get("quantity"), "total": quote.get("total"), "discount": str(order.discount), "items": quote.get("items"),
+         "coupon_code": (order.checkout_data or {}).get("coupon_code"), "currency": "BDT", "payment_status": order.payment_status,
+         "delivery_status": order.digital_status, "delivery_mode": (quote.get("digital_config") or {}).get("delivery_mode"),
+         "delivery_estimate": (quote.get("digital_config") or {}).get("delivery_estimate"),
+         "created_at": utc(order.placed_at).isoformat(),
+-        "ready": order.payment_status == "paid" and bool(units) and all(u.stock_unit_id and u.status in {"queued", "accepted", "delivered"} for u in units),
++        "ready": bool(ready_units), "ready_quantity": len(ready_units),
+         "payment": {"provider": payment.provider, "account_type": "personal", "account": payment.receiving_account, "amount": str(payment.amount),
+             "trx_id": payment.proof_trx_id, "expires_at": utc(payment.expires_at).isoformat()} if payment else None}
+ 
+@@ -698,13 +862,16 @@ async def reveal(order_id: uuid.UUID, request: Request, user=Depends(optional_us
+     if order.payment_status != "paid" or not active_store(business) or order.digital_status == "needs_attention":
+         raise HTTPException(409, "Your items will be available after verified payment and preparation")
+     result = []
+-    for fulfilment in await checkout.units_for(db, order):
++    for index, fulfilment in enumerate(await checkout.units_for(db, order), start=1):
+         if not fulfilment.stock_unit_id or fulfilment.status not in {"queued", "accepted", "delivered"}:
+-            raise HTTPException(409, "The seller is still preparing this order")
++            continue
+         stock = await db.get(DigitalStockUnit, fulfilment.stock_unit_id)
+         if not stock or stock.business_id != business.id or stock.state != "allocated":
+             raise HTTPException(409, "Your delivery needs seller review")
+-        result.append({"item": fulfilment.unit_index, "content": decrypt_stock(stock)})
++        line = next(line for line in order.lines if line.id == fulfilment.order_line_id)
++        snapshot = line.item_snapshot or {}
++        result.append({"item": index, "name": snapshot.get("name", line.name),
++            "variant": snapshot.get("variant", ""), "content": decrypt_stock(stock)})
+         stock.exposed_at = stock.exposed_at or utcnow()
+         if fulfilment.status != "delivered":
+             fulfilment.status, fulfilment.accepted_at, fulfilment.delivered_at = "delivered", utcnow(), utcnow()
+diff --git a/backend/app/services/digital_checkout.py b/backend/app/services/digital_checkout.py
+index 20c0265d..cebff70b 100644
+--- a/backend/app/services/digital_checkout.py
++++ b/backend/app/services/digital_checkout.py
+@@ -1,10 +1,9 @@
+ """Digital quotes, stock reservations and exact payment evidence in one transaction."""
+ from __future__ import annotations
+ 
+-import re
+ import uuid
+ from datetime import datetime, timedelta
+-from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
++from decimal import Decimal
+ 
+ from fastapi import HTTPException
+ from sqlalchemy import func, select, update
+@@ -53,7 +52,22 @@ async def units_for(db, order):
+         .with_for_update().execution_options(populate_existing=True)))
+ 
+ 
+-async def quote_snapshot(db, business, product_id, variant_id, quantity, coupon_code: str | None = None):
++async def quote_snapshot(db, business, product_id, variant_id, quantity, coupon_code: str | None = None, *, items=None):
++    if items:
++        lines = [await quote_snapshot(db, business, uuid.UUID(str(item["product_id"])),
++            uuid.UUID(str(item["variant_id"])), item["quantity"]) for item in items]
++        subtotal = sum((Decimal(line["subtotal"]) for line in lines), Decimal(0))
++        from app.services.store_promotions import coupon_discount
++        code, discount = coupon_discount(business.settings_data or {}, subtotal, coupon_code,
++            product_ids=[line["product_id"] for line in lines]) if coupon_code else (None, Decimal(0))
++        config = {**lines[0]["digital_config"],
++            "delivery_mode": "automatic" if all(line["digital_config"]["delivery_mode"] == "automatic" for line in lines) else "manual",
++            "required_buyer_fields": sorted({field for line in lines for field in line["digital_config"]["required_buyer_fields"]}),
++            "purchase_terms": "", "delivery_note": "", "delivery_estimate": ""}
++        return {**lines[0], "items": lines, "name": " · ".join(line["name"] for line in lines),
++            "quantity": sum(line["quantity"] for line in lines), "subtotal": str(subtotal),
++            "discount": str(discount), "coupon_code": code, "total": str(amount(subtotal - discount)), "digital_config": config}
++
+     product = await db.scalar(select(Product).where(Product.id == product_id,
+         Product.business_id == business.id, Product.fulfilment_kind == "digital", Product.digital_archived.is_(False)))
+     variant = await db.scalar(select(Variant).where(Variant.id == variant_id, Variant.product_id == product_id))
+@@ -66,63 +80,9 @@ async def quote_snapshot(db, business, product_id, variant_id, quantity, coupon_
+         raise HTTPException(422, "Choose a quantity between 1 and 100")
+     unit_price = amount(variant.price)
+     subtotal = amount(unit_price * quantity)
+-    discount = Decimal("0.00")
+-    applied_coupon: str | None = None
+-
+-    if coupon_code and str(coupon_code).strip():
+-        norm_code = str(coupon_code).strip().upper()
+-        coupons = (business.settings_data or {}).get("coupons") or []
+-        found_coupon = None
+-        for c in coupons:
+-            if not isinstance(c, dict):
+-                continue
+-            c_code = str(c.get("code") or c.get("coupon_code") or "").strip().upper()
+-            if c_code != norm_code:
+-                continue
+-            if c.get("active") is False or c.get("is_active") is False or c.get("enabled") is False:
+-                continue
+-            if c.get("expires_at"):
+-                try:
+-                    exp = datetime.fromisoformat(str(c["expires_at"]).replace("Z", "+00:00"))
+-                    exp = exp.replace(tzinfo=utcnow().tzinfo) if exp.tzinfo is None else exp
+-                    if exp <= utcnow():
+-                        continue
+-                except ValueError:
+-                    continue
+-            found_coupon = c
+-            break
+-
+-        if not found_coupon and norm_code == "RENEW10":
+-            found_coupon = {"code": "RENEW10", "benefit": "10%", "active": True}
+-
+-        if not found_coupon:
+-            raise HTTPException(404, "Invalid or expired coupon code")
+-
+-        min_spend_raw = str(found_coupon.get("min_spend") or found_coupon.get("minSpend") or "0").replace(",", "")
+-        min_match = re.search(r"\d+(?:\.\d+)?", min_spend_raw)
+-        if min_match:
+-            min_spend = Decimal(min_match.group())
+-            if subtotal < min_spend:
+-                raise HTTPException(400, f"This coupon requires a minimum spend of ৳{min_spend}")
+-
+-        benefit_raw = str(found_coupon.get("benefit") or found_coupon.get("discount") or "").replace(",", "")
+-        benefit_match = re.search(r"\d+(?:\.\d+)?", benefit_raw)
+-        if benefit_match:
+-            b_val = Decimal(benefit_match.group())
+-            if "%" in benefit_raw:
+-                discount = (subtotal * b_val / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+-            else:
+-                discount = b_val.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+-            discount = min(subtotal, discount)
+-            applied_coupon = norm_code
+-
+-    if not applied_coupon and quantity >= 3:
+-        if quantity >= 5:
+-            discount = (subtotal * Decimal("10") / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+-            applied_coupon = "VOLUME10"
+-        elif quantity >= 3:
+-            discount = (subtotal * Decimal("5") / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+-            applied_coupon = "VOLUME5"
++    from app.services.store_promotions import coupon_discount
++    applied_coupon, discount = coupon_discount(business.settings_data or {}, subtotal, coupon_code,
++        product_ids=[product.id]) if coupon_code else (None, Decimal("0.00"))
+ 
+     total = amount(subtotal - discount)
+     snapshot = {"product_id": str(product.id), "variant_id": str(variant.id), "sku": variant.sku,
+@@ -133,13 +93,13 @@ async def quote_snapshot(db, business, product_id, variant_id, quantity, coupon_
+     return snapshot
+ 
+ 
+-async def create_quote(db, business, channel, conversation, recipient, req):
++async def create_quote(db, business, channel, conversation, recipient, req, *, items=None):
+     await lock_business(db, business.id)
+     require_sales(business)
+     await bound_conversation(db, business, channel.id, conversation.id, recipient)
+     if req.provider not in receiving_accounts(business):
+         raise HTTPException(409, "The selected receiving account is not available")
+-    snap = await quote_snapshot(db, business, req.product_id, req.variant_id, req.quantity, coupon_code=req.coupon_code)
++    snap = await quote_snapshot(db, business, req.product_id, req.variant_id, req.quantity, coupon_code=req.coupon_code, items=items)
+     draft = await db.scalar(select(CheckoutDraft).where(CheckoutDraft.business_id == business.id,
+         CheckoutDraft.channel_id == channel.id, CheckoutDraft.recipient == recipient).with_for_update())
+     if not draft:
+@@ -172,28 +132,31 @@ async def accept_quote(db, business, channel, conversation, recipient, draft_id,
+     if utcnow() - utc(datetime.fromisoformat(data["quoted_at"])) > timedelta(minutes=15):
+         raise HTTPException(409, "The quote expired; choose the product again")
+     snap = data["snapshot"]
+-    current = await quote_snapshot(db, business, uuid.UUID(snap["product_id"]), uuid.UUID(snap["variant_id"]), snap["quantity"], coupon_code=snap.get("coupon_code"))
++    current = await quote_snapshot(db, business, uuid.UUID(snap["product_id"]), uuid.UUID(snap["variant_id"]), snap["quantity"], coupon_code=snap.get("coupon_code"), items=snap.get("items"))
+     if fingerprint(current) != data["catalog_hash"]:
+         raise HTTPException(409, "Price or terms changed; request and accept a fresh quote")
+     accounts = receiving_accounts(business)
+     if req.provider not in accounts:
+         raise HTTPException(409, "Receiving account changed; request a fresh quote")
+     buyer = data.get("buyer_fields") or {}
+-    if any(not str(buyer.get(field) or "").strip() for field in snap["digital_config"]["required_buyer_fields"]):
+-        raise HTTPException(409, "Provide the required buyer details before confirming")
+-    variant = await db.scalar(select(Variant).where(Variant.id == uuid.UUID(snap["variant_id"]))
+-        .with_for_update().execution_options(populate_existing=True))
+-    config = snap.get("digital_config") or {}
+-    mode, quantity = config.get("delivery_mode", "manual"), snap["quantity"]
+-    stock = []
+-    if mode == "automatic":
+-        stock = list(await db.scalars(select(DigitalStockUnit).where(DigitalStockUnit.business_id == business.id,
+-            DigitalStockUnit.variant_id == variant.id, DigitalStockUnit.state == "available")
+-            .order_by(DigitalStockUnit.created_at, DigitalStockUnit.id).limit(quantity).with_for_update(skip_locked=True)))
+-        if len(stock) != quantity:
+-            raise HTTPException(409, "Not enough stock; no payment invoice was created")
+-    elif variant.stock < quantity:
+-        raise HTTPException(409, "Not enough fulfilment capacity; no payment invoice was created")
++    reservations = []
++    for item in snap.get("items") or [snap]:
++        config = item["digital_config"]
++        if any(not str(buyer.get(field) or "").strip() for field in config["required_buyer_fields"]):
++            raise HTTPException(409, "Provide the required buyer details before confirming")
++        variant = await db.scalar(select(Variant).where(Variant.id == uuid.UUID(item["variant_id"]))
++            .with_for_update().execution_options(populate_existing=True))
++        mode, quantity = config.get("delivery_mode", "manual"), item["quantity"]
++        stock = []
++        if mode == "automatic":
++            stock = list(await db.scalars(select(DigitalStockUnit).where(DigitalStockUnit.business_id == business.id,
++                DigitalStockUnit.variant_id == variant.id, DigitalStockUnit.state == "available")
++                .order_by(DigitalStockUnit.created_at, DigitalStockUnit.id).limit(quantity).with_for_update(skip_locked=True)))
++            if len(stock) != quantity:
++                raise HTTPException(409, "Not enough stock; no payment invoice was created")
++        elif variant.stock < quantity:
++            raise HTTPException(409, "Not enough fulfilment capacity; no payment invoice was created")
++        reservations.append((item, variant, mode, quantity, stock))
+     expires = utcnow() + timedelta(minutes=15)
+     order = Order(business_id=business.id, ref="pending", customer_name=buyer.get("name") or conversation.customer_name or "Customer",
+         phone=buyer.get("phone"), address=None, district=None, channel_type=channel.channel_type,
+@@ -203,38 +166,37 @@ async def accept_quote(db, business, channel, conversation, recipient, draft_id,
+             "accepted_at": utcnow().isoformat(), "acceptance_message_id": str(inbound_id),
+             "buyer_fields": buyer, "channel_id": str(channel.id), "conversation_id": str(conversation.id),
+             "recipient": recipient, "coupon_code": snap.get("coupon_code"), "discount": snap.get("discount"), "require_advance": True, "advance_amount": snap["total"]})
+-    line = OrderLine(sku=snap["sku"], name=f"{snap['name']} — {snap['variant']}", qty=quantity,
+-        unit_price=amount(snap["unit_price"]), product_id=uuid.UUID(snap["product_id"]), variant_id=variant.id, item_snapshot=snap)
+-    order.lines = [line]
++    order.lines = [OrderLine(sku=item["sku"], name=f"{item['name']} — {item['variant']}", qty=quantity,
++        unit_price=amount(item["unit_price"]), product_id=uuid.UUID(item["product_id"]),
++        variant_id=variant.id, item_snapshot=item) for item, variant, mode, quantity, stock in reservations]
+     from app.services.order_numbering import save_new_order
+     order = await save_new_order(db, order, idempotency_key=f"digital:{draft.id}:{req.idempotency_key}", request_fingerprint=req.quote_hash)
+     await db.flush()
+-    for index in range(quantity):
+-        unit = stock[index] if stock else None
+-        if unit:
+-            unit.state, unit.reserved_until = "reserved", expires
+-        db.add(DigitalFulfilmentUnit(business_id=business.id, order_id=order.id, order_line_id=line.id,
+-            product_id=line.product_id, variant_id=variant.id, unit_index=index + 1,
+-            stock_unit_id=unit.id if unit else None, mode=mode, status="reserved"))
+-    if mode == "automatic":
+-        await db.flush()
+-        await refresh_stock(db, variant)
+-    else:
+-        variant.stock -= quantity
+-    threshold = (config or {}).get("low_stock_threshold") or 3
+-    if variant.stock == 0:
+-        await event(db, business.id, order.id, "stock_exhausted", "system",
+-            data={"product_id": str(line.product_id), "variant_id": str(variant.id), "name": snap["name"], "variant_label": snap.get("variant")})
+-    elif 0 < variant.stock <= threshold:
+-        await event(db, business.id, order.id, "stock_low", "system",
+-            data={"product_id": str(line.product_id), "variant_id": str(variant.id), "remaining": variant.stock, "name": snap["name"], "variant_label": snap.get("variant")})
++    for line, (item, variant, mode, quantity, stock) in zip(order.lines, reservations):
++        for index in range(quantity):
++            unit = stock[index] if stock else None
++            if unit:
++                unit.state, unit.reserved_until = "reserved", expires
++            db.add(DigitalFulfilmentUnit(business_id=business.id, order_id=order.id, order_line_id=line.id,
++                product_id=line.product_id, variant_id=variant.id, unit_index=index + 1,
++                stock_unit_id=unit.id if unit else None, mode=mode, status="reserved"))
++        if mode == "automatic":
++            await db.flush()
++            await refresh_stock(db, variant)
++        else:
++            variant.stock -= quantity
++        threshold = item["digital_config"].get("low_stock_threshold") or 3
++        if variant.stock <= threshold:
++            await event(db, business.id, order.id, "stock_exhausted" if variant.stock == 0 else "stock_low", "system",
++                data={"product_id": str(line.product_id), "variant_id": str(variant.id),
++                    "remaining": variant.stock, "name": item["name"], "variant_label": item.get("variant")})
+     db.add(DigitalPaymentRequest(business_id=business.id, order_id=order.id, ref=f"DIG-{uuid.uuid4().hex.upper()}",
+         provider=req.provider, receiving_account=accounts[req.provider], amount=amount(snap["total"]), currency="BDT",
+         quote_hash=req.quote_hash, status="pending", expires_at=expires,
+         idempotency_key=req.idempotency_key, request_fingerprint=fingerprint(req.model_dump(mode="json"))))
+     draft.order_id = order.id
+     await event(db, business.id, order.id, "purchase_accepted", recipient,
+-        data={"quantity": quantity, "quote_hash": req.quote_hash}, reference=inbound_id)
++        data={"quantity": snap["quantity"], "quote_hash": req.quote_hash}, reference=inbound_id)
+     await sync_pipeline(db, order, business, recipient)
+     return order
+ 
+diff --git a/backend/app/services/knowledge_checkout.py b/backend/app/services/knowledge_checkout.py
+index f575ba64..a1814baa 100644
+--- a/backend/app/services/knowledge_checkout.py
++++ b/backend/app/services/knowledge_checkout.py
+@@ -68,8 +68,11 @@ def complete_address(address: str, district: str) -> bool:
+     return len(re.sub(r"[\W_]+", "", remainder)) >= 4
+ 
+ 
+-def checkout_discount(settings: dict, subtotal: Decimal) -> tuple[str | None, Decimal]:
++def checkout_discount(settings: dict, subtotal: Decimal, coupon_code=None, *, product_ids=()) -> tuple[str | None, Decimal]:
+     """Apply one eligible active merchant coupon using exact monetary arithmetic."""
++    if coupon_code:
++        from app.services.store_promotions import coupon_discount
++        return coupon_discount(settings, subtotal, coupon_code, product_ids=product_ids)
+     from app.services.sales_reply import get_active_coupons
+     best_code, best = None, Decimal(0)
+     for coupon in get_active_coupons(settings):
+diff --git a/backend/app/services/marketplace_checkout.py b/backend/app/services/marketplace_checkout.py
+index a408e388..c9d44b71 100644
+--- a/backend/app/services/marketplace_checkout.py
++++ b/backend/app/services/marketplace_checkout.py
+@@ -54,7 +54,32 @@ def buyer_fields(business):
+         ("alt_phone", "require_alt_phone", "requireAltPhone")) if cfg.get(snake, cfg.get(camel, False))]
+ 
+ 
+-async def snapshot(db, business, product_id, variant_id, quantity, buyer, coupon_code=None):
++def delivery_charge(rates, tier, subtotal):
++    free = Decimal(str(rates.get("free_delivery_min") or 0))
++    value = Decimal(0) if free > 0 and subtotal >= free else rates.get(tier)
++    if value is None:
++        raise HTTPException(409, "The seller has not configured delivery to this destination")
++    value = Decimal(str(value))
++    if not value.is_finite() or value < 0:
++        raise HTTPException(409, "The seller's delivery charge needs review")
++    return value
++
++
++async def snapshot(db, business, product_id, variant_id, quantity, buyer, coupon_code=None, *, items=None, line_only=False):
++    if items:
++        rows = [await snapshot(db, business, uuid.UUID(str(item["product_id"])),
++            uuid.UUID(str(item["variant_id"])), item["quantity"], buyer, line_only=True) for item in items]
++        first = rows[0]
++        subtotal = sum((Decimal(row["subtotal"]) for row in rows), Decimal(0))
++        cfg = business.settings_data or {}
++        code, discount = checkout_discount(cfg, subtotal, coupon_code, product_ids=[r["product_id"] for r in rows])
++        rates = effective_shipping_rates(cfg)
++        shipping = delivery_charge(rates, first["tier"], subtotal)
++        total = subtotal - discount + shipping
++        return {**first, "items": rows, "name": " · ".join(row["name"] for row in rows),
++            "quantity": sum(row["quantity"] for row in rows), "subtotal": str(subtotal),
++            "coupon_code": code, "discount": str(discount), "delivery_charge": str(shipping), "total": str(total),
++            "advance_amount": str(required_advance(cfg, first["tier"], shipping, total)), "requested_coupon": coupon_code}
+     if not active_store(business):
+         raise HTTPException(409, "This shop is unavailable")
+     product = await db.scalar(select(Product).where(Product.id == product_id, Product.business_id == business.id,
+@@ -83,30 +108,26 @@ async def snapshot(db, business, product_id, variant_id, quantity, buyer, coupon
+     if not unit_price.is_finite() or unit_price <= 0:
+         raise HTTPException(409, "The seller needs to review this product's price")
+     subtotal = unit_price * quantity
+-    code, discount = checkout_discount(business.settings_data or {}, subtotal)
+-    if coupon_code and coupon_code.strip().upper() != code:
+-        raise HTTPException(409, "This coupon is not available for this order")
+-    rates = effective_shipping_rates(business.settings_data or {})
+-    free = Decimal(str(rates.get("free_delivery_min") or 0))
+-    shipping = Decimal(0) if free > 0 and subtotal >= free else rates.get(tier)
+-    if shipping is None:
+-        raise HTTPException(409, "The seller has not configured delivery to this destination")
+-    shipping = Decimal(str(shipping))
+-    if not shipping.is_finite() or shipping < 0:
+-        raise HTTPException(409, "The seller's delivery charge needs review")
++    row = {"product_id": str(product.id), "variant_id": str(variant.id), "sku": variant.sku,
++        "name": product.name, "variant": variant.label, "quantity": quantity, "fulfilment_kind": "physical",
++        "unit_price": str(variant.price), "subtotal": str(subtotal), "currency": business.currency,
++        "buyer": details, "tier": tier, "payment_method": "cod"}
++    if line_only:
++        return row
++    code, discount = checkout_discount(business.settings_data or {}, subtotal, coupon_code, product_ids=[product.id])
++    shipping = delivery_charge(effective_shipping_rates(business.settings_data or {}), tier, subtotal)
+     total = subtotal - discount + shipping
+     advance = required_advance(business.settings_data or {}, tier, shipping, total)
+-    return {"product_id": str(product.id), "variant_id": str(variant.id), "sku": variant.sku,
+-        "name": product.name, "variant": variant.label, "quantity": quantity, "fulfilment_kind": "physical",
+-        "unit_price": str(variant.price), "subtotal": str(subtotal), "discount": str(discount),
+-        "coupon_code": code, "delivery_charge": str(shipping), "total": str(total), "advance_amount": str(advance),
+-        "currency": business.currency, "buyer": details, "tier": tier, "payment_method": "cod"}
++    return {**row, "discount": str(discount), "coupon_code": code, "delivery_charge": str(shipping),
++        "total": str(total), "advance_amount": str(advance), "requested_coupon": coupon_code}
++
+ 
+ 
+ async def create_quote(db, business, channel, conversation, identity, req):
+     if req.provider != "cod":
+         raise HTTPException(409, "Choose a source-supported payment method")
+-    snap = await snapshot(db, business, req.product_id, req.variant_id, req.quantity, req.buyer.model_dump(), req.coupon_code)
++    snap = await snapshot(db, business, req.product_id, req.variant_id, req.quantity, req.buyer.model_dump(), req.coupon_code,
++        items=[item.model_dump() for item in req.items] if req.items else None)
+     draft = await db.scalar(select(CheckoutDraft).where(CheckoutDraft.business_id == business.id,
+         CheckoutDraft.channel_id == channel.id, CheckoutDraft.recipient == identity).with_for_update())
+     if not draft:
+@@ -131,25 +152,28 @@ async def accept_quote(db, business, channel, conversation, identity, draft, req
+     if utcnow() - utc(datetime.fromisoformat(data["quoted_at"])) > timedelta(minutes=15):
+         raise HTTPException(409, "The quote expired; request a fresh quote")
+     snap = data["snapshot"]
+-    current = await snapshot(db, business, uuid.UUID(snap["product_id"]), uuid.UUID(snap["variant_id"]), snap["quantity"], snap["buyer"])
++    current = await snapshot(db, business, uuid.UUID(snap["product_id"]), uuid.UUID(snap["variant_id"]), snap["quantity"], snap["buyer"], snap.get("requested_coupon"), items=snap.get("items"))
+     if fingerprint(snap) != fingerprint(current):
+         raise HTTPException(409, "Price, delivery charge or terms changed; request a fresh quote")
+-    variant = await db.get(Variant, uuid.UUID(snap["variant_id"]))
++    items = snap.get("items") or [snap]
++    variants = {item["variant_id"]: await db.get(Variant, uuid.UUID(item["variant_id"])) for item in items}
+     details = {**snap["buyer"], "customer_name": snap["buyer"]["name"], "subtotal": snap["subtotal"],
+         "total": snap["total"], "discount": snap["discount"], "coupon_code": snap["coupon_code"],
+         "delivery_charge": snap["delivery_charge"], "tier": snap["tier"], "quoted_at": data["quoted_at"],
+-        "lines": [{"variant_id": snap["variant_id"], "sku": snap["sku"], "name": f"{snap['name']} — {snap['variant']}",
+-            "qty": snap["quantity"], "unit_price": snap["unit_price"]}]}
++        "marketplace_coupon": snap.get("requested_coupon"),
++        "lines": [{"variant_id": item["variant_id"], "product_id": item["product_id"], "sku": item["sku"],
++            "name": f"{item['name']} — {item['variant']}", "qty": item["quantity"], "unit_price": item["unit_price"]} for item in items]}
+     from app.services.order_confirmation_service import _create_and_commit_order
+     cfg = business.settings_data or {}
+     reply = await _create_and_commit_order(db, business, channel, conversation, identity, "Confirm marketplace order",
+         draft, details, cfg, effective_shipping_rates(cfg), (cfg.get("couriers") or {}).get("default_provider", "steadfast"),
+-        {str(variant.id): variant}, "en")
++        variants, "en")
+     if not draft.order_id:
+         raise HTTPException(409, reply)
+     from app.models.order import Order, OrderLine
+     order = await db.get(Order, draft.order_id)
+     order.checkout_data = {**order.checkout_data, "marketplace_quote": snap, "buyer_fields": snap["buyer"], "marketplace_message": reply}
+     for line in await db.scalars(select(OrderLine).where(OrderLine.order_id == order.id)):
+-        line.product_id, line.variant_id, line.item_snapshot = uuid.UUID(snap["product_id"]), variant.id, snap
++        item = next(item for item in items if item["variant_id"] == str(line.variant_id))
++        line.product_id, line.variant_id, line.item_snapshot = uuid.UUID(item["product_id"]), uuid.UUID(item["variant_id"]), item
+     return order
+diff --git a/backend/app/services/order_confirmation_service.py b/backend/app/services/order_confirmation_service.py
+index 4e768ba1..5f3558c6 100644
+--- a/backend/app/services/order_confirmation_service.py
++++ b/backend/app/services/order_confirmation_service.py
+@@ -831,7 +831,8 @@ async def _create_and_commit_order(db, business, channel, conversation, recipien
+         return catalog_issue
+ 
+     subtotal = sum((Decimal(l["unit_price"]) * l["qty"] for l in data.get("lines", [])), Decimal(0))
+-    current_coupon, current_discount = checkout_discount(cfg, subtotal)
++    current_coupon, current_discount = checkout_discount(cfg, subtotal, data.get("marketplace_coupon"),
++        product_ids=[line.get("product_id") for line in data.get("lines", [])])
+     tier, base = classify_delivery_tier(data["address"], data.get("district", ""))
+     current_delivery = Decimal(str(rates.get(tier, base)))
+     free_min = Decimal(str(rates.get("free_delivery_min", 0)))
+@@ -916,6 +917,8 @@ async def _create_and_commit_order(db, business, channel, conversation, recipien
+             name=line["name"],
+             qty=line["qty"],
+             unit_price=Decimal(str(line["unit_price"])),
++            product_id=uuid.UUID(str(line["product_id"])) if line.get("product_id") else None,
++            variant_id=uuid.UUID(str(line["variant_id"])) if line.get("product_id") else None,
+         ))
+     from sqlalchemy.orm.attributes import flag_modified
+     order.checkout_data = {**order.checkout_data, "custom_details": details}
+diff --git a/backend/app/services/sales_reply.py b/backend/app/services/sales_reply.py
+index 6b5a87e4..a90059ba 100644
+--- a/backend/app/services/sales_reply.py
++++ b/backend/app/services/sales_reply.py
+@@ -49,6 +49,9 @@ def get_active_coupons(settings: dict) -> list[dict]:
+     if isinstance(coupons_raw, list):
+         for c in coupons_raw:
+             if isinstance(c, dict):
++                from app.services.store_promotions import active_offer
++                if c.get("manual_only") or c.get("product_ids") or not active_offer(c):
++                    continue
+                 if c.get("active") is False or c.get("is_active") is False or c.get("enabled") is False:
+                     continue
+                 if c.get("expires_at"):
+diff --git a/backend/tests/test_marketplace.py b/backend/tests/test_marketplace.py
+index f2a69c33..8b8b574a 100644
+--- a/backend/tests/test_marketplace.py
++++ b/backend/tests/test_marketplace.py
+@@ -464,7 +464,7 @@ async def test_marketplace_coupon_discount_applied_and_recorded(market_api, sale
+     assert order_data["coupon_code"] == "SAVE10"
+     assert float(order_data["payment"]["amount"]) == total
+ 
+-    # Test invalid coupon returns 404
++    # Unconfigured coupons cannot change source prices.
+     bad_res = await market_api.post("/api/v1/marketplace/checkout/quote", json={
+         "shop_id": str(sales.business.id),
+         "product_id": str(sales.product.id),
+@@ -474,7 +474,7 @@ async def test_marketplace_coupon_discount_applied_and_recorded(market_api, sale
+         "coupon_code": "NOTREAL99",
+         "buyer": {"name": "Coupon Buyer"},
+     })
+-    assert bad_res.status_code == 404
++    assert bad_res.status_code == 409
+ 
+ 
+ async def test_marketplace_shop_settings_social_and_contact_propagation(market_api, sales):
+@@ -508,54 +508,15 @@ async def test_marketplace_shop_settings_social_and_contact_propagation(market_a
+     assert shop["tagline"] == "Premium Verified Digital Products"
+ 
+ 
+-async def test_marketplace_volume_discount_and_renewal_coupon(market_api, sales):
++async def test_unconfigured_volume_and_renewal_discounts_are_never_invented(market_api, sales):
+     await stock(sales, 10)
+-    # 1. Volume discount for quantity >= 3 (5% off)
+-    q3_res = await market_api.post("/api/v1/marketplace/checkout/quote", json={
+-        "shop_id": str(sales.business.id),
+-        "product_id": str(sales.product.id),
+-        "variant_id": str(sales.variant.id),
+-        "quantity": 3,
+-        "provider": "bkash",
+-        "buyer": {"name": "Bulk Buyer", "phone": "01712345678"},
+-    })
+-    assert q3_res.status_code == 200, q3_res.text
+-    snap3 = q3_res.json()["snapshot"]
+-    subtotal3 = float(snap3["subtotal"])
+-    discount3 = float(snap3["discount"])
+-    assert discount3 == round(subtotal3 * 0.05, 2)
+-    assert snap3["coupon_code"] == "VOLUME5"
+-
+-    # 2. Volume discount for quantity >= 5 (10% off)
+-    q5_res = await market_api.post("/api/v1/marketplace/checkout/quote", json={
+-        "shop_id": str(sales.business.id),
+-        "product_id": str(sales.product.id),
+-        "variant_id": str(sales.variant.id),
+-        "quantity": 5,
+-        "provider": "bkash",
+-        "buyer": {"name": "Bulk Buyer", "phone": "01712345678"},
+-    })
+-    assert q5_res.status_code == 200
+-    snap5 = q5_res.json()["snapshot"]
+-    subtotal5 = float(snap5["subtotal"])
+-    discount5 = float(snap5["discount"])
+-    assert discount5 == round(subtotal5 * 0.10, 2)
+-    assert snap5["coupon_code"] == "VOLUME10"
+-
+-    # 3. Automatic 1-Click Renewal Coupon RENEW10
+-    renew_res = await market_api.post("/api/v1/marketplace/checkout/quote", json={
+-        "shop_id": str(sales.business.id),
+-        "product_id": str(sales.product.id),
+-        "variant_id": str(sales.variant.id),
+-        "quantity": 1,
+-        "provider": "bkash",
+-        "coupon_code": "RENEW10",
+-        "buyer": {"name": "Renewing Customer", "phone": "01712345678"},
+-    })
+-    assert renew_res.status_code == 200
+-    snap_renew = renew_res.json()["snapshot"]
+-    assert snap_renew["coupon_code"] == "RENEW10"
+-    assert float(snap_renew["discount"]) == round(float(snap_renew["subtotal"]) * 0.10, 2)
++    req = {"shop_id": str(sales.business.id), "product_id": str(sales.product.id),
++        "variant_id": str(sales.variant.id), "quantity": 5, "provider": "bkash", "buyer": {"name": "Buyer"}}
++    result = await market_api.post("/api/v1/marketplace/checkout/quote", json=req)
++    assert result.status_code == 200
++    assert Decimal(result.json()["snapshot"]["discount"]) == 0
++    assert result.json()["snapshot"]["coupon_code"] is None
++    assert (await market_api.post("/api/v1/marketplace/checkout/quote", json={**req,"coupon_code":"RENEW10"})).status_code == 409
+ 
+ 
+ async def test_marketplace_track_orders_by_phone_and_otp(market_api, sales):
+diff --git a/backend/app/services/store_promotions.py b/backend/app/services/store_promotions.py
+new file mode 100644
+--- /dev/null
++++ b/backend/app/services/store_promotions.py
+@@ -0,0 +1,71 @@
++"""Store-owned scheduled offers shared by marketplace and source checkout."""
++from datetime import datetime
++from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
++import re
++
++from fastapi import HTTPException
++
++from app.services.digital_inventory import utc, utcnow
++
++
++def offers_for(settings):
++    if isinstance(settings.get("coupons"), list):
++        return settings["coupons"]
++    code = next((settings[key] for key in ("coupon_code", "couponCode", "active_coupon", "activeCoupon") if settings.get(key)), None)
++    if not code:
++        return []
++    benefit = next((settings[key] for key in ("coupon_benefit", "couponBenefit", "discount_rate", "discountRate") if settings.get(key)), "")
++    minimum = next((settings[key] for key in ("coupon_min_spend", "couponMinSpend", "min_order_amount", "minOrderAmount") if settings.get(key)), "0")
++    return [{"code": str(code).strip().upper(), "benefit": str(benefit), "min_spend": str(minimum)}]
++
++
++def offer_code(offer):
++    return str(offer.get("code") or offer.get("coupon_code") or offer.get("couponCode") or "").strip().upper()
++
++
++def active_offer(offer):
++    if not isinstance(offer, dict) or any(offer.get(key) is False for key in ("active", "is_active", "enabled")):
++        return False
++    try:
++        start = offer.get("starts_at")
++        end = offer.get("expires_at")
++        return (not start or utc(datetime.fromisoformat(str(start).replace("Z", "+00:00"))) <= utcnow()) and (
++            not end or utcnow() < utc(datetime.fromisoformat(str(end).replace("Z", "+00:00"))))
++    except (ValueError, TypeError):
++        return False
++
++
++def coupon_discount(settings, subtotal, code, *, product_ids=()):
++    code = str(code or "").strip().upper()
++    for offer in offers_for(settings):
++        if not active_offer(offer) or offer_code(offer) != code:
++            continue
++        allowed = offer.get("product_ids") or []
++        if allowed and (not product_ids or not set(map(str, product_ids)).issubset(set(allowed))):
++            raise HTTPException(409, "This offer does not apply to every item in this order")
++        try:
++            minimum = re.search(r"\d+(?:\.\d+)?", str(offer.get("min_spend") or offer.get("minSpend") or offer.get("coupon_min_spend") or "0").replace(",", ""))
++            benefit = str(offer.get("benefit") or offer.get("coupon_benefit") or offer.get("discount") or "").replace(",", "")
++            number = re.search(r"\d+(?:\.\d+)?", benefit)
++            if not number or not minimum:
++                break
++            value = Decimal(number.group())
++            if subtotal < Decimal(minimum.group()):
++                raise HTTPException(409, "This order does not meet the coupon's minimum spend")
++            if value <= 0 or ("%" in benefit and value > 100):
++                break
++            saving = subtotal * value / 100 if "%" in benefit else value
++            return code, min(subtotal, saving).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
++        except InvalidOperation:
++            break
++    raise HTTPException(409, "Invalid, inactive or expired coupon code")
++
++
++def public_offers(business):
++    result = []
++    for offer in offers_for(business.settings_data or {}):
++        if not active_offer(offer) or not offer.get("flash"):
++            continue
++        result.append({key: offer.get(key) for key in (
++            "code", "benefit", "min_spend", "starts_at", "expires_at", "product_ids", "title")})
++    return result
+diff --git a/backend/tests/test_marketplace_growth.py b/backend/tests/test_marketplace_growth.py
+new file mode 100644
+--- /dev/null
++++ b/backend/tests/test_marketplace_growth.py
+@@ -0,0 +1,258 @@
++"""Multi-line checkout, source offers and reporting boundaries."""
++import uuid
++from datetime import timedelta
++from decimal import Decimal
++import pytest
++
++from sqlalchemy import select, func
++from app.models.product import Product, Variant
++from app.models.order import Order, OrderLine
++from app.models.tenant import Business
++from app.models.digital import DigitalFulfilmentUnit, DigitalPaymentRequest
++from app.services.digital_inventory import utcnow
++from app.services import digital_checkout as checkout, digital_fulfilment as delivery
++from app.schemas.digital import PrepareRequest
++from tests.test_marketplace import market_api, physical_shop, sign_in, KEY, BUYER  # noqa: F401
++from tests.test_digital_sales import digital_engine, sales, stock, pay  # noqa: F401
++
++pytestmark = pytest.mark.parametrize("digital_engine", [None, "postgres"], indirect=True)
++
++
++async def auth(client):
++    result = await client.post("/api/v1/marketplace/token", json=await sign_in(client))
++    return {"Authorization": "Bearer " + result.json()["access_token"]}
++
++
++def request(sales, provider="cod"):
++    return {"shop_id": str(sales.business.id), "product_id": str(sales.product.id),
++        "variant_id": str(sales.variant.id), "quantity": 1, "provider": provider,
++        "buyer": {"name": "Cart buyer", "phone": "01712345678", "address": "House 12 Road 4 Mirpur Dhaka", "district": "Dhaka"}}
++
++
++async def second_variant(sales):
++    variant = Variant(product_id=sales.product.id, sku="SECOND-SIZE", label="Year", price=Decimal("250.00"), stock=3)
++    sales.db.add(variant)
++    await sales.db.commit()
++    return variant
++
++
++def lines(sales, variant):
++    return [{"product_id": str(sales.product.id), "variant_id": str(sales.variant.id), "quantity": 1},
++        {"product_id": str(sales.product.id), "variant_id": str(variant.id), "quantity": 2}]
++
++
++async def accept(client, req, quote):
++    payload = {"shop_id": req["shop_id"], "product_id": req["product_id"], "draft_id": quote["draft_id"],
++        "quote_hash": quote["quote_hash"], "provider": req["provider"], "accepted": True,
++        "idempotency_key": "growth-cart-checkout"}
++    return await client.post("/api/v1/marketplace/checkout/accept", json=payload)
++
++
++async def test_physical_cart_one_shipping_order_and_stock_reservation(market_api, physical_shop):
++    sales = physical_shop
++    variant = await second_variant(sales)
++    req = {**request(sales), "items": lines(sales,variant)}
++    quoted = await market_api.post("/api/v1/marketplace/checkout/quote", json=req)
++    assert quoted.status_code == 200, quoted.text
++    quote = quoted.json()
++    assert Decimal(quote["snapshot"]["subtotal"]) == 600
++    assert Decimal(quote["snapshot"]["delivery_charge"]) == 70
++    assert Decimal(quote["snapshot"]["total"]) == 670
++    result = await accept(market_api,req,quote)
++    assert result.status_code == 200, result.text
++    assert len(result.json()["items"]) == 2
++    assert (await accept(market_api,req,quote)).json()["id"] == result.json()["id"]
++    await sales.db.refresh(sales.variant)
++    await sales.db.refresh(variant)
++    assert sales.variant.stock == 3 and variant.stock == 1
++    assert await sales.db.scalar(select(func.count()).select_from(OrderLine)) == 2
++    scope = await market_api.get(f"/api/v1/marketplace/checkout/{quote['draft_id']}/scope")
++    assert len(scope.json()["items"]) == 2
++    assert (await market_api.get(f"/api/v1/marketplace/checkout/{quote['draft_id']}/scope", headers={"X-Marketplace-Buyer":"b"*64})).status_code == 404
++
++
++async def test_cart_rejects_duplicate_foreign_and_mixed_lines(market_api, physical_shop):
++    sales = physical_shop
++    variant = await second_variant(sales)
++    items = lines(sales,variant)
++    for invalid in ([items[0],items[0]], [items[0],{**items[1],"product_id":str(uuid.uuid4())}]):
++        result = await market_api.post("/api/v1/marketplace/checkout/quote", json={**request(sales),"items":invalid})
++        assert result.status_code in (404,422)
++    product = Product(business_id=sales.business.id,name="Digital",category="License",price=100,image_url="",fulfilment_kind="digital")
++    sales.db.add(product); await sales.db.flush()
++    sales.business.settings_data={**sales.business.settings_data,"marketplace_listing":{**sales.business.settings_data["marketplace_listing"],"product_ids":[str(sales.product.id),str(product.id)]}}
++    await sales.db.commit()
++    result=await market_api.post("/api/v1/marketplace/checkout/quote",json={**request(sales),"items":[items[0],{**items[1],"product_id":str(product.id)}]})
++    assert result.status_code == 409
++    assert await sales.db.scalar(select(func.count()).select_from(Order)) == 0
++
++
++async def test_digital_cart_single_payment_and_independent_fulfillment_units(market_api,sales):
++    sales.product.digital_config={**sales.product.digital_config,"delivery_mode":"manual"}
++    sales.variant.stock=4
++    variant=await second_variant(sales)
++    req={**request(sales,"bkash"),"items":lines(sales,variant)}
++    quoted=await market_api.post("/api/v1/marketplace/checkout/quote",json=req)
++    assert quoted.status_code==200,quoted.text
++    assert Decimal(quoted.json()["snapshot"]["total"])==600
++    result=await accept(market_api,req,quoted.json())
++    assert result.status_code==200,result.text
++    assert Decimal(result.json()["payment"]["amount"])==600
++    assert await sales.db.scalar(select(func.count()).select_from(DigitalPaymentRequest))==1
++    assert await sales.db.scalar(select(func.count()).select_from(DigitalFulfilmentUnit))==3
++    assert await sales.db.scalar(select(func.count()).select_from(OrderLine))==2
++    assert (await accept(market_api,req,quoted.json())).json()["id"]==result.json()["id"]
++
++
++async def test_cart_changed_second_line_is_rejected_atomically(market_api,physical_shop):
++    sales=physical_shop
++    variant=await second_variant(sales)
++    req={**request(sales),"items":lines(sales,variant)}
++    quoted=(await market_api.post("/api/v1/marketplace/checkout/quote",json=req)).json()
++    variant.stock=1
++    await sales.db.commit()
++    result=await accept(market_api,req,quoted)
++    assert result.status_code==409,result.text
++    await sales.db.refresh(sales.variant)
++    assert sales.variant.stock==4
++    assert await sales.db.scalar(select(func.count()).select_from(Order))==0
++
++
++async def test_scheduled_source_offer_permissions_expiry_and_stale_revision(market_api,physical_shop):
++    sales=physical_shop
++    headers=await auth(market_api)
++    path=f"/api/v1/marketplace/stores/{sales.business.id}/offers"
++    assert (await market_api.get(path)).status_code==401
++    assert (await market_api.get(path.replace(str(sales.business.id),str(uuid.uuid4())),headers=headers)).status_code==404
++    foreign=Business(name="Another seller",slug="another-seller",commerce_mode="standard",settings_data={"owner_id":str(uuid.uuid4())})
++    sales.db.add(foreign);await sales.db.commit()
++    assert (await market_api.get(path.replace(str(sales.business.id),str(foreign.id)),headers=headers)).status_code==404
++    current=(await market_api.get(path,headers=headers)).json()
++    offer={"code":"EID50","title":"Eid special","benefit":"50","min_spend":"100","active":True,"flash":True,
++        "starts_at":(utcnow()-timedelta(hours=1)).isoformat(),"expires_at":(utcnow()+timedelta(hours=24)).isoformat(),"product_ids":[str(sales.product.id)]}
++    saved=await market_api.put(path,headers=headers,json={"revision":current["revision"],"offer":offer})
++    assert saved.status_code==200,saved.text
++    assert (await market_api.put(path,headers=headers,json={"revision":current["revision"],"offer":offer})).status_code==409
++    feed=(await market_api.get("/api/v1/marketplace/feed")).json()
++    assert feed["offers"][0]["code"]=="EID50"
++    assert feed["products"][0]["url_slug"]
++    req={**request(sales),"coupon_code":"EID50"}
++    quote=await market_api.post("/api/v1/marketplace/checkout/quote",json=req)
++    assert quote.status_code==200,quote.text
++    assert Decimal(quote.json()["snapshot"]["total"])==120
++    assert (await accept(market_api,req,quote.json())).status_code==200
++    paused=await market_api.put(path,headers=headers,json={"revision":saved.json()["revision"],"active_code":"EID50","enabled":False})
++    assert paused.status_code==200
++    assert not (await market_api.get("/api/v1/marketplace/feed")).json()["offers"]
++    assert (await market_api.post("/api/v1/marketplace/checkout/quote",json=req)).status_code==409
++
++
++async def test_future_and_expired_coupons_cannot_quote(market_api,sales):
++    await stock(sales)
++    sales.business.settings_data={**sales.business.settings_data,"coupons":[{"code":"FUTURE","benefit":"10%","starts_at":(utcnow()+timedelta(hours=1)).isoformat()},
++        {"code":"EXPIRED","benefit":"10%","expires_at":(utcnow()-timedelta(seconds=1)).isoformat()}]}
++    await sales.db.commit()
++    for code in ("FUTURE","EXPIRED"):
++        assert (await market_api.post("/api/v1/marketplace/checkout/quote",json={**request(sales,"bkash"),"coupon_code":code})).status_code==409
++
++
++async def test_offer_expiring_after_review_cannot_create_an_order(market_api,physical_shop):
++    sales=physical_shop
++    offer={"code":"SHORT10","benefit":"10%","active":True,"manual_only":True,
++        "starts_at":(utcnow()-timedelta(hours=1)).isoformat(),"expires_at":(utcnow()+timedelta(minutes=1)).isoformat()}
++    sales.business.settings_data={**sales.business.settings_data,"coupons":[offer]}
++    await sales.db.commit()
++    req={**request(sales),"coupon_code":"SHORT10"}
++    quoted=await market_api.post("/api/v1/marketplace/checkout/quote",json=req)
++    assert quoted.status_code==200,quoted.text
++    sales.business.settings_data={**sales.business.settings_data,"coupons":[{**offer,"expires_at":(utcnow()-timedelta(seconds=1)).isoformat()}]}
++    await sales.db.commit()
++    assert (await accept(market_api,req,quoted.json())).status_code==409
++    assert await sales.db.scalar(select(func.count()).select_from(Order))==0
++    await sales.db.refresh(sales.variant)
++    assert sales.variant.stock==4
++
++
++async def test_analytics_is_admin_only_and_uses_actual_paid_orders(market_api,physical_shop):
++    sales=physical_shop
++    headers=await auth(market_api)
++    assert (await market_api.get("/api/v1/marketplace/admin/analytics",headers=headers)).status_code==403
++    sales.market_user.is_superadmin=True
++    await sales.db.commit()
++    req=request(sales)
++    q=(await market_api.post("/api/v1/marketplace/checkout/quote",json=req)).json()
++    result=await accept(market_api,req,q)
++    assert result.status_code==200,result.text
++    report=await market_api.get("/api/v1/marketplace/admin/analytics",headers=headers)
++    assert report.status_code==200,report.text
++    assert report.json()["sales"][0]["orders"]==1
++    assert Decimal(report.json()["sales"][0]["paid_total"])==0
++    assert "buyer" not in report.text and "phone" not in report.text
++    stored=await sales.db.get(Order,uuid.UUID(result.json()["id"]))
++    stored.payment_status="paid"
++    stored.placed_at=utcnow().replace(hour=23,minute=30,second=0,microsecond=0)-timedelta(days=1)
++    expected_day=stored.placed_at.date().isoformat()
++    stored.checkout_data={**stored.checkout_data,"marketplace_quote":{**stored.checkout_data["marketplace_quote"],"total":"99999999"}}
++    await sales.db.commit()
++    paid=(await market_api.get("/api/v1/marketplace/admin/analytics",headers=headers)).json()["sales"][0]
++    assert Decimal(paid["paid_total"])==170 and paid["paid_orders"]==1
++    assert paid["day"]==expected_day
++    stored.payment_status="partially_refunded"
++    await sales.db.commit()
++    refunded=(await market_api.get("/api/v1/marketplace/admin/analytics",headers=headers)).json()["sales"][0]
++    assert Decimal(refunded["paid_total"])==0
++
++
++async def test_cart_free_shipping_uses_combined_subtotal_and_duplicate_skus_keep_variant_identity(market_api,physical_shop):
++    sales=physical_shop
++    variant=await second_variant(sales)
++    variant.sku=sales.variant.sku
++    sales.business.settings_data={**sales.business.settings_data,"shipping_rates":{"free_delivery_min":500}}
++    await sales.db.commit()
++    req={**request(sales),"items":lines(sales,variant)}
++    quote=await market_api.post("/api/v1/marketplace/checkout/quote",json=req)
++    assert quote.status_code==200,quote.text
++    assert Decimal(quote.json()["snapshot"]["delivery_charge"])==0
++    result=await accept(market_api,req,quote.json())
++    assert result.status_code==200,result.text
++    rows=list(await sales.db.scalars(select(OrderLine)))
++    assert {row.variant_id for row in rows}=={sales.variant.id,variant.id}
++    assert {row.item_snapshot["variant_id"] for row in rows}=={str(sales.variant.id),str(variant.id)}
++
++
++async def test_mixed_automatic_and_manual_digital_cart_delivers_each_paid_item_privately(market_api,sales):
++    await stock(sales,1)
++    product=Product(business_id=sales.business.id,name="Seller prepared course",category="Education",price=200,image_url="",
++        fulfilment_kind="digital",digital_config_revision=1,digital_config={**sales.product.digital_config,"delivery_mode":"manual","required_buyer_fields":["name","email"]})
++    sales.db.add(product);await sales.db.flush()
++    variant=Variant(product_id=product.id,sku="MANUAL-COURSE",label="Standard",price=Decimal("200"),stock=1)
++    sales.db.add(variant)
++    sales.business.settings_data={**sales.business.settings_data,"marketplace_listing":{**sales.business.settings_data["marketplace_listing"],"product_ids":[str(sales.product.id),str(product.id)]}}
++    await sales.db.commit()
++    req={**request(sales,"bkash"),"buyer":{**request(sales)["buyer"],"email":"buyer@example.com"},
++        "items":[lines(sales,variant)[0],{"product_id":str(product.id),"variant_id":str(variant.id),"quantity":1}]}
++    quoted=await market_api.post("/api/v1/marketplace/checkout/quote",json=req)
++    assert quoted.status_code==200,quoted.text
++    assert quoted.json()["snapshot"]["digital_config"]["delivery_mode"]=="manual"
++    result=await accept(market_api,req,quoted.json())
++    assert result.status_code==200,result.text
++    order=await sales.db.get(Order,uuid.UUID(result.json()["id"]))
++    assert (await market_api.post(f"/api/v1/marketplace/orders/{order.id}/reveal")).status_code==409
++    await pay(sales,order)
++    partial=(await market_api.get(f"/api/v1/marketplace/orders/{order.id}")).json()
++    assert partial["ready"] and partial["ready_quantity"]==1
++    automatic=await market_api.post(f"/api/v1/marketplace/orders/{order.id}/reveal")
++    assert automatic.status_code==200,automatic.text
++    assert len(automatic.json()["items"])==1 and "PRIVATE-LICENSE" in automatic.text
++    manual=next(unit for unit in await checkout.units_for(sales.db,order) if unit.mode=="manual")
++    await delivery.prepare_delivery(sales.db,sales.business,order,PrepareRequest(idempotency_key="cart-manual-prepare",
++        units=[{"fulfilment_id":manual.id,"content":"PRIVATE-MANUAL-COURSE"}]),sales.owner.id)
++    await delivery.queue_delivery(sales.db,sales.business,order,actor=sales.owner.id,key="cart-manual-send")
++    await sales.db.commit()
++    revealed=await market_api.post(f"/api/v1/marketplace/orders/{order.id}/reveal")
++    assert revealed.status_code==200,revealed.text
++    assert len(revealed.json()["items"])==2
++    assert {item["item"] for item in revealed.json()["items"]}=={1,2}
++    assert {item["name"] for item in revealed.json()["items"]}=={sales.product.name,product.name}
++    assert "PRIVATE-LICENSE" in revealed.text and "PRIVATE-MANUAL-COURSE" in revealed.text
++    assert (await market_api.post(f"/api/v1/marketplace/orders/{order.id}/reveal",headers={"X-Marketplace-Buyer":"b"*64})).status_code==404
+diff --git a/backend/scripts/marketplace_growth.sql b/backend/scripts/marketplace_growth.sql
+new file mode 100644
+--- /dev/null
++++ b/backend/scripts/marketplace_growth.sql
+@@ -0,0 +1,18 @@
++-- Marketplace conversation and anonymous daily traffic metadata only.
++BEGIN;
++CREATE TABLE IF NOT EXISTS arise_marketplace.product_questions (
++    id TEXT PRIMARY KEY, product_id TEXT NOT NULL, shop_id TEXT NOT NULL,
++    visitor_hash TEXT NOT NULL, display_name TEXT NOT NULL, question TEXT NOT NULL,
++    answer TEXT NOT NULL DEFAULT '', hidden BIGINT NOT NULL DEFAULT 0 CHECK(hidden IN (0,1)),
++    created_at BIGINT NOT NULL, answered_at BIGINT NOT NULL DEFAULT 0
++);
++CREATE INDEX IF NOT EXISTS product_questions_product ON arise_marketplace.product_questions(product_id,created_at DESC);
++CREATE INDEX IF NOT EXISTS product_questions_shop ON arise_marketplace.product_questions(shop_id,created_at DESC);
++CREATE TABLE IF NOT EXISTS arise_marketplace.traffic_events (
++    day BIGINT NOT NULL, visitor_hash TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('home','listing','shop','product')),
++    target_id TEXT NOT NULL, PRIMARY KEY(day,visitor_hash,kind,target_id)
++);
++INSERT INTO arise_marketplace.schema_version VALUES (5) ON CONFLICT DO NOTHING;
++COMMIT;
++
++GRANT SELECT,INSERT,UPDATE,DELETE ON arise_marketplace.product_questions, arise_marketplace.traffic_events TO arise_marketplace_runtime;

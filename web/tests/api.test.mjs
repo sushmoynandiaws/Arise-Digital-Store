@@ -10,6 +10,23 @@ function client(fetch=async()=>({ok:true,json:async()=>({ok:true})}), clock=Date
   vm.runInNewContext(code,{exports,fetch,Intl,Number,Date:clock});return exports;
 }
 
+test("courier labels preserve source pickup and delivery stages",()=>{
+  const {deliveryLabel}=client();
+  assert.equal(deliveryLabel("pickup_pending"),"Awaiting pickup");
+  assert.equal(deliveryLabel("out_for_delivery"),"Out for delivery");
+  assert.equal(deliveryLabel("out_for_delivery","bn"),"ডেলিভারি দিতে যাচ্ছে");
+  assert.equal(deliveryLabel("unrecognized_provider_state"),"Status unavailable");
+});
+
+test("partial paid digital delivery shows an accurate count without overriding refund or cancellation",()=>{
+  const {purchaseMessage}=client();
+  const order={fulfilment_kind:"digital",payment_status:"paid",delivery_status:"partially_sent",ready:true,ready_quantity:1,quantity:2};
+  assert.equal(purchaseMessage(order).title,"Some of your items are ready");
+  assert.match(purchaseMessage(order).description,/1 of 2/);
+  assert.equal(purchaseMessage({...order,payment_status:"refunded"}).title,"Payment refunded");
+  assert.equal(purchaseMessage({...order,delivery_status:"cancelled"}).title,"Order cancelled");
+});
+
 test("checkout follows product fulfillment and source capability without treating unknown items as digital",()=>{
   const {productFulfilment,productPayments,canCheckout,shopType}=client();
   const shop={kind:"Fashion & Clothing",commerce_mode:"standard",payment_methods:["cod"]};

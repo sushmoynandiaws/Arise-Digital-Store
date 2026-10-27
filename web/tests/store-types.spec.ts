@@ -15,6 +15,8 @@ test("physical checkout collects delivery details and displays source shipping a
   let quoted: any;
   await page.route("**/api/**", async route => {
     const path=new URL(route.request().url()).pathname;
+    if (path === "/api/traffic") return route.fulfill({json:{ok:true}});
+    if (path.endsWith("/questions")) return route.fulfill({json:{questions:[],has_more:false}});
     if(path==="/api/promotions") return route.fulfill({json:{ads:[],settings:{}}});
     if(path==="/api/session") return route.fulfill({json:{user:null,csrf:"test-csrf",demo:false,source_web:""}});
     if(path==="/api/catalog") return route.fulfill({json:{shops:[shop],products:[physical],synced_at:new Date().toISOString()}});
@@ -61,6 +63,8 @@ test("physical checkout collects delivery details and displays source shipping a
 test("source category filters include physical shops and unavailable checkout cannot be opened directly",async ({page})=>{
   await page.route("**/api/**",route=>{
     const path=new URL(route.request().url()).pathname;
+    if (path === "/api/traffic") return route.fulfill({json:{ok:true}});
+    if (path.endsWith("/questions")) return route.fulfill({json:{questions:[],has_more:false}});
     if(path==="/api/promotions") return route.fulfill({json:{ads:[],settings:{}}});
     if(path==="/api/session") return route.fulfill({json:{user:null,csrf:"test-csrf",demo:false,source_web:""}});
     if(path.endsWith("/reviews")) return route.fulfill({json:{count:0,average:null,has_more:false,reviews:[]}});

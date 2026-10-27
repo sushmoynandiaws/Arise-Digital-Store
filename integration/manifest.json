@@ -35,5 +35,32 @@
     "production_deployed": false,
     "database_migration_required": false,
     "new_environment_variables": []
+  },
+  "growth_extension": {
+    "source_repository": "nazmulh0/arise-sell",
+    "base_revision": "22eff296f61bf9399ca38e1d90f7dc4f35e82b6d",
+    "patch": "arisesell-growth.patch",
+    "files": [
+      ".github/workflows/backend-postgres.yml",
+      ".github/workflows/deploy-vps.yml",
+      "backend/app/api/v1/marketplace.py",
+      "backend/app/services/digital_checkout.py",
+      "backend/app/services/knowledge_checkout.py",
+      "backend/app/services/marketplace_checkout.py",
+      "backend/app/services/order_confirmation_service.py",
+      "backend/app/services/sales_reply.py",
+      "backend/tests/test_marketplace.py",
+      "backend/app/services/store_promotions.py",
+      "backend/tests/test_marketplace_growth.py",
+      "backend/scripts/marketplace_growth.sql"
+    ],
+    "marketplace_migration": "migrations/006_growth.sql",
+    "new_environment_variables": [],
+    "production_deployed": false,
+    "deployment_order": [
+      "Apply marketplace migration 006 and its runtime grants",
+      "Update AriseSell bridge",
+      "Deploy storefront"
+    ]
   }
 }

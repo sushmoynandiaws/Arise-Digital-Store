@@ -102,9 +102,12 @@ export const paymentLabel = (value: string, lang: string = "en") => {
 
 export const deliveryLabel = (value: string, lang: string = "en") => {
   const shipping = {
+    partially_sent: ["Some items delivered", "কিছু আইটেম ডেলিভারি হয়েছে"],
     confirmed: ["Order confirmed", "অর্ডার নিশ্চিত হয়েছে"], awaiting_confirm: ["Awaiting confirmation", "নিশ্চিতকরণের অপেক্ষায়"],
     awaiting_advance: ["Awaiting advance verification", "অগ্রিম যাচাইয়ের অপেক্ষায়"],
     courier_booked: ["Courier booked", "কুরিয়ার বুকিং হয়েছে"], awaiting_pickup: ["Awaiting pickup", "কুরিয়ার সংগ্রহের অপেক্ষায়"],
+    booked: ["Courier booked", "কুরিয়ার বুকিং হয়েছে"], pickup_pending: ["Awaiting pickup", "কুরিয়ার সংগ্রহের অপেক্ষায়"],
+    out_for_delivery: ["Out for delivery", "ডেলিভারি দিতে যাচ্ছে"],
     in_transit: ["In transit", "ডেলিভারির পথে"], returned: ["Returned", "ফেরত এসেছে"], settled: ["Settled", "হিসাব সম্পন্ন"],
   }[value];
   if (shipping) return shipping[lang === "bn" ? 1 : 0];
@@ -137,6 +140,11 @@ export const deliveryLabel = (value: string, lang: string = "en") => {
 };
 
 export function purchaseMessage(order: Purchase, lang: string = "en") {
+  if (order.fulfilment_kind !== "physical" && order.payment_status === "paid" && order.delivery_status !== "cancelled" && order.ready && typeof order.ready_quantity === "number" && order.ready_quantity > 0 && order.ready_quantity < order.quantity) {
+    return {title: lang === "bn" ? "কিছু আইটেম প্রস্তুত" : "Some of your items are ready",
+      description: lang === "bn" ? `${order.quantity}টি আইটেমের মধ্যে ${order.ready_quantity}টি নিচে খুলতে পারবেন। বাকি আইটেম এখনও প্রস্তুত করা হচ্ছে।`
+        : `${order.ready_quantity} of ${order.quantity} items are available below. The remaining items are still being prepared.`};
+  }
   if (order.fulfilment_kind === "physical" && !["refunded", "partially_refunded"].includes(order.payment_status) && order.delivery_status !== "cancelled") {
     const bn = lang === "bn";
     if (["delivered", "settled"].includes(order.delivery_status)) return {

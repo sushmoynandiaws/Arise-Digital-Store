@@ -17,6 +17,8 @@ async function preview(page: Page, getOrder: () => Purchase = () => order, lang 
   await page.addInitScript(value => localStorage.setItem("arise_lang", value), lang);
   await page.route("**/api/**", route => {
     const path = new URL(route.request().url()).pathname;
+    if (path === "/api/traffic") return route.fulfill({json:{ok:true}});
+    if (path.endsWith("/questions")) return route.fulfill({json:{questions:[],has_more:false}});
     if (route.request().method() !== "GET") throw new Error(`Unexpected write: ${path}`);
     if (path === "/api/session") return route.fulfill({ json: { user: null, csrf: "sample", demo: false } });
     if (path === "/api/catalog") return route.fulfill({ json: { shops: [shop], products: [], synced_at: now.toISOString() } });

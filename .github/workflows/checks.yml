@@ -35,7 +35,7 @@ jobs:
           key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
       - name: Prepare isolated PostgreSQL metadata
         run: |
-          psql "$PG_ADMIN_URL" -v ON_ERROR_STOP=1 -f migrations/002_postgres.sql -f migrations/003_reviews.sql -f migrations/004_shop_pages.sql -f migrations/005_admin_console.sql
+          psql "$PG_ADMIN_URL" -v ON_ERROR_STOP=1 -f migrations/002_postgres.sql -f migrations/003_reviews.sql -f migrations/004_shop_pages.sql -f migrations/005_admin_console.sql -f migrations/006_growth.sql
           psql "$PG_ADMIN_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE marketplace_test LOGIN PASSWORD 'local-test-only'; GRANT USAGE ON SCHEMA arise_marketplace TO marketplace_test; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA arise_marketplace TO marketplace_test; CREATE TABLE public.commerce_sentinel(id integer);"
       - run: cargo fmt --check && cargo test --locked && cargo test --locked -- --ignored --test-threads=1
       - uses: actions/setup-node@v4
@@ -57,7 +57,7 @@ jobs:
           mkdir -p ../artifacts
           npx vite preview --host 127.0.0.1 --port 5173 --strictPort > ../artifacts/vite-preview.log 2>&1 &
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:5173/ >/dev/null && break; sleep 1; done
-          npx playwright test tests/admin-console.spec.ts tests/payment-countdown.spec.ts tests/shop-pages.spec.ts tests/shop-support.spec.ts tests/product-purchase.spec.ts tests/checkout.spec.ts tests/reviews.spec.ts tests/store-types.spec.ts --workers=1
+          npx playwright test tests/admin-console.spec.ts tests/payment-countdown.spec.ts tests/shop-pages.spec.ts tests/shop-support.spec.ts tests/product-purchase.spec.ts tests/checkout.spec.ts tests/reviews.spec.ts tests/store-types.spec.ts tests/growth.spec.ts --workers=1
           npx playwright test tests/ui-refresh.spec.ts --grep "keyboard|moderation errors" --workers=1
           npx playwright test tests/product-purchase.spec.ts --repeat-each=5 --workers=1
       - uses: actions/upload-artifact@v4

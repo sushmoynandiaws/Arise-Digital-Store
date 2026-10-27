@@ -19,6 +19,9 @@ async function fixture(page: Page) {
   await page.route("**/api/**", route => {
     if (new URL(route.request().url()).pathname === "/api/promotions") return route.fulfill({ json: { ads: [], settings: {} } });
     const endpoint = new URL(route.request().url()).pathname;
+    if (endpoint === "/api/traffic") return route.fulfill({json:{ok:true}});
+    if (endpoint.endsWith("/questions")) return route.fulfill({json:{questions:[],has_more:false}});
+    if (endpoint.endsWith("/offers")) return route.fulfill({json:{offers:[],revision:"a".repeat(64)}});
     if (endpoint === "/api/session") return route.fulfill({ json: { user: { id: "seller", name: "Seller", admin: false }, csrf: "csrf", demo: false, source_web: "https://example.test" } });
     if (endpoint === "/api/catalog") return route.fulfill({ json: { shops: [shop, other], products: [product], synced_at: new Date().toISOString() } });
     if (endpoint === "/api/seller") return route.fulfill({ json: { shops: [shop, other] } });

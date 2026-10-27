@@ -16,6 +16,8 @@ test("checkout updates totals, rejects invalid quantities and uses the seller qu
   await page.route("**/api/**", async route => {
     if (new URL(route.request().url()).pathname === "/api/promotions") return route.fulfill({ json: { ads: [], settings: {} } });
     const endpoint = new URL(route.request().url()).pathname;
+    if (endpoint === "/api/traffic") return route.fulfill({json:{ok:true}});
+    if (endpoint.endsWith("/questions")) return route.fulfill({json:{questions:[],has_more:false}});
     if (endpoint === "/api/session") return route.fulfill({ json: { user: null, csrf: "test-csrf", demo: false, source_web: "" } });
     if (endpoint === "/api/catalog") return route.fulfill({ json: {
       shops: [{ id: "shop-test", slug: "test-shop", name: "Test shop", support: "", payment_methods: ["bkash"] }],

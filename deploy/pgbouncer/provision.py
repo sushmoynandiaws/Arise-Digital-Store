@@ -34,6 +34,7 @@ sql(Path('/opt/arise-digital-store/migrations/002_postgres.sql').read_text())
 sql(Path('/opt/arise-digital-store/migrations/003_reviews.sql').read_text())
 sql(Path('/opt/arise-digital-store/migrations/004_shop_pages.sql').read_text())
 sql(Path('/opt/arise-digital-store/migrations/005_admin_console.sql').read_text())
+sql(Path('/opt/arise-digital-store/migrations/006_growth.sql').read_text())
 sql("""BEGIN;
 DO $$ BEGIN
 IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='arise_marketplace_runtime') THEN
@@ -47,7 +48,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
 arise_marketplace.auth_requests, arise_marketplace.sessions, arise_marketplace.moderation,
 arise_marketplace.reports, arise_marketplace.rate_limits, arise_marketplace.reviews,
 arise_marketplace.shop_pages, arise_marketplace.admin_documents, arise_marketplace.admin_roles,
-arise_marketplace.admin_notes, arise_marketplace.review_moderation, arise_marketplace.ad_events
+arise_marketplace.admin_notes, arise_marketplace.review_moderation, arise_marketplace.ad_events,
+arise_marketplace.product_questions, arise_marketplace.traffic_events
 TO arise_marketplace_runtime;
 GRANT SELECT, INSERT ON arise_marketplace.admin_activity TO arise_marketplace_runtime;
 ALTER ROLE arise_marketplace_runtime IN DATABASE arisesell_db SET search_path TO arise_marketplace, pg_catalog;
@@ -56,7 +58,7 @@ COMMIT;""" % password)
 assert sql("SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication FROM pg_roles WHERE rolname='arise_marketplace_runtime'") == 'f'
 assert sql("SELECT count(*) FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname='arise_marketplace_runtime')") == '0'
 assert sql("SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','v','m','p') AND has_table_privilege('arise_marketplace_runtime',c.oid,'SELECT,INSERT,UPDATE,DELETE')") == '0'
-assert sql('SELECT max(version) FROM arise_marketplace.schema_version') == '4'
+assert sql('SELECT max(version) FROM arise_marketplace.schema_version') == '5'
 assert sql("SELECT has_table_privilege('arise_marketplace_runtime','arise_marketplace.admin_documents','SELECT,INSERT,UPDATE,DELETE') AND has_table_privilege('arise_marketplace_runtime','arise_marketplace.admin_activity','SELECT,INSERT') AND NOT has_table_privilege('arise_marketplace_runtime','arise_marketplace.admin_activity','UPDATE,DELETE')") == 't'
 
 pool = ROOT/'pgbouncer'

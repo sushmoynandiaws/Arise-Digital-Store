@@ -15,6 +15,8 @@ test("verified customers can publish and edit one review, and products show real
   await page.route("**/api/**", route => {
     if (new URL(route.request().url()).pathname === "/api/promotions") return route.fulfill({ json: { ads: [], settings: {} } });
     const endpoint = new URL(route.request().url()).pathname;
+    if (endpoint === "/api/traffic") return route.fulfill({json:{ok:true}});
+    if (endpoint.endsWith("/questions")) return route.fulfill({json:{questions:[],has_more:false}});
     if (endpoint === "/api/session") return route.fulfill({ json: { user: null, csrf: "test-csrf", demo: false, source_web: "" } });
     if (endpoint === "/api/catalog") return route.fulfill({ json: { products: [product], shops: [shop], synced_at: new Date().toISOString() } });
     if (endpoint === "/api/products/product-test/reviews") {
@@ -82,6 +84,8 @@ test("many reviews scroll within a bounded keyboard-accessible list and paginati
   await page.route("**/api/**", route => {
     if (new URL(route.request().url()).pathname === "/api/promotions") return route.fulfill({ json: { ads: [], settings: {} } });
     const url = new URL(route.request().url());
+    if(url.pathname==="/api/traffic")return route.fulfill({json:{ok:true}});
+    if(url.pathname.endsWith("/questions"))return route.fulfill({json:{questions:[],has_more:false}});
     if (url.pathname === "/api/session") return route.fulfill({ json: { user: null, csrf: "test-csrf", demo: false, source_web: "" } });
     if (url.pathname === "/api/catalog") return route.fulfill({ json: { products: [product], shops: [shop], synced_at: new Date().toISOString() } });
     if (url.pathname.endsWith("/reviews")) {

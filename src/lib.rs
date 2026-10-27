@@ -1,6 +1,7 @@
 pub mod admin;
 pub mod app;
 pub mod db;
+pub mod growth;
 pub mod source;
 
 use aes_gcm::{Aes256Gcm, KeyInit};

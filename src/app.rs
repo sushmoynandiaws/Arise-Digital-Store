@@ -53,6 +53,7 @@ fn build_router(state: AppState, serve_web: bool) -> Router {
             get(|| async { Json(json!({"status":"ok","service":"arise-digital-store"})) }),
         )
         .merge(crate::admin::routes())
+        .merge(crate::growth::routes())
         .route("/api/session", get(session))
         .route("/api/auth/start", get(auth_start))
         .route("/api/auth/callback", get(auth_callback))
@@ -426,7 +427,7 @@ async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Result<Res
     );
     Ok(response)
 }
-async fn feed(state: &AppState) -> Result<Value> {
+pub(crate) async fn feed(state: &AppState) -> Result<Value> {
     let mut feed = state
         .source(reqwest::Method::GET, "/marketplace/feed", None, None, None)
         .await?;
@@ -467,6 +468,7 @@ async fn feed(state: &AppState) -> Result<Value> {
                     .any(|(kind, id)| kind == "product" && product["id"].as_str() == Some(id))
         });
     }
+    crate::growth::decorate(state, &mut feed).await?;
     Ok(feed)
 }
 async fn catalog(State(state): State<AppState>) -> Result<Json<Value>> {
@@ -563,11 +565,19 @@ async fn save_listing(
 }
 async fn ensure_visible(state: &AppState, body: &Value) -> Result<()> {
     let catalog = feed(state).await?;
-    if !catalog["products"].as_array().is_some_and(|rows| {
-        rows.iter().any(|product| {
-            product["id"] == body["product_id"] && product["shop_id"] == body["shop_id"]
+    let mut items = vec![body];
+    if let Some(lines) = body["items"].as_array() {
+        items.extend(lines);
+    }
+    if items.len() > 21
+        || items.iter().any(|item| {
+            !catalog["products"].as_array().is_some_and(|rows| {
+                rows.iter().any(|product| {
+                    product["id"] == item["product_id"] && product["shop_id"] == body["shop_id"]
+                })
+            })
         })
-    }) {
+    {
         return Err(AppError::new(
             StatusCode::CONFLICT,
             "This product is no longer available on the marketplace.",
@@ -611,6 +621,19 @@ async fn accept(
     Json(body): Json<Value>,
 ) -> Result<Json<Value>> {
     ensure_visible(&state, &body).await?;
+    let draft = body["draft_id"].as_str().ok_or_else(|| {
+        AppError::new(StatusCode::UNPROCESSABLE_ENTITY, "Choose a valid checkout.")
+    })?;
+    uuid(draft)?;
+    let scope = commerce(
+        &state,
+        &headers,
+        reqwest::Method::GET,
+        &format!("/marketplace/checkout/{draft}/scope"),
+        None,
+    )
+    .await?;
+    ensure_visible(&state, &scope.0).await?;
     commerce(
         &state,
         &headers,

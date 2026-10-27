@@ -79,6 +79,12 @@ pub async fn connect_pool(value: &str) -> std::result::Result<AnyPool, String> {
         .execute(&pool)
         .await
         .map_err(|_| "Could not apply local admin migrations")?;
+        sqlx::raw_sql(
+            &include_str!("../migrations/006_growth.sql").replace("arise_marketplace.", ""),
+        )
+        .execute(&pool)
+        .await
+        .map_err(|_| "Could not apply local growth migrations")?;
     }
     Ok(pool)
 }

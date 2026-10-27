@@ -41,7 +41,9 @@ async fn setup_with_pool(pool: sqlx::AnyPool) -> (AppState, Requests, tokio::tas
     let captured = calls.clone();
     let listing_calls = calls.clone();
     let source=Router::new()
-        .route("/api/v1/marketplace/feed",get(||async {Json(json!({"shops":[{"id":SHOP,"slug":"test-shop","name":"Test shop"}],"products":[{"id":PRODUCT,"shop_id":SHOP,"name":"Owned product"}]}))}))
+        .route("/index.html",get(||async {axum::response::Html("<!doctype html><html><head><title>Arise Store</title></head><body><div id='root'></div><script src='/assets/app.js'></script></body></html>")}))
+        .route("/api/v1/marketplace/feed",get(||async {Json(json!({"shops":[{"id":SHOP,"slug":"test-shop","name":"Test shop"}],"products":[{"id":PRODUCT,"shop_id":SHOP,"name":"Owned product","url_slug":"owned-product","description":"Plain text <img src=x onerror=alert(1)>","currency":"BDT","variants":[{"price":"12.50","stock":2}]}]}))}))
+        .route("/api/v1/marketplace/checkout/{id}/scope",get(||async {Json(json!({"shop_id":SHOP,"product_id":PRODUCT,"items":[{"product_id":"99999999-9999-4999-8999-999999999999"}]}))}))
         .route("/api/v1/marketplace/me",get(|headers:axum::http::HeaderMap|async move {
             if headers.get("authorization").and_then(|v|v.to_str().ok())==Some("Bearer revoked") {return (StatusCode::UNAUTHORIZED,Json(json!({"detail":"Session revoked"}))).into_response();}
             Json(json!({"user":{"id":"user-1","admin":headers.get("authorization").and_then(|v|v.to_str().ok())==Some("Bearer admin")},"shops":[]})).into_response()
@@ -58,8 +60,9 @@ async fn setup_with_pool(pool: sqlx::AnyPool) -> (AppState, Requests, tokio::tas
                 "delivery_status":if id.starts_with('5') {"queued"} else {"delivered"},
                 "private_secret":"must not appear in public reviews"})).into_response()
         }))
-        .route("/api/v1/marketplace/stores/{id}/catalog", get(|axum::extract::Path(id): axum::extract::Path<String>| async move {
-            Json(json!({"shop":{"id":id,"name":"Test shop"},"products":[]}))
+        .route("/api/v1/marketplace/stores/{id}/catalog", get(|axum::extract::Path(id): axum::extract::Path<String>, headers: axum::http::HeaderMap| async move {
+            if id != SHOP || headers.get("authorization").and_then(|v|v.to_str().ok()) != Some("Bearer seller-source-access") {return (StatusCode::NOT_FOUND,Json(json!({"detail":"Shop not found"}))).into_response();}
+            Json(json!({"shop":{"id":id,"name":"Test shop"},"products":[]})).into_response()
         }))
         .route("/api/v1/marketplace/stores/{id}/listing", axum::routing::put(move |axum::extract::Path(id): axum::extract::Path<String>, headers: axum::http::HeaderMap, Json(body): Json<Value>| {
             let calls = listing_calls.clone();
@@ -1279,7 +1282,7 @@ async fn serverless_api_preserves_public_paths_and_never_serves_a_storefront_fal
         ("/health", StatusCode::OK),
         ("/api/catalog", StatusCode::OK),
         ("/api/unknown", StatusCode::NOT_FOUND),
-        ("/shops/test-shop", StatusCode::NOT_FOUND),
+        ("/shops/unknown-shop", StatusCode::NOT_FOUND),
     ] {
         let response = app
             .clone()
@@ -1522,6 +1525,307 @@ async fn postgres_state_survives_separate_function_instances_without_commerce_ta
             .fetch_all(&second.db)
             .await
             .is_err()
+    );
+    server.abort();
+}
+
+#[tokio::test]
+async fn questions_require_source_ownership_and_publish_only_answered_rows() {
+    let (state, _, server) = setup().await;
+    let app = router(state.clone());
+    let mut ask = write(
+        &format!("/api/products/{PRODUCT}/questions"),
+        json!({"display_name":"Buyer","question":"Is this option available in blue?"}),
+    );
+    *ask.method_mut() = axum::http::Method::POST;
+    assert_eq!(
+        app.clone().oneshot(ask).await.unwrap().status(),
+        StatusCode::OK
+    );
+    let public = body(
+        app.clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/api/products/{PRODUCT}/questions"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(public["questions"].as_array().unwrap().is_empty());
+    let seller = sign_in(&state, "seller-source-access").await;
+    let private = body(
+        app.clone()
+            .oneshot(admin_request(
+                "GET",
+                &format!("/api/seller/stores/{SHOP}/questions"),
+                &seller,
+                json!(null),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let id = private["questions"][0]["id"].as_str().unwrap();
+    assert!(!private.to_string().contains("visitor_hash"));
+    let foreign = "99999999-9999-4999-8999-999999999999";
+    let denied = app
+        .clone()
+        .oneshot(admin_request(
+            "PUT",
+            &format!("/api/seller/stores/{foreign}/questions/{id}"),
+            &seller,
+            json!({"answer":"Stolen reply"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(denied.status(), StatusCode::NOT_FOUND);
+    let answered = app
+        .clone()
+        .oneshot(admin_request(
+            "PUT",
+            &format!("/api/seller/stores/{SHOP}/questions/{id}"),
+            &seller,
+            json!({"answer":"Yes, the blue option is available."}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(answered.status(), StatusCode::OK);
+    let public = body(
+        app.clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/api/products/{PRODUCT}/questions"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(
+        public["questions"][0]["answer"],
+        "Yes, the blue option is available."
+    );
+    assert_eq!(
+        app.oneshot(admin_request(
+            "GET",
+            "/api/admin/questions",
+            &seller,
+            json!(null)
+        ))
+        .await
+        .unwrap()
+        .status(),
+        StatusCode::FORBIDDEN
+    );
+    sqlx::query("DELETE FROM sessions WHERE token_hash=$1")
+        .bind(digest(&seller))
+        .execute(&state.db)
+        .await
+        .unwrap();
+    let admin = sign_in(&state, "admin").await;
+    assert_eq!(
+        router(state.clone())
+            .oneshot(admin_request(
+                "PUT",
+                &format!("/api/admin/questions/{id}/visibility"),
+                &admin,
+                json!({"hidden":true,"reason":"Removed customer contact details."})
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    let public = body(
+        router(state)
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/api/products/{PRODUCT}/questions"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(public["questions"].as_array().unwrap().is_empty());
+    server.abort();
+}
+
+#[tokio::test]
+async fn badges_require_admin_review_and_expire_without_publishing_private_evidence() {
+    let (state, _, server) = setup().await;
+    let session = sign_in(&state, "admin").await;
+    let app = router(state.clone());
+    let payload = json!({"revision":0,"content":{SHOP:{"label":"Trusted Shop","expires_at":now()+86400,"reason":"Reviewed actual orders and resolved support cases."}}});
+    assert_eq!(
+        app.clone()
+            .oneshot(admin_request(
+                "PUT",
+                "/api/admin/documents/badges",
+                &session,
+                payload
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    let feed = body(
+        app.clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/catalog")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(feed["shops"][0]["merchant_badge"]["label"], "Trusted Shop");
+    assert!(!feed.to_string().contains("Reviewed actual orders"));
+    let bad = json!({"revision":1,"content":{SHOP:{"label":"Government verified","expires_at":now()+86400,"reason":"Unsupported verification claim"}}});
+    assert_eq!(
+        app.clone()
+            .oneshot(admin_request(
+                "PUT",
+                "/api/admin/documents/badges",
+                &session,
+                bad
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    sqlx::query("UPDATE admin_documents SET content=$1 WHERE key='badges'").bind(json!({SHOP:{"label":"Trusted Shop","expires_at":now()-1,"reason":"Previously reviewed shop"}}).to_string()).execute(&state.db).await.unwrap();
+    let feed = body(
+        app.oneshot(
+            Request::builder()
+                .uri("/api/catalog")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert!(feed["shops"][0]["merchant_badge"].is_null());
+    server.abort();
+}
+
+#[tokio::test]
+async fn anonymous_daily_visits_are_deduplicated_and_do_not_accept_arbitrary_targets() {
+    let (state, _, server) = setup().await;
+    let app = router(state.clone());
+    for _ in 0..2 {
+        let mut req = write(
+            "/api/traffic",
+            json!({"kind":"product","target_id":PRODUCT}),
+        );
+        *req.method_mut() = axum::http::Method::POST;
+        assert_eq!(
+            app.clone().oneshot(req).await.unwrap().status(),
+            StatusCode::OK
+        );
+    }
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM traffic_events")
+        .fetch_one(&state.db)
+        .await
+        .unwrap();
+    assert_eq!(count, 1);
+    let visitor: String = sqlx::query_scalar("SELECT visitor_hash FROM traffic_events")
+        .fetch_one(&state.db)
+        .await
+        .unwrap();
+    assert_ne!(visitor, BUYER);
+    assert_ne!(visitor, digest(BUYER));
+    let mut req = write(
+        "/api/traffic",
+        json!({"kind":"product","target_id":"99999999-9999-4999-8999-999999999999"}),
+    );
+    *req.method_mut() = axum::http::Method::POST;
+    assert_eq!(
+        app.oneshot(req).await.unwrap().status(),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let mut listing = write(
+        "/api/traffic",
+        json!({"kind":"listing","target_id":"products"}),
+    );
+    *listing.method_mut() = axum::http::Method::POST;
+    assert_eq!(
+        router(state).oneshot(listing).await.unwrap().status(),
+        StatusCode::OK
+    );
+    server.abort();
+}
+
+#[tokio::test]
+async fn product_share_response_has_server_rendered_metadata_and_keeps_the_app_shell() {
+    let (mut state, _, server) = setup().await;
+    let origin = state
+        .config
+        .source_api
+        .trim_end_matches("/api/v1")
+        .to_owned();
+    Arc::make_mut(&mut state.config).origin = origin;
+    let response = router(state)
+        .oneshot(
+            Request::builder()
+                .uri(format!("/products/{PRODUCT}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let text = String::from_utf8(
+        response
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+    )
+    .unwrap();
+    assert!(text.contains("property=\"og:title\" content=\"Owned product\""));
+    assert!(text.contains("&lt;img src=x onerror=alert(1)&gt;"));
+    assert!(!text.contains("<img src=x"));
+    assert!(text.contains("product:price:amount"));
+    assert!(text.contains("/shops/test-shop/products/owned-product"));
+    assert!(text.contains("summary_large_image"));
+    assert!(text.contains("<script"));
+    server.abort();
+}
+
+#[tokio::test]
+async fn cart_checkout_checks_every_line_and_accept_uses_source_scope_instead_of_client_claims() {
+    let (state, _, server) = setup().await;
+    let app = router(state);
+    let mut quote = write(
+        "/api/checkout/quote",
+        json!({"shop_id":SHOP,"product_id":PRODUCT,"items":[{"product_id":"99999999-9999-4999-8999-999999999999"}]}),
+    );
+    *quote.method_mut() = axum::http::Method::POST;
+    assert_eq!(
+        app.clone().oneshot(quote).await.unwrap().status(),
+        StatusCode::CONFLICT
+    );
+    let mut accept = write(
+        "/api/checkout/accept",
+        json!({"shop_id":SHOP,"product_id":PRODUCT,"draft_id":"88888888-8888-4888-8888-888888888888"}),
+    );
+    *accept.method_mut() = axum::http::Method::POST;
+    assert_eq!(
+        app.oneshot(accept).await.unwrap().status(),
+        StatusCode::CONFLICT
     );
     server.abort();
 }

@@ -7,6 +7,7 @@ import ArrowRightRaw from "lucide-react/dist/esm/icons/arrow-right.js";
 import ArrowLeftRaw from "lucide-react/dist/esm/icons/arrow-left.js";
 import SearchRaw from "lucide-react/dist/esm/icons/search.js";
 import ShoppingBagRaw from "lucide-react/dist/esm/icons/shopping-bag.js";
+import ShoppingCartRaw from "lucide-react/dist/esm/icons/shopping-cart.js";
 import StoreRaw from "lucide-react/dist/esm/icons/store.js";
 import MenuRaw from "lucide-react/dist/esm/icons/menu.js";
 import XRaw from "lucide-react/dist/esm/icons/x.js";
@@ -51,6 +52,7 @@ import EyeRaw from "lucide-react/dist/esm/icons/eye.js";
 import TrendingUpRaw from "lucide-react/dist/esm/icons/trending-up.js";
 
 export const ArrowUpRight = ArrowUpRightRaw as LucideIcon;
+export const ShoppingCart = ShoppingCartRaw as LucideIcon;
 export const ArrowRight = ArrowRightRaw as LucideIcon;
 export const ArrowLeft = ArrowLeftRaw as LucideIcon;
 export const Search = SearchRaw as LucideIcon;

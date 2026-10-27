@@ -153,6 +153,7 @@ fn capability(key: &str) -> Result<&'static str> {
     match key {
         "campaigns" => Ok("campaigns"),
         "settings" => Ok("content"),
+        "badges" => Ok("campaigns"),
         _ => Err(AppError::new(StatusCode::NOT_FOUND, "Document not found.")),
     }
 }
@@ -287,7 +288,25 @@ fn active(ad: &Value) -> bool {
         && date(ad["end_date"].as_str().unwrap_or("")).is_some_and(|d| now() < d + 86400)
 }
 fn validate_document(key: &str, value: &Value) -> Result<()> {
-    if key == "campaigns" {
+    if key == "badges" {
+        let badges = value
+            .as_object()
+            .filter(|v| v.len() <= 500)
+            .ok_or_else(|| invalid("Use at most 500 shop badges."))?;
+        for (id, badge) in badges {
+            crate::app::uuid(id)?;
+            if !["Top Seller", "Trusted Shop"].contains(&text(badge, "label", 1, 40)?)
+                || !badge["expires_at"]
+                    .as_i64()
+                    .is_some_and(|end| end > now() && end <= now() + 366 * 86400)
+            {
+                return Err(invalid(
+                    "Choose a supported badge and an expiry within one year.",
+                ));
+            }
+            text(badge, "reason", 10, 500)?;
+        }
+    } else if key == "campaigns" {
         let ads = value
             .as_array()
             .filter(|a| a.len() <= 100)

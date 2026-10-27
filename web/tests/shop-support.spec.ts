@@ -16,6 +16,8 @@ test("shop shows products and a fixed WhatsApp icon using the seller's configure
   await page.route("**/api/**", route => {
     if (new URL(route.request().url()).pathname === "/api/promotions") return route.fulfill({ json: { ads: [], settings: {} } });
     const path = new URL(route.request().url()).pathname;
+    if (path === "/api/traffic") return route.fulfill({json:{ok:true}});
+    if (path.endsWith("/questions")) return route.fulfill({json:{questions:[],has_more:false}});
     if (path === "/api/session") return route.fulfill({ json: { user: null, csrf: "csrf", demo: false, source_web: "" } });
     if (path === "/api/catalog") return route.fulfill({ json: { shops: [shop], products: [product], synced_at: new Date().toISOString() } });
     throw new Error(`Unexpected request: ${path}`);

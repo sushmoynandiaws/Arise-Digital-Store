@@ -18,6 +18,7 @@ function nameSlug(name: string) {
 }
 
 export function productSlug(product: Product, products: Product[]) {
+  if (product.url_slug) return product.url_slug;
   const slug = nameSlug(product.name);
   const duplicate = products.some((other) => other.id !== product.id &&
     other.shop_id === product.shop_id && nameSlug(other.name) === slug);

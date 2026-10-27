@@ -23,6 +23,7 @@ import {
   X,
 } from "./icons";
 import "./admin.css";
+import { StoreOffers, MerchantBadges, SalesInsights, QuestionsModeration } from "./GrowthAdmin";
 
 type Report = {
   id: string;
@@ -237,6 +238,10 @@ const sections = [
   ["support", "Support & reports", "reports", Flag, "Review customer reports and record the resolution."],
   ["reviews", "Reviews", "reviews", ShieldCheck, "Moderate customer reviews with a recorded reason."],
   ["campaigns", "Campaigns", "campaigns", Plus, "Schedule and manage sponsored placements across the marketplace."],
+  ["offers", "Coupons & flash deals", "campaigns", Plus, "Manage source-owned discounts and scheduled flash deals by shop."],
+  ["badges", "Merchant badges", "campaigns", ShieldCheck, "Review and grant time-limited merchant badges."],
+  ["analytics", "Sales & traffic", "activity", LayoutGrid, "View actual source sales, daily visitors and category interest."],
+  ["questions", "Product questions", "reviews", Store, "Moderate public product questions and seller replies."],
   ["content", "Website content", "content", LayoutGrid, "Edit announcements, homepage text and marketplace information pages."],
   ["activity", "Activity log", "activity", Clock, "Review the recorded history of administrator actions."],
   ["access", "Team access", "access", LockKeyhole, "Review marketplace roles for existing AriseSell administrators."],
@@ -406,6 +411,14 @@ export default function Admin({
           <Reviews data={data} onModerate={setTarget} />
         ) : path === "campaigns" ? (
           <Campaigns />
+        ) : path === "offers" ? (
+          <StoreOffers catalog={data.catalog} onSaved={refresh}/>
+        ) : path === "badges" ? (
+          <MerchantBadges catalog={data.catalog} onSaved={refresh}/>
+        ) : path === "analytics" ? (
+          <SalesInsights/>
+        ) : path === "questions" ? (
+          <QuestionsModeration/>
         ) : path === "content" ? (
           <Content />
         ) : path === "activity" ? (

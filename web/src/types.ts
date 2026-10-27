@@ -5,6 +5,7 @@ export type Variant = {
   stock: number;
 };
 export type Product = {
+  url_slug?: string;
   id: string;
   shop_id: string;
   name: string;
@@ -48,6 +49,7 @@ export type ShopContact = {
 };
 
 export type Shop = {
+  merchant_badge?: { label: "Top Seller" | "Trusted Shop"; expires_at: number; reviewed: boolean };
   id: string;
   slug: string;
   name: string;
@@ -67,7 +69,9 @@ export type Shop = {
   volume_discount_enabled?: boolean;
   payment_account_types?: Record<string, "merchant" | "personal">;
 };
-export type Catalog = { shops: Shop[]; products: Product[]; synced_at: string };
+export type Offer = {code: string; title: string; benefit: string; min_spend: string; starts_at: string; expires_at: string; active: boolean; flash: boolean; product_ids: string[]; shop_id?: string};
+export type CartLine = {product_id: string; variant_id: string; quantity: number};
+export type Catalog = { shops: Shop[]; products: Product[]; offers?: Offer[]; synced_at: string };
 export type User = { id: string; name: string; email: string; admin: boolean; admin_role?: string; admin_permissions?: string[] };
 export type Session = {
   user: User | null;
@@ -79,6 +83,7 @@ export type Quote = {
   draft_id: string;
   quote_hash: string;
   snapshot: {
+    items?: {product_id: string; variant_id: string; name: string; variant: string; quantity: number; unit_price: string; digital_config?: {purchase_terms: string; delivery_note: string}}[];
     unit_price?: string;
     subtotal?: string;
     discount?: string;
@@ -99,6 +104,7 @@ export type Quote = {
   };
 };
 export type Purchase = {
+  items?: Quote["snapshot"]["items"];
   fulfilment_kind?: "physical" | "digital";
   payment_method?: string;
   delivery_charge?: string;
@@ -106,7 +112,7 @@ export type Purchase = {
   district?: string;
   advance_amount?: string;
   seller_message?: string;
-  tracking?: {provider: string; status: string; tracking: string; tracking_url?: string | null} | null;
+  tracking?: {provider: string; status: string; tracking: string; tracking_url?: string | null; updated_at?: string; poll_delayed?: boolean} | null;
   id: string;
   ref: string;
   shop: Shop;
@@ -122,6 +128,7 @@ export type Purchase = {
   delivery_estimate: string;
   created_at: string;
   ready: boolean;
+  ready_quantity?: number;
   product_id?: string;
   buyer_name?: string | null;
   buyer_email?: string | null;
