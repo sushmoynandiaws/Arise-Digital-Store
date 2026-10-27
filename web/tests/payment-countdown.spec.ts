@@ -59,6 +59,16 @@ test("deadline immediately switches to expired state and removes payment control
   await expect(page.getByText("This payment request is no longer active. Do not send payment using these details.")).toBeVisible();
 });
 
+test("a physical advance cannot invent an account, payment request or expiry from contact details",async({page})=>{
+  await preview(page,()=>({...order,fulfilment_kind:"physical",delivery_mode:"shipping",delivery_status:"awaiting_advance",advance_amount:"70.00",payment:null,
+    shop:{...shop,contact:{phone:"01712345678"},payment_methods:["cod"],payment_account_types:{bkash:"personal"}}}));
+  await expect(page.getByRole("heading",{name:"Awaiting advance verification",exact:true})).toBeVisible();
+  await expect(page.locator(".payment-instruction-card")).toHaveCount(0);
+  await expect(page.getByRole("timer")).toHaveCount(0);
+  await expect(page.getByLabel("Transaction ID",{exact:true})).toHaveCount(0);
+  await expect(page.locator(".purchase-buyer-info")).toContainText("Contact the seller to verify the advance before dispatch");
+});
+
 test("countdown follows a source deadline update and stops after verified payment", async ({ page }) => {
   let current = order;
   await preview(page, () => current);

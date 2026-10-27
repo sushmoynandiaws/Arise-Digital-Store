@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { api, deliveryLabel, money, paymentLabel, stock, shopType, productFulfilment } from "./api";
-import { shopPageSections } from "./shopPages";
+import { shopPageSections, defaultPlatformPolicies } from "./shopPages";
 import type { Catalog, Shop, SponsoredAd, User } from "./types";
 import {
   ArrowLeft,
@@ -1709,20 +1709,57 @@ function ContentForm({
           information.
         </p>
         {shopPageSections.map((section) => (
-          <label className="field" key={section.key}>
-            {section.title}
-            <textarea
-              rows={5}
-              maxLength={3000}
-              value={settings.pages?.[section.key] || ""}
-              onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  pages: { ...settings.pages, [section.key]: e.target.value },
-                })
-              }
-            />
-          </label>
+          <div className="field-group" key={section.key} style={{ marginBottom: "20px" }}>
+            <label className="field">
+              {section.title}
+              <textarea
+                rows={8}
+                maxLength={10000}
+                placeholder={defaultPlatformPolicies[section.key]?.en || section.hint}
+                value={settings.pages?.[section.key] || ""}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    pages: { ...settings.pages, [section.key]: e.target.value },
+                  })
+                }
+              />
+            </label>
+            <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
+              <button
+                type="button"
+                className="button ghost small"
+                style={{ fontSize: "12px", padding: "4px 10px", minHeight: "28px" }}
+                onClick={() =>
+                  setSettings({
+                    ...settings,
+                    pages: {
+                      ...settings.pages,
+                      [section.key]: defaultPlatformPolicies[section.key]?.bn || "",
+                    },
+                  })
+                }
+              >
+                ডিফল্ট বাংলা টেমপ্লেট লোড করুন
+              </button>
+              <button
+                type="button"
+                className="button ghost small"
+                style={{ fontSize: "12px", padding: "4px 10px", minHeight: "28px" }}
+                onClick={() =>
+                  setSettings({
+                    ...settings,
+                    pages: {
+                      ...settings.pages,
+                      [section.key]: defaultPlatformPolicies[section.key]?.en || "",
+                    },
+                  })
+                }
+              >
+                Load default English template
+              </button>
+            </div>
+          </div>
         ))}
       </section>
       {error && (

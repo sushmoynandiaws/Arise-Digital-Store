@@ -87,7 +87,7 @@ import {
 import type { Catalog, Shop, Product, Session, Quote, Purchase } from "./types";
 import { productForRoute, productPath, productSection, type ProductSection } from "./product";
 import { ProductReviews, PurchaseReview, ShopReviews } from "./Reviews";
-import { shopPageSections } from "./shopPages";
+import { shopPageSections, defaultPlatformPolicies } from "./shopPages";
 import { LiveTracking, CourierStatus, CartProvider, CartButton, useCart, rememberProduct, RecentlyViewed, ShopBadge, FlashDeals, VisitTracker, ProductQuestions, SellerQuestions, OffersEditor } from "./Commerce";
 import {
   PromotionsProvider,
@@ -616,13 +616,18 @@ function SubNavBar() {
   const productsActive = shopBase
     ? pathname === shopBase || pathname.startsWith(`${shopBase}/products/`) || pathname.startsWith("/checkout/")
     : pathname.startsWith("/products");
-  const [menu, setMenu] = useState<"categories" | "help" | null>(null);
+  const shopsActive = !shopBase && (pathname === "/shops" || pathname.startsWith("/shops/"));
+  const [menu, setMenu] = useState<"categories" | "shop-types" | "help" | null>(null);
   const navigation = useRef<HTMLDivElement>(null);
   const categoriesButton = useRef<HTMLButtonElement>(null);
+  const shopTypesButton = useRef<HTMLButtonElement>(null);
   const helpButton = useRef<HTMLButtonElement>(null);
   const categories = [...new Set((catalog?.products || [])
     .filter(product => !shopBase || product.shop_id === shop?.id)
     .map(product => product.category))].filter(Boolean);
+  const shopKinds = [...new Set((catalog?.shops || [])
+    .map(s => s.kind || (s.commerce_mode === "digital" ? "Digital Products" : ""))
+    .filter((kind): kind is string => Boolean(kind)))].sort();
   useEffect(() => setMenu(null), [pathname, search]);
   useEffect(() => {
     if (!menu) return;
@@ -631,8 +636,11 @@ function SubNavBar() {
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      const prev = menu;
       setMenu(null);
-      (menu === "categories" ? categoriesButton : helpButton).current?.focus();
+      if (prev === "categories") categoriesButton.current?.focus();
+      else if (prev === "shop-types") shopTypesButton.current?.focus();
+      else helpButton.current?.focus();
     };
     document.addEventListener("mousedown", outside);
     document.addEventListener("keydown", escape);
@@ -665,7 +673,48 @@ function SubNavBar() {
             <NavLink to={`${shopBase}/reviews`} className="navigation-link">{lang === "bn" ? "রিভিউসমূহ" : "Reviews"}</NavLink>
             <NavLink to={`${shopBase}/info/about`} className="navigation-link">{lang === "bn" ? "শপ সম্পর্কে" : "About this shop"}</NavLink>
           </> : <>
-            <NavLink to="/shops" className="navigation-link"><Store size={16} />{lang === "bn" ? "শপসমূহ" : "Shops"}</NavLink>
+            <div className={`navigation-products navigation-shops${shopsActive ? " is-current" : ""}`}>
+              <Link to="/shops" aria-current={shopsActive ? "page" : undefined} className="navigation-link">
+                <Store size={16} />{lang === "bn" ? "শপসমূহ" : "Shops"}
+              </Link>
+              <button
+                ref={shopTypesButton}
+                type="button"
+                className="category-pill-btn nav-category-toggle"
+                aria-label={lang === "bn" ? "শপ ক্যাটাগরি ব্রাউজ" : "Browse shop categories"}
+                aria-expanded={menu === "shop-types"}
+                aria-controls="navigation-shop-types"
+                onClick={() => setMenu(menu === "shop-types" ? null : "shop-types")}
+              >
+                <ChevronDown size={15} className={menu === "shop-types" ? "chevron-rotated" : ""} />
+              </button>
+              {menu === "shop-types" && (
+                <div id="navigation-shop-types" className="category-dropdown-menu navigation-dropdown" aria-label={lang === "bn" ? "শপ ক্যাটাগরি ডিরেক্টরি" : "Shop categories"}>
+                  <div className="navigation-menu-scroll">
+                    <p className="navigation-menu-label">{lang === "bn" ? "শপ ক্যাটাগরি অনুযায়ী খুঁজুন" : "Browse by shop category"}</p>
+                    <Link to="/shops" className="category-dropdown-item" onClick={() => setMenu(null)}>
+                      {lang === "bn" ? "সকল শপ" : "All shops"}
+                      <ArrowRight size={14} />
+                    </Link>
+                    {shopKinds.map((kind) => (
+                      <Link
+                        key={kind}
+                        to={`/shops?type=${encodeURIComponent(kind)}`}
+                        className="category-dropdown-item"
+                        onClick={() => setMenu(null)}
+                      >
+                        {kind}
+                      </Link>
+                    ))}
+                    {!shopKinds.length && (
+                      <p className="navigation-menu-empty">
+                        {lang === "bn" ? "শপ যুক্ত হলে ক্যাটাগরি দেখা যাবে।" : "Categories appear as shops are registered."}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <NavLink to="/purchases" className="navigation-link"><ShoppingBag size={16} />{t("myPurchases")}</NavLink>
           </>}
         </div>
@@ -731,7 +780,7 @@ function Header() {
 
   const onSearchChange = (val: string) => {
     setHeaderSearch(val);
-    const isCatalogPage = location.pathname === "/products" || (shop && location.pathname === `/shops/${shop.slug}`);
+    const isCatalogPage = location.pathname === "/products" || (shop && location.pathname === `/shops/${shop.slug}`) || location.pathname === "/shops";
     if (isCatalogPage) {
       const next = new URLSearchParams(params);
       if (val.trim()) {
@@ -749,6 +798,8 @@ function Header() {
     const q = headerSearch.trim();
     if (shop) {
       navigate(`/shops/${shop.slug}${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+    } else if (location.pathname === "/shops") {
+      navigate(`/shops${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     } else {
       navigate(`/products${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     }
@@ -786,11 +837,13 @@ function Header() {
             placeholder={
               shop
                 ? (lang === "bn" ? `${shop.name}-এর প্রোডাক্ট খুঁজুন...` : `Search in ${shop.name}...`)
-                : (lang === "bn" ? "প্রোডাক্ট, শপ বা ক্যাটাগরি খুঁজুন..." : "Search Tools, Subscriptions, Shops...")
+                : location.pathname === "/shops"
+                  ? (lang === "bn" ? "শপের নাম বা বিবরণ দিয়ে খুঁজুন..." : "Search shop names or descriptions...")
+                  : (lang === "bn" ? "পণ্য, দোকান বা ক্যাটাগরি খুঁজুন..." : "Search products, shops, categories...")
             }
             value={headerSearch}
             onChange={(e) => onSearchChange(e.target.value)}
-            aria-label={shop ? `Search ${shop.name} products` : "Search tools"}
+            aria-label={shop ? `Search ${shop.name} products` : "Search products"}
           />
           {headerSearch && (
             <button
@@ -1104,42 +1157,6 @@ function ShopContactContent({ shop, lang, support }: { shop: Shop; lang: "bn" | 
         </div>
       )}
 
-      <div className="contact-guidelines-box">
-        <h3 className="guidelines-title">
-          {lang === "bn" ? "কীভাবে দ্রুততম সময়ে সহায়তা পাবেন?" : "How to get the fastest resolution?"}
-        </h3>
-        <div className="guidelines-grid">
-          <div className="guideline-item">
-            <span className="guideline-icon">🕒</span>
-            <div>
-              <strong>{lang === "bn" ? "সাপোর্ট কর্মঘণ্টা" : "Support Hours"}</strong>
-              <p>{lang === "bn" ? "প্রতিদিন সকাল ১০:০০ AM - রাত ১২:০০ AM (বাংলাদেশ সময়)" : "Daily 10:00 AM - 12:00 AM (BD Time)"}</p>
-            </div>
-          </div>
-          <div className="guideline-item">
-            <span className="guideline-icon">📌</span>
-            <div>
-              <strong>{lang === "bn" ? "অর্ডার আইডি সাথে রাখুন" : "Keep Order ID Ready"}</strong>
-              <p>{lang === "bn" ? "ইতিমধ্যে অর্ডার করা থাকলে মেসেজে আপনার Order Ref (যেমন ORD-XXXXX) বা পেমেন্ট ট্রানজেকশন আইডি দিন।" : "Include your Order Ref (e.g. ORD-XXXXX) or Transaction ID in your message for instant resolution."}</p>
-            </div>
-          </div>
-          <div className="guideline-item">
-            <span className="guideline-icon">⚡</span>
-            <div>
-              <strong>{lang === "bn" ? "ইনস্ট্যান্ট ডেলিভারি" : "Instant Delivery"}</strong>
-              <p>{lang === "bn" ? "পেমেন্ট সম্পন্ন হওয়ার ৪৫ সেকেন্ডের মধ্যেই My purchases পেজে আপনার পণ্য অ্যাক্টিভ হয়ে যায়।" : "Digital access is automatically delivered to My purchases within 45s of verified payment."}</p>
-            </div>
-          </div>
-          <div className="guideline-item">
-            <span className="guideline-icon">🛡️</span>
-            <div>
-              <strong>{lang === "bn" ? "পূর্ণ মেয়াদি রিপ্লেসমেন্ট ওয়ারেন্টি" : "Full Term Warranty"}</strong>
-              <p>{lang === "bn" ? "ক্রয়কৃত পণ্যের মেয়াদ থাকা পর্যন্ত যেকোনো সমস্যায় সেলার রিপ্লেসমেন্ট সাপোর্ট প্রদান করবে।" : "Sellers provide replacements or assistance throughout the product guarantee term."}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {shop.social_links && Object.values(shop.social_links).some(Boolean) && (
         <div className="contact-social-channels">
           <h4>{lang === "bn" ? "কমিউনিটি ও সোশ্যাল মিডিয়া চ্যানেল" : "Community & Social Channels"}</h4>
@@ -1180,8 +1197,9 @@ function ShopInformationPage() {
   if (slug && catalogError && !catalog) return <main id="main" className="container section"><ErrorBox message={catalogError} retry={() => void reloadCatalog()} /></main>;
   if (slug && !catalog) return <Loading />;
   if (!section || (slug && !shop)) return <NotFound />;
-  const text = (shop ? shop.pages?.[section.key]?.trim() || (section.key === "about" ? shop.description : "") : platform.pages?.[section.key]?.trim());
-  const support = shop?.support || (!shop ? platform.support_email || "" : "");
+  const defaultPolicy = !shop ? (defaultPlatformPolicies[section.key]?.[lang] || defaultPlatformPolicies[section.key]?.en) : undefined;
+  const text = (shop ? shop.pages?.[section.key]?.trim() || (section.key === "about" ? shop.description : "") : platform.pages?.[section.key]?.trim()) || defaultPolicy;
+  const support = shop?.support || (!shop ? platform.support_email || "support@arisesell.com" : "");
   return (
     <main id="main" className="container narrow-page shop-policy-page">
       <Link className="text-link" to={shop ? `/shops/${shop.slug}` : "/"}>
@@ -1712,7 +1730,6 @@ function ProductCard({ product }: { product: Product }) {
             {product.variants.length > 1 && <small>{lang === "bn" ? "শুরু " : "From "}</small>}
             {money(minimumPrice(product), product.currency)}
           </span>
-          <Link className="card-buy" to={productPath(product, catalog!)} aria-label={`View options for ${product.name}`}><ArrowUpRight size={19} /></Link>
         </div>
       </div>
     </article>
@@ -1952,7 +1969,7 @@ function Home() {
         <FlashDeals catalog={catalog}/>
         <section className="hero container">
           <div className="hero-copy">
-            <p className="eyebrow">{lang === "bn" ? "স্বাধীন শপের মার্কেটপ্লেস" : "INDEPENDENT SHOP MARKETPLACE"}</p>
+            <p className="eyebrow">{lang === "bn" ? "মাল্টি-ভেন্ডর মার্কেটপ্লেস" : "MULTI-CATEGORY MARKETPLACE"}</p>
             <h1>
               {platform.hero_title || (lang === "bn" ? (
                 <>স্বাধীন শপ থেকে<br />আপনার পছন্দের পণ্য</>
@@ -2026,7 +2043,6 @@ function Home() {
                 >
                   <Art key={cover.id} product={cover} />
                   <span><strong>{category}</strong><small>{items.length} {lang === "bn" ? "টি প্রোডাক্ট" : items.length === 1 ? "product" : "products"}</small></span>
-                  <ArrowUpRight size={18} />
                 </Link>
               );})}
             </div>
@@ -2038,7 +2054,7 @@ function Home() {
         </section>
         <section className="container section products-section">
           <SectionTitle
-            title={lang === "bn" ? "আপনার পরের ডিজিটাল প্রোডাক্ট" : "Find your next digital essential"}
+            title={lang === "bn" ? "সকল ক্যাটাগরির বিশ্বস্ত প্রোডাক্ট" : "Explore products across all categories"}
             link={lang === "bn" ? "সব প্রোডাক্ট দেখুন" : "View all products"}
             to="/products"
           />
@@ -2169,15 +2185,7 @@ function Products({ shop }: { shop?: Shop }) {
           </p>
         </div>
       )}
-      <div className="catalog-search-row">
-        <label className="catalog-search"><Search size={18} /><span className="sr-only">{shop ? `Search ${shop.name} catalog` : "Search the catalog"}</span><input type="search" value={query} placeholder={lang === "bn" ? "প্রোডাক্ট বা ক্যাটাগরি খুঁজুন" : "Search products or categories"} onChange={event => update("q", event.target.value)} /></label>
-        <p className="catalog-context">{shop ? shop.name : (lang === "bn" ? "স্বাধীন বিক্রেতাদের ডিজিটাল প্রোডাক্ট" : "Digital products from independent sellers")}</p>
-      </div>
       <div className="catalog-toolbar-row">
-        {!shop && <label className="field">Shop type<select value={storeType} onChange={e => update("store_type", e.target.value)}>
-          <option value="">All shop types</option>
-          {[...new Set((catalog?.shops || []).map(s => s.kind).filter((kind): kind is string => Boolean(kind)))].sort().map(kind => <option key={kind} value={kind}>{kind}</option>)}
-        </select></label>}
         <div className="filter-chips">
           <button
             className={!category ? "chip selected" : "chip"}
@@ -2269,19 +2277,32 @@ function Products({ shop }: { shop?: Shop }) {
 function Shops() {
   const { catalog, catalogError, reloadCatalog } = useMarket();
   const { lang } = useLang();
-  const [query, setQuery] = useState("");
-  const [storeType, setStoreType] = useState("");
-  const shops = catalog?.shops.filter((s) =>
-    (!storeType || s.kind === storeType) && `${s.name} ${s.description} ${s.kind || ""}`.toLowerCase().includes(query.toLowerCase()),
-  );
+  const [params, setParams] = useSearchParams();
+  const query = (params.get("q") || params.get("search") || "").trim().toLowerCase();
+  const storeType = params.get("type") || params.get("store_type") || "";
+  const setStoreType = (val: string) => {
+    const next = new URLSearchParams(params);
+    if (val) {
+      next.set("type", val);
+    } else {
+      next.delete("type");
+      next.delete("store_type");
+    }
+    setParams(next);
+  };
+  const shopKinds = [...new Set((catalog?.shops || [])
+    .map(s => s.kind || (s.commerce_mode === "digital" ? "Digital Products" : ""))
+    .filter((kind): kind is string => Boolean(kind)))].sort();
+  const shops = catalog?.shops.filter((s) => {
+    const kind = s.kind || (s.commerce_mode === "digital" ? "Digital Products" : "");
+    const matchesType = !storeType || kind.toLowerCase() === storeType.toLowerCase() || s.kind?.toLowerCase() === storeType.toLowerCase();
+    const matchesQuery = !query || `${s.name} ${s.description} ${s.kind || ""}`.toLowerCase().includes(query);
+    return matchesType && matchesQuery;
+  });
   return (
     <main id="main" className="container listing-page">
       <div className="page-intro">
         <p className="eyebrow">{lang === "bn" ? "শপ ডিরেক্টরি" : "Shop directory"}</p>
-        <label className="field">Shop type<select value={storeType} onChange={e => setStoreType(e.target.value)}>
-          <option value="">All shop types</option>
-          {[...new Set((catalog?.shops || []).map(s => s.kind).filter((kind): kind is string => Boolean(kind)))].sort().map(kind => <option key={kind} value={kind}>{kind}</option>)}
-        </select></label>
         <h1>
           {lang === "bn" ? "স্বাধীন শপসমূহ" : "Independent shops"}
         </h1>
@@ -2289,18 +2310,52 @@ function Shops() {
           {lang === "bn" ? "স্বাধীন শপ এবং তাদের পণ্যগুলো ব্রাউজ করুন।" : "Browse independent shops and their products."}
         </p>
       </div>
-      <div className="catalog-search standalone-search">
-        <Search size={20} />
-        <label className="sr-only" htmlFor="shop-search">
-          {lang === "bn" ? "শপ খুঁজুন" : "Search shops"}
-        </label>
-        <input
-          id="shop-search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={lang === "bn" ? "শপের নাম বা বিবরণ দিয়ে খুঁজুন..." : "Search shop names or descriptions"}
-        />
-      </div>
+      {query && (
+        <div className="active-filter-banner" style={{ marginBottom: "20px" }}>
+          <span>
+            {lang === "bn" ? `খোঁজা হচ্ছে: "${query}"` : `Showing results for: "${query}"`}
+            <span className="active-count"> ({shops?.length || 0} {shops?.length === 1 ? (lang === "bn" ? "টি শপ পাওয়া গেছে" : "shop found") : (lang === "bn" ? "টি শপ পাওয়া গেছে" : "shops found")})</span>
+          </span>
+          <button
+            type="button"
+            className="clear-search-pill"
+            onClick={() => {
+              const next = new URLSearchParams(params);
+              next.delete("q");
+              next.delete("search");
+              setParams(next);
+            }}
+          >
+            <X size={14} />
+            <span>{lang === "bn" ? "মুছুন" : "Clear"}</span>
+          </button>
+        </div>
+      )}
+      {shopKinds.length > 0 && (
+        <div className="catalog-toolbar-row">
+          <div className="filter-chips" role="group" aria-label={lang === "bn" ? "শপ ক্যাটাগরি ফিল্টার" : "Shop category filter"}>
+            <button
+              type="button"
+              className={!storeType ? "chip selected" : "chip"}
+              aria-pressed={!storeType}
+              onClick={() => setStoreType("")}
+            >
+              {lang === "bn" ? "সকল শপ" : "All shops"}
+            </button>
+            {shopKinds.map((kind) => (
+              <button
+                type="button"
+                key={kind}
+                className={storeType.toLowerCase() === kind.toLowerCase() ? "chip selected" : "chip"}
+                aria-pressed={storeType.toLowerCase() === kind.toLowerCase()}
+                onClick={() => setStoreType(storeType.toLowerCase() === kind.toLowerCase() ? "" : kind)}
+              >
+                {kind}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <FeaturedShopSponsoredAd />
       {catalogError ? (
         <ErrorBox message={catalogError} retry={() => void reloadCatalog()} />
@@ -3075,9 +3130,22 @@ function Checkout() {
                   </label>
                 ))}
               </div>
-              {!paymentMethods.length && <ErrorBox message="This seller has no payment method available. Please contact the seller." />}
+              {provider === "cod" ? (
+                <p className="payment-method-desc">
+                  {lang === "bn"
+                    ? "ক্যাশ অন ডেলিভারি — পণ্য হাতে পেয়ে মূল্য পরিশোধ করবেন (প্রযোজ্য ক্ষেত্রে অগ্রিম ডেলিভারি চার্জ প্রযোজ্য হতে পারে)।"
+                    : "Cash on delivery — pay the remaining amount when you receive the product (advance delivery charge may apply)."}
+                </p>
+              ) : provider ? (
+                <p className="payment-method-desc">
+                  {lang === "bn"
+                    ? `${paymentMethodLabel(provider)}-এর মাধ্যমে পেমেন্ট করতে পারবেন। অর্ডার নিশ্চিত করার পর অ্যাকাউন্ট নম্বর ও সরাসরি স্ক্যান করে পেমেন্ট করার কিউআর কোড পেয়ে যাবেন।`
+                    : `Pay via ${paymentMethodLabel(provider)}. Account details and payment QR code will be shown after confirming your order.`}
+                </p>
+              ) : null}
+              {!paymentMethods.length && <ErrorBox message={lang === "bn" ? "এই বিক্রেতার কোনো পেমেন্ট মাধ্যম উপলব্ধ নেই। অনুগ্রহ করে বিক্রেতার সাথে যোগাযোগ করুন।" : "This seller has no payment method available. Please contact the seller."} />}
               <p className="form-hint muted">
-                You’ll get payment instructions after reviewing and confirming your order.
+                {lang === "bn" ? "অর্ডারটি রিভিউ এবং নিশ্চিত করার পর পেমেন্ট নির্দেশিকা পাবেন।" : "You’ll get payment instructions after reviewing and confirming your order."}
               </p>
               </fieldset>
             </>
@@ -3118,7 +3186,19 @@ function Checkout() {
                 </div>
               )}
               <div className="terms-box">
-                {!digital && Number(quote.snapshot.advance_amount || 0) > 0 && <p>Required advance: {money(quote.snapshot.advance_amount!, product.currency)}. The seller verifies payment before dispatch. Further verification may be required after the source checks the order.</p>}
+                {!digital && Number(quote.snapshot.advance_amount || 0) > 0 && (
+                  <div className="advance-notice-box">
+                    <div className="advance-notice-header">
+                      <ShieldCheck size={18} />
+                      <strong>{lang === "bn" ? "প্রয়োজনীয় অগ্রিম পেমেন্ট:" : "Required advance payment:"}</strong> {money(quote.snapshot.advance_amount!, product.currency)}
+                    </div>
+                    <p className="advance-notice-desc">
+                      {lang === "bn"
+                        ? `ডেলিভারির আগে ${money(quote.snapshot.advance_amount!, product.currency)} অগ্রিম যাচাই করতে বিক্রেতার সাথে যোগাযোগ করুন।`
+                        : `Contact the seller to verify the required advance of ${money(quote.snapshot.advance_amount!, product.currency)} before dispatch.`}
+                    </p>
+                  </div>
+                )}
                 <h3>Seller’s purchase terms</h3>
                 <p className="preserve-lines">
                   {quote.snapshot.digital_config?.purchase_terms || product.purchase_terms || "Contact the seller for purchase terms."}
@@ -3385,6 +3465,17 @@ export function detectPaymentAccountType(payment: any, shop?: Shop | null): "mer
   return "personal";
 }
 
+function formatCountdown(totalSecs: number): string {
+  const secs = Math.max(0, Math.floor(totalSecs));
+  const hours = Math.floor(secs / 3600);
+  const minutes = Math.floor((secs % 3600) / 60);
+  const seconds = secs % 60;
+  if (hours > 0) {
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 export function PaymentInstructionCard({
   order,
   session,
@@ -3395,9 +3486,8 @@ export function PaymentInstructionCard({
   remainingSeconds: number | null;
 }) {
   const { t, lang } = useLang();
-  if (!order.payment) return null;
-
   const payment = order.payment;
+  if (!payment) return null;
   const provider = paymentMethodLabel(payment.provider);
   const accountType = detectPaymentAccountType(payment, order.shop);
   const isMerchant = accountType === "merchant";
@@ -3435,6 +3525,15 @@ export function PaymentInstructionCard({
           </div>
         </div>
       </div>
+
+      {payment.account && (payment.provider.toLowerCase().includes("bkash") || payment.provider.toLowerCase().includes("nagad")) && (
+        <DynamicPaymentQR
+          provider={payment.provider}
+          account={payment.account}
+          amount={payment.amount}
+          orderRef={order.ref}
+        />
+      )}
 
       <div className="payment-steps-container">
         <h4 className="payment-steps-heading">
@@ -3540,7 +3639,7 @@ export function PaymentInstructionCard({
           <Clock size={18} aria-hidden="true" />
           <span>{lang === "bn" ? "পেমেন্টের বাকি সময়:" : "Time left to pay:"}</span>
           <strong role="timer" aria-live="off">
-            {String(Math.floor(remainingSeconds / 60)).padStart(2, "0")}:{String(remainingSeconds % 60).padStart(2, "0")}
+            {formatCountdown(remainingSeconds)}
           </strong>
         </p>
       )}
@@ -3747,8 +3846,9 @@ function PurchasePage() {
             </form>
             {order.payment.trx_id && (
               <p className="notice">
-                Submitted: {order.payment.trx_id}. We’re matching it with the
-                seller’s payment receipt.
+                {lang === "bn"
+                  ? `সাবমিট করা হয়েছে: ${order.payment.trx_id}। বিক্রেতার পেমেন্ট রিসিটের সাথে এটি মেলানো হচ্ছে।`
+                  : `Submitted: ${order.payment.trx_id}. We're matching it with the seller's payment receipt.`}
               </p>
             )}
           </>
@@ -3769,7 +3869,16 @@ function PurchasePage() {
           <h3>Delivery details</h3><p className="preserve-lines">{order.address}, {order.district}</p>
           <p>Payment method: {paymentMethodLabel(order.payment_method || "cod")}</p>
           {order.delivery_charge !== undefined && <p>Delivery charge: {money(order.delivery_charge, order.currency)}</p>}
-          {Number(order.advance_amount || 0) > 0 && <p>Required advance: {money(order.advance_amount!, order.currency)}. Contact the seller for verification.</p>}
+          {Number(order.advance_amount || 0) > 0 && (
+            <p className="advance-order-info">
+              <strong>{lang === "bn" ? "প্রয়োজনীয় অগ্রিম:" : "Required advance:"}</strong> {money(order.advance_amount!, order.currency)}
+              {order.payment_status === "paid" ? (
+                <span className="badge-paid"> {lang === "bn" ? "(পরিশোধিত)" : "(Paid)"}</span>
+              ) : (
+                <span> {lang === "bn" ? "— অগ্রিম যাচাই করতে বিক্রেতার সাথে যোগাযোগ করুন।" : "— Contact the seller to verify the advance before dispatch."}</span>
+              )}
+            </p>
+          )}
           <CourierStatus order={order}/>
           {order.tracking?.tracking_url?.startsWith("https://") && <a className="button secondary" href={order.tracking.tracking_url} target="_blank" rel="noopener noreferrer">Track with courier<ExternalLink size={16} /></a>}
         </section>}
@@ -3982,11 +4091,16 @@ function Seller() {
     setError("");
     setMessage("");
     try {
+      let supportPayload = form.support.trim();
+      const bdPhone = supportPayload.replace(/\D/g, "").match(/^(?:88)?(01[3-9]\d{8})$/);
+      if (bdPhone) {
+        supportPayload = `https://wa.me/88${bdPhone[1]}`;
+      }
       const result = await api<{ shop: Shop }>(
         `/seller/stores/${selected}/listing`,
         {
           method: "PUT",
-          body: JSON.stringify({ ...form, published, product_ids: ids }),
+          body: JSON.stringify({ ...form, support: supportPayload, published, product_ids: ids }),
         },
       );
       setData((previous) =>
@@ -4236,7 +4350,7 @@ function Seller() {
                         <small>{form.description.length}/1,500</small>
                       </label>
                       <label className="field">
-                        Support email or website
+                        Support email, WhatsApp or website
                         <input
                           required
                           maxLength={255}
@@ -4244,8 +4358,13 @@ function Seller() {
                           onChange={(e) =>
                             setForm({ ...form, support: e.target.value })
                           }
-                          placeholder="hello@yourshop.com or https://…"
+                          placeholder="hello@yourshop.com, 01XXXXXXXXX or https://wa.me/…"
                         />
+                        <span className="form-hint">
+                          {lang === "bn"
+                            ? "কাস্টমার সাপোর্টের জন্য আপনার ইমেইল, হোয়াটসঅ্যাপ নম্বর বা লিঙ্ক দিন।"
+                            : "Enter your support email, WhatsApp number, or support link."}
+                        </span>
                       </label>
                       <details className="branding-details">
                         <summary>

@@ -71,8 +71,7 @@ test("source category filters include physical shops and unavailable checkout ca
     if(path==="/api/catalog") return route.fulfill({json:{shops:[shop],products:[{...physical,checkout_available:false,checkout_unavailable_reason:"Contact the seller to complete custom requirements."}],synced_at:new Date().toISOString()}});
     throw new Error(`Unexpected request: ${path}`);
   });
-  await page.goto("/products");
-  await page.getByRole("combobox",{name:"Shop type",exact:true}).selectOption("Fashion & Clothing");
+  await page.goto("/products?type=Fashion+%26+Clothing");
   await expect(page.getByRole("link",{name:"Cotton shirt",exact:true})).toBeVisible();
   for (const width of [320, 1440]) {
     await page.setViewportSize({width,height:900});

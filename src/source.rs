@@ -41,9 +41,41 @@ impl AppState {
             )
         })?;
         if !status.is_success() {
-            let message = value.get("detail").and_then(Value::as_str).unwrap_or(
-                "AriseSell could not complete this action. Please check the details and retry.",
-            );
+            let extracted: Option<String> =
+                if let Some(s) = value.get("detail").and_then(Value::as_str) {
+                    Some(s.to_string())
+                } else if let Some(arr) = value.get("detail").and_then(Value::as_array) {
+                    let parts: Vec<String> = arr
+                        .iter()
+                        .filter_map(|item| {
+                            let msg = item.get("msg").and_then(Value::as_str)?;
+                            let field = item
+                                .get("loc")
+                                .and_then(Value::as_array)
+                                .and_then(|l| l.last())
+                                .and_then(Value::as_str);
+                            if let Some(f) = field {
+                                Some(format!("{f}: {msg}"))
+                            } else {
+                                Some(msg.to_string())
+                            }
+                        })
+                        .collect();
+                    if parts.is_empty() {
+                        None
+                    } else {
+                        Some(parts.join(", "))
+                    }
+                } else if let Some(msg) = value.get("message").and_then(Value::as_str) {
+                    Some(msg.to_string())
+                } else if let Some(err) = value.get("error").and_then(Value::as_str) {
+                    Some(err.to_string())
+                } else {
+                    None
+                };
+            let fallback =
+                "AriseSell could not complete this action. Please check the details and retry.";
+            let message = extracted.unwrap_or_else(|| fallback.to_string());
             return Err(AppError::new(
                 StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::BAD_GATEWAY),
                 message,
