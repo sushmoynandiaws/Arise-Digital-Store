@@ -1723,7 +1723,6 @@ function ProductCard({ product }: { product: Product }) {
             {product.variants.length > 1 && <small>{lang === "bn" ? "শুরু " : "From "}</small>}
             {money(minimumPrice(product), product.currency)}
           </span>
-          <Link className="card-buy" to={productPath(product, catalog!)} aria-label={`View options for ${product.name}`}><ArrowUpRight size={19} /></Link>
         </div>
       </div>
     </article>
