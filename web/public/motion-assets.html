@@ -471,7 +471,7 @@
       font-weight: 600;
     }
 
-    /* Real Product Grid on Homepage */
+    /* Product Grid Shared */
     .s1-catalog-container {
       padding: 16px 28px;
     }
@@ -672,12 +672,26 @@
       display: block;
     }
 
-    /* SCENE 2: REAL SHOP PAGE & FREE SHOP LINK */
+    /* SCENE 2: 100% REAL ARISE FASHION SHOP PAGE */
     .s2-shop-container {
-      padding: 20px 24px;
+      padding: 16px 24px 32px;
       display: flex;
       flex-direction: column;
       gap: 16px;
+    }
+
+    .shop-breadcrumbs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .shop-breadcrumbs a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
     }
 
     .arisesell-banner-alert {
@@ -696,7 +710,7 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      font-size: 14px;
+      font-size: 13.5px;
       font-weight: 600;
     }
 
@@ -731,7 +745,7 @@
       box-shadow: var(--shadow-sm);
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 12px;
     }
 
     .shop-hero-top {
@@ -797,6 +811,12 @@
       font-weight: 700;
     }
 
+    .shop-desc-text {
+      font-size: 13px;
+      color: #475569;
+      line-height: 1.45;
+    }
+
     .shop-contact-chips {
       display: flex;
       gap: 8px;
@@ -814,6 +834,52 @@
       display: flex;
       align-items: center;
       gap: 6px;
+    }
+
+    /* Shop Products Section in Scene 2 */
+    .shop-catalog-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .shop-nav-tab {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+    }
+
+    .shop-nav-tab.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #ffffff;
+    }
+
+    /* Floating WhatsApp Support in Shop */
+    .floating-whatsapp-btn {
+      position: absolute;
+      bottom: 20px;
+      right: 24px;
+      background: #25d366;
+      color: #ffffff;
+      border: none;
+      border-radius: 9999px;
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 750;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 6px 20px rgba(37, 211, 102, 0.4);
+      cursor: pointer;
+      z-index: 50;
     }
 
     /* SCENE 3: REAL PRODUCT DETAIL VIEW */
@@ -1482,8 +1548,8 @@
     </div>
 
     <nav class="scene-tabs">
-      <button class="btn-tab active" onclick="goToScene(1)">১. Arise Store হোমপেজ & হুক</button>
-      <button class="btn-tab" onclick="goToScene(2)">২. ফ্রি শপ লিঙ্ক</button>
+      <button class="btn-tab active" onclick="goToScene(1)">১. Arise Store হোমপেজ</button>
+      <button class="btn-tab" onclick="goToScene(2)">২. Arise Fashion শপ পেজ</button>
       <button class="btn-tab" onclick="goToScene(3)">৩. রিয়েল প্রডাক্ট পেজ</button>
       <button class="btn-tab" onclick="goToScene(4)">৪. বিকাশ পেমেন্ট & QR</button>
       <button class="btn-tab" onclick="goToScene(5)">৫. স্টেডফাস্ট ট্র্যাকিং</button>
@@ -1681,7 +1747,7 @@
           </div>
         </section>
 
-        <!-- SCENE 2: AriseSell -> Free Lifetime Storefront -->
+        <!-- SCENE 2: 100% REAL ARISE FASHION SHOP STOREFRONT -->
         <section class="scene-view" id="scene-2">
           <!-- Real Site Header -->
           <header class="real-header">
@@ -1695,7 +1761,7 @@
             </a>
             <div class="real-search-bar">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <span>Search products, sneakers and shops...</span>
+              <span>Search in Arise Fashion...</span>
             </div>
             <div class="real-header-actions">
               <span class="lang-pill">বাং / EN</span>
@@ -1706,6 +1772,15 @@
           </header>
 
           <div class="s2-shop-container">
+            <!-- Breadcrumbs -->
+            <nav class="shop-breadcrumbs">
+              <a href="javascript:void(0)" onclick="goToScene(1)">হোম</a>
+              <span>/</span>
+              <a href="javascript:void(0)">সকল শপ</a>
+              <span>/</span>
+              <strong style="color: var(--ink);">Arise Fashion</strong>
+            </nav>
+
             <!-- AriseSell Merchant Alert Banner -->
             <div class="arisesell-banner-alert">
               <div class="left">
@@ -1736,13 +1811,115 @@
                 </div>
               </div>
 
+              <p class="shop-desc-text">
+                প্রিমিয়াম কোয়ালিটির স্নিকার্স ও ক্যাজুয়াল ফুটওয়্যার কালেকশন। সারা বাংলাদেশে দ্রুত হোম ডেলিভারি ও সহজ রিটার্ন সুবিধা।
+              </p>
+
+              <!-- Demo Masked Contact Chips: 01400000XXX -->
               <div class="shop-contact-chips">
-                <span class="contact-chip">💬 WhatsApp: 01712-345678</span>
-                <span class="contact-chip">📞 01987-654321</span>
+                <span class="contact-chip">💬 WhatsApp: 01400000XXX</span>
+                <span class="contact-chip">📞 01400000XXX</span>
                 <span class="contact-chip">🚚 ২ দিনে স্টেডফাস্ট ডেলিভারি</span>
                 <span class="contact-chip">🔄 ৭ দিনের ইজি রিটার্ন</span>
               </div>
             </div>
+
+            <!-- Shop Catalog Category Navigation Filter -->
+            <div class="shop-catalog-nav">
+              <button class="shop-nav-tab active">সব প্রোডাক্ট (১২)</button>
+              <button class="shop-nav-tab">স্নিকার্স (৮)</button>
+              <button class="shop-nav-tab">ক্যাজুয়াল সু (৪)</button>
+              <button class="shop-nav-tab">স্পেশাল অফার</button>
+            </div>
+
+            <!-- Real Shop Footwear Catalog Grid -->
+            <div class="real-product-grid">
+              <!-- Item 1: Chunky Sneakers White (Main Video Product) -->
+              <article class="real-product-card" style="cursor: pointer; border: 1.5px solid var(--primary);" onclick="goToScene(3)">
+                <div class="card-art-box">
+                  <img src="/products/chunky-sneakers-white.jpg" alt="Chunky Sneakers White">
+                  <button class="card-art-wishlist active">♥</button>
+                </div>
+                <div class="card-content">
+                  <span class="card-cat-label">Sneakers</span>
+                  <h3 class="card-prod-title">Chunky Sneakers White — Air Edition</h3>
+                  <div class="card-shop-by">
+                    <span class="tiny-shop-avatar">A</span>
+                    <span>Arise Fashion</span>
+                  </div>
+                  <div class="card-bottom-row">
+                    <span class="card-price">৳ ১,৪৫০</span>
+                    <span class="card-stock-status">● ইন স্টক</span>
+                  </div>
+                </div>
+              </article>
+
+              <!-- Item 2: Casual Oxford Sneakers Black -->
+              <article class="real-product-card">
+                <div class="card-art-box">
+                  <img src="/products/casual-sneakers.jpg" alt="Casual Oxford Sneakers">
+                  <button class="card-art-wishlist">♥</button>
+                </div>
+                <div class="card-content">
+                  <span class="card-cat-label">Casual Shoes</span>
+                  <h3 class="card-prod-title">Casual Oxford Sneakers Black</h3>
+                  <div class="card-shop-by">
+                    <span class="tiny-shop-avatar">A</span>
+                    <span>Arise Fashion</span>
+                  </div>
+                  <div class="card-bottom-row">
+                    <span class="card-price">৳ ১,৮৫০</span>
+                    <span class="card-stock-status">● ইন স্টক</span>
+                  </div>
+                </div>
+              </article>
+
+              <!-- Item 3: Classic High-Top Trainers -->
+              <article class="real-product-card">
+                <div class="card-art-box">
+                  <img src="/products/high-top-sneakers.jpg" alt="Classic High-Top Trainers">
+                  <button class="card-art-wishlist">♥</button>
+                </div>
+                <div class="card-content">
+                  <span class="card-cat-label">High-Top</span>
+                  <h3 class="card-prod-title">Classic High-Top Street Trainers</h3>
+                  <div class="card-shop-by">
+                    <span class="tiny-shop-avatar">A</span>
+                    <span>Arise Fashion</span>
+                  </div>
+                  <div class="card-bottom-row">
+                    <span class="card-price">৳ ২,১০০</span>
+                    <span class="card-stock-status">● ইন স্টক</span>
+                  </div>
+                </div>
+              </article>
+
+              <!-- Item 4: Minimalist Suede Loafers -->
+              <article class="real-product-card">
+                <div class="card-art-box">
+                  <img src="/products/suede-loafers.jpg" alt="Minimalist Suede Loafers">
+                  <button class="card-art-wishlist">♥</button>
+                </div>
+                <div class="card-content">
+                  <span class="card-cat-label">Loafers</span>
+                  <h3 class="card-prod-title">Minimalist Suede Loafers Tan</h3>
+                  <div class="card-shop-by">
+                    <span class="tiny-shop-avatar">A</span>
+                    <span>Arise Fashion</span>
+                  </div>
+                  <div class="card-bottom-row">
+                    <span class="card-price">৳ ১,৬৫০</span>
+                    <span class="card-stock-status">● ইন স্টক</span>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <!-- Floating WhatsApp Support Button -->
+            <button class="floating-whatsapp-btn" onclick="alert('WhatsApp Chat: 01400000XXX')">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2z"/></svg>
+              <span>চ্যাট করুন (01400000XXX)</span>
+            </button>
           </div>
         </section>
 
@@ -1765,9 +1942,9 @@
 
           <div class="s3-product-detail-view">
             <nav class="product-breadcrumbs">
-              <a href="#">Arise Fashion</a>
+              <a href="javascript:void(0)" onclick="goToScene(2)">Arise Fashion</a>
               <span>/</span>
-              <a href="#">Footwear</a>
+              <a href="javascript:void(0)">Footwear</a>
               <span>/</span>
               <span>Chunky Sneakers White</span>
             </nav>
@@ -1894,9 +2071,9 @@
                 <div class="advance-amount">৳ ১৩০.০০</div>
               </div>
 
-              <!-- Step Details & Copy Buttons -->
+              <!-- Demo Masked Account: 01400000XXX -->
               <div class="payment-step-row">
-                <span>মার্চেন্ট অ্যাকাউন্ট: <strong>01712-345678</strong></span>
+                <span>মার্চেন্ট অ্যাকাউন্ট: <strong>01400000XXX</strong></span>
                 <button class="btn-copy-code" onclick="this.innerHTML='Copied!'">Copy</button>
               </div>
 
