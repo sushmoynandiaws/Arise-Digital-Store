@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arise Store × AriseSell — Motion Graphic Video Assets</title>
+  <link rel="stylesheet" href="/fonts/fonts.css">
+  <style>
+    :root {
+      --primary: #6336d6;
+      --primary-hover: #5025c4;
+      --primary-light: #f3f0ff;
+      --accent: #ff6b00;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --surface: #ffffff;
+      --success: #10b981;
+      --font-heading: 'Urbanist', system-ui, sans-serif;
+      --font-body: 'Hind Siliguri', system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #090d16;
+      color: #f8fafc;
+      font-family: var(--font-body);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 24px;
+      overflow-x: hidden;
+    }
+
+    /* Studio Controller Bar */
+    .studio-bar {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 20px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      backdrop-filter: blur(16px);
+      margin-bottom: 24px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+      z-index: 100;
+    }
+
+    .studio-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-heading);
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .scene-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn-tab {
+      background: rgba(255, 255, 255, 0.06);
+      color: #94a3b8;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 180ms ease;
+    }
+
+    .btn-tab:hover, .btn-tab.active {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+      box-shadow: 0 4px 16px rgba(99, 54, 214, 0.4);
+    }
+
+    .studio-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-action {
+      background: #1e293b;
+      color: #f1f5f9;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 7px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 160ms ease;
+    }
+
+    .btn-action:hover { background: #334155; }
+    .btn-action.highlight {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* Screen Stage Viewport */
+    .stage-container {
+      width: 100%;
+      max-width: 1100px;
+      display: grid;
+      place-items: center;
+      perspective: 1000px;
+    }
+
+    .viewport {
+      position: relative;
+      background: radial-gradient(circle at 50% 20%, #1e1538 0%, #0c0818 70%);
+      border: 2px solid rgba(99, 54, 214, 0.3);
+      border-radius: 28px;
+      overflow: hidden;
+      box-shadow: 0 32px 80px rgba(0, 0, 0, 0.7), 0 0 80px rgba(99, 54, 214, 0.15);
+      transition: all 400ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Aspect Ratio Modes */
+    .viewport.mode-16-9 {
+      width: 1000px;
+      height: 562.5px; /* 16:9 */
+    }
+
+    .viewport.mode-9-16 {
+      width: 380px;
+      height: 675px; /* 9:16 vertical reel */
+    }
+
+    /* Scene Elements Common */
+    .scene-frame {
+      position: absolute;
+      inset: 0;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.94) translateY(20px);
+      transition: opacity 400ms ease, transform 450ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .scene-frame.visible {
+      opacity: 1;
+      pointer-events: auto;
+      transform: scale(1) translateY(0);
+    }
+
+    /* Scene 1: Pain Point / Inbox Chaos */
+    .chat-bubble {
+      position: absolute;
+      padding: 12px 20px;
+      border-radius: 20px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      font-size: 15px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: floatBubble 3s ease-in-out infinite alternate;
+    }
+
+    .b-1 { top: 18%; left: 12%; animation-delay: 0s; }
+    .b-2 { top: 28%; right: 14%; animation-delay: 0.6s; }
+    .b-3 { bottom: 24%; left: 16%; animation-delay: 1.2s; }
+    .b-4 { bottom: 20%; right: 18%; animation-delay: 1.8s; }
+
+    @keyframes floatBubble {
+      0% { transform: translateY(0) scale(1); }
+      100% { transform: translateY(-12px) scale(1.03); }
+    }
+
+    .danger-badge {
+      background: #ef4444;
+      color: #fff;
+      font-weight: 700;
+      padding: 8px 18px;
+      border-radius: 9999px;
+      font-size: 14px;
+      margin-bottom: 16px;
+      animation: pulseAlert 1.5s infinite;
+    }
+
+    @keyframes pulseAlert {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+      50% { transform: scale(1.05); box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); }
+    }
+
+    /* Scene 2: AriseSell -> Free Shop Link */
+    .url-bar-card {
+      width: 100%;
+      max-width: 640px;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1.5px solid var(--primary);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 20px 60px rgba(99, 54, 214, 0.35);
+      text-align: center;
+      position: relative;
+    }
+
+    .mock-browser-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 10px 16px;
+      margin-top: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      color: #a5b4fc;
+    }
+
+    .free-pill-glow {
+      position: absolute;
+      top: -14px;
+      right: 24px;
+      background: linear-gradient(135deg, #ff6b00, #ff8800);
+      color: #fff;
+      font-weight: 800;
+      font-size: 12px;
+      padding: 4px 14px;
+      border-radius: 9999px;
+      box-shadow: 0 4px 14px rgba(255, 107, 0, 0.5);
+      animation: bouncePill 2s infinite;
+    }
+
+    @keyframes bouncePill {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+
+    /* Scene 3: Product Card Mockup */
+    .product-mock-card {
+      width: 320px;
+      background: #ffffff;
+      color: #0f172a;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+      border: 1px solid #e2e8f0;
+      animation: cardPop 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .mock-art {
+      width: 100%;
+      height: 220px;
+      background: #f8fafc;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .mock-art img {
+      width: 85%;
+      height: 85%;
+      object-fit: contain;
+      filter: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.15));
+      transition: transform 300ms ease;
+    }
+
+    .mock-body {
+      padding: 18px 20px;
+    }
+
+    .mock-title {
+      font-family: var(--font-heading);
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .mock-sizes {
+      display: flex;
+      gap: 6px;
+      margin: 10px 0;
+    }
+
+    .mock-size-chip {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .mock-size-chip.selected {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .mock-btn-buy {
+      width: 100%;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 12px;
+      border-radius: 9999px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      box-shadow: 0 4px 14px rgba(99, 54, 214, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    /* Scene 4: bKash/Nagad Payment & Advance Box */
+    .payment-mock-card {
+      width: 100%;
+      max-width: 440px;
+      background: #ffffff;
+      color: #0f172a;
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    .advance-box {
+      background: #f5f3ff;
+      border: 1.5px dashed var(--primary);
+      padding: 14px;
+      border-radius: 12px;
+      margin-top: 14px;
+      font-size: 14px;
+      color: #431407;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Scene 5: Live Courier Tracking & Reviews */
+    .courier-card {
+      width: 100%;
+      max-width: 480px;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    }
+
+    .tracking-progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #334155;
+      border-radius: 9999px;
+      margin: 16px 0 10px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .tracking-fill {
+      width: 75%;
+      height: 100%;
+      background: linear-gradient(90deg, #10b981, #34d399);
+      border-radius: 9999px;
+      animation: fillProgress 2s ease-out;
+    }
+
+    @keyframes fillProgress {
+      0% { width: 0; }
+      100% { width: 75%; }
+    }
+
+    /* Scene 6: Final CTA */
+    .cta-hero-title {
+      font-family: var(--font-heading);
+      font-size: 38px;
+      font-weight: 800;
+      text-align: center;
+      line-height: 1.25;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #ffffff 30%, #c4b5fd 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .cta-btn-glow {
+      background: linear-gradient(135deg, #6336d6, #8b5cf6);
+      color: #fff;
+      font-size: 18px;
+      font-weight: 700;
+      padding: 16px 36px;
+      border-radius: 9999px;
+      border: none;
+      box-shadow: 0 10px 30px rgba(99, 54, 214, 0.6);
+      cursor: pointer;
+      transition: transform 180ms ease;
+    }
+
+    .cta-btn-glow:hover { transform: scale(1.05); }
+
+    /* Animated Cursor Simulation */
+    .mouse-cursor {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      pointer-events: none;
+      z-index: 1000;
+      transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Studio Controller Bar -->
+  <header class="studio-bar">
+    <div class="studio-brand">
+      <svg width="28" height="28" viewBox="0 0 48 48"><rect width="48" height="48" rx="14" fill="#6336d6"/><path d="M12 32 24 12l12 20h-8l-4-7-4 7Z" fill="#fff"/><circle cx="35" cy="13" r="4" fill="#ff6b00"/></svg>
+      <span>Motion Studio · Arise</span>
+    </div>
+
+    <nav class="scene-tabs">
+      <button class="btn-tab active" onclick="showScene(1)">১. হুক & মেসেজ জ্যাম</button>
+      <button class="btn-tab" onclick="showScene(2)">২. ফ্রি ওয়েবসাইট লিঙ্ক</button>
+      <button class="btn-tab" onclick="showScene(3)">৩. প্রডাক্ট & সাইজ অর্ডার</button>
+      <button class="btn-tab" onclick="showScene(4)">৪. বিকাশ/নগদ অ্যাডভান্স</button>
+      <button class="btn-tab" onclick="showScene(5)">৫. কুরিয়ার ট্র্যাকিং</button>
+      <button class="btn-tab" onclick="showScene(6)">৬. ফাইনাল কল-টু-অ্যাকশন</button>
+    </nav>
+
+    <div class="studio-actions">
+      <button class="btn-action" onclick="toggleAspect()">📐 <span id="aspect-label">16:9 Landscape</span></button>
+      <button class="btn-action highlight" onclick="autoplaySequence()">▶ ফুল ভিডিও প্লে</button>
+    </div>
+  </header>
+
+  <!-- Screen Stage Viewport -->
+  <main class="stage-container">
+    <div class="viewport mode-16-9" id="viewport">
+
+      <!-- SCENE 1: Problem / Inbox Chaos -->
+      <section class="scene-frame visible" id="scene-1">
+        <span class="danger-badge">⚠️ ফেসবুক পেজের ইনবক্স জ্যাম?</span>
+        <h2 style="font-size: 32px; font-weight: 800; text-align: center; margin-bottom: 24px;">
+          ম্যানুয়াল অর্ডার আর ডেলিভারি চার্জ নিয়ে হয়রানি?
+        </h2>
+        <div class="chat-bubble b-1">
+          <span>💬</span> <strong>"ভাইয়া এই জুতার দাম কত?"</strong>
+        </div>
+        <div class="chat-bubble b-2">
+          <span>💬</span> <strong>"ক্যাশ অন ডেলিভারিতে পাঠাবেন?"</strong>
+        </div>
+        <div class="chat-bubble b-3">
+          <span>💬</span> <strong>"ছবি দেখান তো ভাই, সাইজ আছে?"</strong>
+        </div>
+        <div class="chat-bubble b-4">
+          <span>❌</span> <strong style="color: #f87171;">"কাস্টমার পার্সেল রিসিভ করেনি..."</strong>
+        </div>
+      </section>
+
+      <!-- SCENE 2: AriseSell -> Free Shop Link -->
+      <section class="scene-frame" id="scene-2">
+        <span class="free-pill-glow">১০০% ফ্রি লাইফটাইম শপ লিঙ্ক</span>
+        <h2 style="font-size: 30px; font-weight: 800; text-align: center; margin-bottom: 16px;">
+          AriseSell-এ লগইন করলেই পাচ্ছেন আপনার নিজস্ব ওয়েবসাইট!
+        </h2>
+        <div class="url-bar-card">
+          <p style="font-size: 14px; color: #cbd5e1; margin-bottom: 8px;">আপনার ব্র্যান্ডের প্রফেশনাল ই-কমার্স শপ:</p>
+          <div class="mock-browser-nav">
+            <span style="color: #10b981;">🔒 https://</span>
+            <strong style="color: #ffffff; font-size: 16px;">arise-store.com/shops/arise-fashion</strong>
+          </div>
+          <p style="margin-top: 14px; font-size: 13px; color: #94a3b8;">
+            জিরো কোডিং • জিরো সেটআপ ফি • মাত্র ৫ মিনিটে রেডি!
+          </p>
+        </div>
+      </section>
+
+      <!-- SCENE 3: Product Card Mockup -->
+      <section class="scene-frame" id="scene-3">
+        <div class="product-mock-card">
+          <div class="mock-art">
+            <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="#6336d6" stroke-width="1.5">
+              <path d="M4 16l3-6 4 2 5-6 4 3v7H4z"/>
+              <circle cx="9" cy="8" r="2"/>
+            </svg>
+          </div>
+          <div class="mock-body">
+            <span style="font-size: 12px; font-weight: 700; color: var(--primary);">Arise Fashion</span>
+            <h3 class="mock-title">Chunky Sneakers White</h3>
+            <div style="font-size: 18px; font-weight: 800; color: #0f172a;">৳ ১,৪৫০</div>
+            <div style="font-size: 12px; color: #64748b; margin-top: 6px;">সাইজ নির্বাচন করুন:</div>
+            <div class="mock-sizes">
+              <div class="mock-size-chip">40</div>
+              <div class="mock-size-chip">41</div>
+              <div class="mock-size-chip selected">42</div>
+              <div class="mock-size-chip">43</div>
+            </div>
+            <button class="mock-btn-buy">
+              <span>Buy now</span>
+              <span>➔</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCENE 4: bKash/Nagad Payment & Advance Box -->
+      <section class="scene-frame" id="scene-4">
+        <div class="payment-mock-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="width: 10px; height: 10px; border-radius: 50%; background: #e2136e;"></span>
+              <strong>Pay with bKash</strong>
+            </div>
+            <span style="background: #e0e7ff; color: #4338ca; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 6px;">Merchant Verified</span>
+          </div>
+
+          <div class="advance-box">
+            <span style="font-size: 22px;">🛡️</span>
+            <div>
+              <strong style="display: block; color: var(--primary);">অগ্রিম কুরিয়ার চার্জ: ৳ ১৩০</strong>
+              <small style="color: #64748b;">ফেক অর্ডার বন্ধে কুরিয়ার ফি সরাসরি আপনার একাউন্টে নিন</small>
+            </div>
+          </div>
+
+          <div style="margin-top: 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; font-size: 13px;">
+            রেফারেন্স কোড: <strong>ORD-4921</strong> | TrxID সাবমিট করলেই কনফার্ম!
+          </div>
+        </div>
+      </section>
+
+      <!-- SCENE 5: Live Courier Tracking & Reviews -->
+      <section class="scene-frame" id="scene-5">
+        <div class="courier-card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 13px; color: #94a3b8;">Courier: <strong>Steadfast Logistics</strong></span>
+            <span style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 9999px;">In Transit</span>
+          </div>
+          <div class="tracking-progress-bar">
+            <div class="tracking-fill"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1;">
+            <span>Picked up</span>
+            <span>Hub sorting</span>
+            <strong style="color: #10b981;">Out for delivery</strong>
+          </div>
+
+          <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; gap: 12px;">
+            <div style="color: #f59e0b; font-size: 18px;">★★★★★</div>
+            <div style="font-size: 13px;">
+              <strong>"১০০% অরিজিনাল স্নিকার্স, প্যাকেজিং দারুণ!"</strong>
+              <span style="display: block; font-size: 11px; color: #94a3b8;">— তানভীর হাসান (Verified Buyer)</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCENE 6: Final CTA -->
+      <section class="scene-frame" id="scene-6">
+        <div style="margin-bottom: 16px;">
+          <svg width="56" height="56" viewBox="0 0 48 48"><rect width="48" height="48" rx="14" fill="#6336d6"/><path d="M12 32 24 12l12 20h-8l-4-7-4 7Z" fill="#fff"/><circle cx="35" cy="13" r="4" fill="#ff6b00"/></svg>
+        </div>
+        <h2 class="cta-hero-title">
+          আজই AriseSell-এ লগইন করুন<br>
+          ৫ মিনিটেই চালু করুন আপনার নিজস্ব অনলাইন শপ!
+        </h2>
+        <button class="cta-btn-glow" onclick="alert('AriseSell Login: https://arisesell.com')">
+          Login & Get Free Shop Link ➔
+        </button>
+        <p style="margin-top: 16px; font-size: 14px; color: #a5b4fc; font-family: 'JetBrains Mono', monospace;">
+          www.arisesell.com • www.arise-store.com
+        </p>
+      </section>
+
+    </div>
+  </main>
+
+  <script>
+    let currentScene = 1;
+    const totalScenes = 6;
+    let isLandscape = true;
+    let autoplayTimer = null;
+
+    function showScene(n) {
+      if (autoplayTimer) clearTimeout(autoplayTimer);
+      currentScene = n;
+      for (let i = 1; i <= totalScenes; i++) {
+        const frame = document.getElementById(`scene-${i}`);
+        if (frame) frame.classList.remove('visible');
+      }
+      const activeFrame = document.getElementById(`scene-${n}`);
+      if (activeFrame) activeFrame.classList.add('visible');
+
+      // Update Tab Styles
+      const tabs = document.querySelectorAll('.btn-tab');
+      tabs.forEach((tab, index) => {
+        if (index + 1 === n) tab.classList.add('active');
+        else tab.classList.remove('active');
+      });
+    }
+
+    function toggleAspect() {
+      const vp = document.getElementById('viewport');
+      const lbl = document.getElementById('aspect-label');
+      isLandscape = !isLandscape;
+      if (isLandscape) {
+        vp.className = 'viewport mode-16-9';
+        lbl.innerText = '16:9 Landscape';
+      } else {
+        vp.className = 'viewport mode-9-16';
+        lbl.innerText = '9:16 Vertical Reel';
+      }
+    }
+
+    function autoplaySequence() {
+      let scene = 1;
+      showScene(scene);
+      function next() {
+        scene++;
+        if (scene > totalScenes) scene = 1;
+        showScene(scene);
+        autoplayTimer = setTimeout(next, 5000); // 5s per scene
+      }
+      autoplayTimer = setTimeout(next, 5000);
+    }
+  </script>
+</body>
+</html>
