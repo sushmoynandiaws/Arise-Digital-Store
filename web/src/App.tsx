@@ -1721,14 +1721,7 @@ function ProductCard({ product }: { product: Product }) {
         <div className="product-meta">
           <span className={product.sales_enabled && stock(product) > 0 ? "availability" : "sold-out"}>
             {!product.sales_enabled ? (lang === "bn" ? "ক্রয় সাময়িক বন্ধ" : "Purchases paused") : stock(product) > 0 ? (
-              productFulfilment(product) === "physical" ? <>Physical delivery</> : product.delivery_mode === "automatic" ? (
-                <>
-                  <Zap size={12} />
-                  {lang === "bn" ? "অটো ডেলিভারি" : "Automatic delivery"}
-                </>
-              ) : (
-                lang === "bn" ? "ম্যানুয়াল ডেলিভারি" : "Seller-prepared delivery"
-              )
+              lang === "bn" ? "ইন স্টক" : "In stock"
             ) : (
               lang === "bn" ? "স্টক শেষ" : "Sold out"
             )}
@@ -2680,24 +2673,11 @@ function ProductPage() {
             {available ? (
               <span className="product-stock">
                 <span className="status-dot" />
-                {selected!.stock} in stock
+                {lang === "bn" ? `${selected!.stock}টি স্টকে আছে` : `${selected!.stock} in stock`}
               </span>
             ) : (
-              <span className="product-stock unavailable">{selected?.stock ? "Checkout unavailable" : product.sales_enabled ? "Sold out" : "Purchases paused"}</span>
+              <span className="product-stock unavailable">{selected?.stock ? (lang === "bn" ? "চেকআউট সাময়িক অনুপলব্ধ" : "Checkout unavailable") : product.sales_enabled ? (lang === "bn" ? "স্টক শেষ" : "Sold out") : (lang === "bn" ? "ক্রয় সাময়িক বন্ধ" : "Purchases paused")}</span>
             )}
-            <span>
-              {!digital ? <><Package size={14} />Physical delivery</> : product.delivery_mode === "automatic" ? (
-                <>
-                  <Zap size={14} />
-                  Automatic delivery
-                </>
-              ) : (
-                <>
-                  <Package size={14} />
-                  Seller-prepared delivery
-                </>
-              )}
-            </span>
           </div>
 
           <div className="product-trust-stats-badges">

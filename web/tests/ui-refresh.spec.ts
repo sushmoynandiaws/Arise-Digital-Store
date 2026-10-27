@@ -217,8 +217,8 @@ test("shared product cards distinguish source delivery, sold-out and paused offe
   const cards = page.locator(".product-card");
   await expect(cards.nth(0).locator(".product-meta")).toHaveText("Purchases paused");
   await expect(cards.nth(1).locator(".product-meta")).toHaveText("Sold out");
-  await expect(cards.nth(2).locator(".product-meta")).toHaveText("Automatic delivery");
-  await expect(cards.nth(5).locator(".product-meta")).toHaveText("Seller-prepared delivery");
+  await expect(cards.nth(2).locator(".product-meta")).toHaveText("In stock");
+  await expect(cards.nth(5).locator(".product-meta")).toHaveText("In stock");
   await expect(cards.nth(0).locator(".price")).toHaveText(/490/);
   await expect(cards.nth(0).locator(".by-shop")).toContainText("Studio North");
 });
