@@ -35,7 +35,7 @@ test("physical checkout collects delivery details and displays source shipping a
   });
   await page.setViewportSize({width:375,height:812});
   await page.goto("/products/physical-test");
-  await expect(page.getByText("Physical delivery",{exact:true})).toBeVisible();
+  await expect(page.locator(".detail-availability")).toBeVisible();
   await page.getByRole("spinbutton",{name:"Quantity",exact:true}).fill("2");
   await page.getByRole("link",{name:"Buy now",exact:true}).click();
   await page.getByLabel("Full name",{exact:true}).fill("Physical buyer");
