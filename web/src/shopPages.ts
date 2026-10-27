@@ -6,236 +6,259 @@ export const shopPageSections = [
   { key: "contact", title: "Contact us", titleBn: "যোগাযোগ করুন", hint: "Share your support channels, contact details and working hours." },
 ] as const;
 
+export type ShopPageSectionKey = typeof shopPageSections[number]["key"];
+
 export const defaultPlatformPolicies: Record<string, { en: string; bn: string }> = {
   terms: {
-    en: `Welcome to Arise Store (arise-digital-store.vercel.app). By browsing, accessing, or placing an order on our marketplace, you agree to these Terms & Conditions. Please read them carefully.
+    en: `Welcome to Arise Store. By accessing, browsing, or purchasing from our marketplace, you agree to comply with and be bound by the following Terms & Conditions.
 
 1. Marketplace Intermediary Role
-Arise Store is an open, multi-vendor electronic commerce marketplace platform powered by AriseSell. Arise Store serves strictly as a neutral technological intermediary connecting independent third-party merchant shops with buyers. Unless explicitly stated otherwise on an individual product listing, Arise Store is not the direct manufacturer, seller, owner, or packer of items listed on this platform.
+Arise Store is an independent multi-vendor technology platform and online marketplace powered by AriseSell. We provide digital storefront infrastructure, catalog discovery, and order management tools connecting independent merchant shops ("Sellers") with shoppers ("Buyers"). Arise Store operates solely as an intermediary and is not the manufacturer, owner, stockist, or direct seller of third-party products.
 
-2. Independent Sellers & Catalog Accuracy
-All shops hosted on Arise Store are owned and operated by independent sellers. Each merchant maintains sole responsibility for their product descriptions, variant configurations, stock counts, pricing, warranties, physical packaging, and order fulfillment. While Arise Store conducts seller verification and active content moderation, the platform does not warrant that merchant-provided specifications are always error-free.
+2. Independent Seller Responsibility
+Each shop on Arise Store operates as an independent business. The respective merchant shop is solely responsible for:
+• Accuracy of product listings, specifications, sizes, colors, images, and pricing.
+• Product authenticity, condition, quality, and compliance with applicable standards.
+• Packaging, courier dispatch, fulfillment, and honoring any manufacturer or seller warranties stated on their listings.
 
-3. Multi-Category Marketplace: Physical & Digital Goods
-Arise Store offers a diverse catalog across multiple industries:
-• Physical Goods (Fashion, Footwear, Electronics, Lifestyle, Accessories): Physical products are packaged and dispatched directly by the independent merchant through licensed third-party courier services (e.g. SteadFast, Pathao, RedX). Courier delivery timeframes are estimates and subject to logistics conditions.
-• Digital Products (Software Licenses, Developer Tools, Subscriptions): Legitimate digital keys and licenses are delivered electronically or as instructed in the product listing.
+3. Pricing, Orders & Payments
+• All product prices, discounts, and delivery charges are set directly by the respective merchant shop in Bangladeshi Taka (BDT).
+• Placing an order constitutes a direct commercial agreement between the buyer and the seller.
+• Accepted payment methods include Cash on Delivery (COD) and direct mobile financial services (bKash, Nagad, Rocket).
+• When advance payment (such as courier delivery charges or partial advance) is requested for Cash on Delivery orders, the buyer transfers funds directly to the seller's verified mobile account and submits the Transaction ID (TrxID) for verification.
+• Arise Store does not collect, hold, or escrow customer transaction funds directly.
 
-4. Orders, Advance Payments & Cash on Delivery (COD)
-• Customers must provide authentic and verifiable contact information (full name, phone number, complete delivery address, and district).
-• For Cash on Delivery (COD) orders, independent sellers may require a non-refundable advance payment covering courier delivery charges or commitment fees to protect against fraudulent, unverified, or cancelled orders.
-• Buyers must send advance payments strictly using the official payment accounts and order reference codes displayed at checkout. Arise Store never asks for personal mobile financial service PINs or OTPs.
+4. Shipping & Delivery of Physical Goods
+• Physical items are dispatched by each seller using licensed third-party courier services across Bangladesh (e.g., Steadfast, Pathao, RedX, Sundarban, etc.).
+• Delivery timeframes are estimated and subject to courier schedules and regional transit conditions.
+• Customers must provide an accurate recipient name, complete delivery address, and active Bangladeshi mobile number.
 
-5. Courier Delivery & Parcel Inspection
-Buyers are strongly required to inspect the exterior and condition of the parcel in the presence of the courier delivery agent upon delivery. If an item is visibly broken, damaged, tampered with, or mismatched, the customer has the right to refuse acceptance immediately and report the issue to the seller.
+5. Digital Products & Software Licenses
+• Digital items, software licenses, game keys, and subscription credentials are delivered according to the seller's stated fulfillment mode (instant or manual).
+• Buyers must verify device compatibility before purchase. Resale or unauthorized sharing of single-user digital licenses is strictly prohibited.
 
-6. Limitation of Liability
-To the fullest extent permitted by the laws of Bangladesh:
-• Arise Store shall not be liable for any direct, indirect, incidental, punitive, or consequential damages resulting from merchant transactions, courier delivery delays, defective items, or seller breaches.
-• The platform's liability is strictly limited to facilitating order communication, tracking routing, and mediating disputes in good faith.
+6. Limitation of Liability & Disclaimers
+To the maximum extent permitted by the laws of Bangladesh:
+• Arise Store is not liable for indirect, incidental, punitive, or consequential damages resulting from transactions between buyers and third-party sellers.
+• Arise Store does not warrant that product descriptions or seller representations are free from error.
+• In any event, Arise Store's aggregate liability relating to marketplace platform technology shall not exceed the platform service fee (if any) collected for the specific transaction.
 
-7. Prohibited Products & Zero Tolerance
-Counterfeit items, unauthorized replicas, stolen licenses, illegal goods, and copyright-infringing materials are strictly prohibited. Sellers violating these rules face immediate shop termination, permanent forfeiture of access, and reporting to relevant legal authorities.
+7. Buyer Protection & Dispute Resolution
+Arise Store is committed to maintaining a safe, transparent marketplace. If a buyer encounters fraudulent activity, non-delivery, counterfeit goods, or an unresponsive seller, they may report the shop via the "Report Product" or platform support channels. Arise Store reserves the right to investigate, mediate, suspend, or terminate non-compliant seller accounts.
 
-8. Governing Law
-These terms and conditions are governed by and construed in accordance with the applicable laws of Bangladesh.`,
-    bn: `অ্যারাইজ স্টোরে (Arise Store - arise-digital-store.vercel.app) আপনাকে স্বাগতম। আমাদের মার্কেটপ্লেস ব্রাউজ করা বা অর্ডার করার মাধ্যমে আপনি নিম্নোক্ত নিয়ম ও শর্তাবলীতে সম্মতি প্রদান করছেন।
+8. Fair Use & Prohibited Activities
+Fraudulent orders, abusive behavior, submission of fake TrxIDs, harassment of sellers or courier agents, and unlawful commercial activities are strictly prohibited and subject to legal action under the Cyber Security / Digital Security regulations of Bangladesh.`,
+    bn: `অ্যারাইজ স্টোর (Arise Store)-এ আপনাকে স্বাগতম। আমাদের মার্কেটপ্লেস ব্রাউজ, ব্যবহার বা কোনো পণ্য ক্রয়ের মাধ্যমে আপনি নিচের নিয়ম ও শর্তাবলীর সাথে সম্পূর্ণভাবে সম্মত হচ্ছেন।
 
-১. প্ল্যাটফর্ম ও প্রযুক্তিগত মধ্যস্থতাকারী হিসেবে ভূমিকা (Marketplace Intermediary Role)
-অ্যারাইজ স্টোর হলো AriseSell ইকোসিস্টেমের অধীন পরিচালিত একটি উন্মুক্ত মাল্টি-ভেন্ডার ডিজিটাল মার্কেটপ্লেস প্ল্যাটফর্ম। অ্যারাইজ স্টোর একটি নিরপেক্ষ প্রযুক্তিগত মাধ্যম (Intermediary) হিসেবে স্বাধীন তৃতীয়-পক্ষ বিক্রেতা (Independent Sellers) এবং ক্রেতাদের সংযুক্ত করে। কোনো নির্দিষ্ট পণ্যে স্পষ্ট উল্লেখ না থাকলে, অ্যারাইজ স্টোর সরাসরি কোনো পণ্যের প্রস্তুতকারক, আমদানিকারক, পাইকার বা প্রত্যক্ষ বিক্রেতা নয়।
+১. মার্কেটপ্লেস মধ্যস্থতাকারী ভূমিকা (Marketplace Intermediary Role)
+অ্যারাইজ স্টোর একটি আধুনিক মাল্টি-ভেন্ডার ই-কমার্স প্রযুক্তি প্ল্যাটফর্ম (Powered by AriseSell)। আমরা স্বাধীন উদ্যোক্তা ও বিক্রেতাদের (Seller) সাথে ক্রেতাদের (Buyer) সংযোগ স্থাপনকারী মাধ্যম হিসেবে কাজ করি। অ্যারাইজ স্টোর প্ল্যাটফর্মে প্রদর্শিত পণ্যের সরাসরি প্রস্তুতকারক, মালিক বা মজুদদার নয়; সকল পণ্য স্বাধীন মার্চেন্টদের দ্বারা পরিচালিত, সংরক্ষিত ও সরবরাহিত হয়।
 
-২. স্বাধীন বিক্রেতা ও পণ্যের তথ্যের দায়বদ্ধতা
-অ্যারাইজ স্টোরে নিবন্ধিত প্রতিটি শপ সম্পূর্ণ স্বাধীনভাবে তাদের ব্যবসা পরিচালনা করে। পণ্যের বিবরণ, ছবি, সাইজ, স্টক, মূল্য নির্ধারণ, প্যাকেজিং, ডেলিভারি এবং ওয়্যারেন্টি প্রতিশ্রুতি সংক্রান্ত সকল দায়-দায়িত্ব সংশ্লিষ্ট বিক্রেতার। কোনো পণ্যের বিবরণ বা তথ্যের অসঙ্গতির জন্য সংশ্লিষ্ট বিক্রেতা সম্পূর্ণ দায়বদ্ধ থাকবেন।
+২. বিক্রেতার একক দায়িত্ব ও পণ্য বিবরণ
+মার্কেটপ্লেসের প্রতিটি শপ নিজস্ব পরিচালনায় পরিচালিত হয়। পণ্যের সঠিক বিবরণ, মান, স্পেসিফিকেশন, সাইজ, রঙ, মেয়াদ, ওয়ারেন্টি ও স্টক ব্যবস্থাপনার সার্বিক দায়িত্ব সংশ্লিষ্ট বিক্রেতার। বিক্রেতার অসত্য বা অসম্পূর্ণ বিবরণের জন্য অ্যারাইজ স্টোর দায়ী থাকবে না।
 
-৩. মাল্টি-ক্যাটাগরি পণ্য (ফিজিক্যাল ও ডিজিটাল)
-অ্যারাইজ স্টোর এখন পোশাক, জুতো, গ্যাজেটস, ইলেকট্রনিক্স, দৈনন্দিন পণ্য এবং ডিজিটাল লাইসেন্সসহ বহুবিধ পণ্যের সমাহার:
-• ফিজিক্যাল পণ্য: পোশাক, জুতো ও হার্ডওয়্যার পণ্যসমূহ সরাসরি বিক্রেতার ওয়্যারহাউস থেকে প্যাকেজিং হয়ে নির্ভরযোগ্য কুরিয়ার সার্ভিসের (যেমন SteadFast, Pathao, RedX) মাধ্যমে ক্রেতার ঠিকানায় পৌঁছায়।
-• ডিজিটাল পণ্য: ডিজিটাল সফটওয়্যার ও লাইসেন্সসমূহ সরাসরি অর্ডার পেজ বা মেসেজের মাধ্যমে নিরাপদ পদ্ধতিতে সরবরাহ করা হয়।
+৩. মূল্য নির্ধারণ, অর্ডার ও পেমেন্ট পদ্ধতি
+• পণ্যের মূল্য ও ডেলিভারি চার্জ সংশ্লিষ্ট বিক্রেতা কর্তৃক বাংলাদেশি টাকায় (BDT) নির্ধারিত হয়।
+• অর্ডার প্রদানের মাধ্যমে ক্রেতা ও বিক্রেতার মধ্যে সরাসরি ক্রয়-বিক্রয় চুক্তি সম্পাদিত হয়।
+• পেমেন্ট পদ্ধতির মধ্যে ক্যাশ অন ডেলিভারি (COD) এবং মোবাইল ব্যাংকিং (বিকাশ, নগদ, রকেট) অন্তর্ভুক্ত।
+• ক্যাশ অন ডেলিভারি অর্ডারে কুরিয়ার ডেলিভারি চার্জ বা আংশিক অগ্রিম (Advance) প্রযোজ্য হলে, ক্রেতা সরাসরি বিক্রেতার অনুমোদিত নম্বরে টাকা পাঠিয়ে TrxID প্রদান করবেন।
+• অ্যারাইজ স্টোর গ্রাহকদের পেমেন্টের টাকা সরাসরি নিজের একাউন্টে জমা বা এসক্রো হিসেবে ধারণ করে না।
 
-৪. অর্ডার ও অগ্রিম ডেলিভারি চার্জ (Advance Payment)
-• ক্রেতাকে অবশ্যই সঠিক ও সক্রিয় যোগাযোগের তথ্য (নাম, সচল মোবাইল নম্বর, বিস্তারিত ডেলিভারি ঠিকানা ও জেলা) প্রদান করতে হবে।
-• ক্যাশ অন ডেলিভারি (COD) অর্ডারের ক্ষেত্রে ভুয়া বা ফেক অর্ডার প্রতিরোধে বিক্রেতা কুরিয়ার ডেলিভারি চার্জ বা আংশিক অগ্রিম পেমেন্ট চাইতে পারেন।
-• ক্রেতাকে চেকআউটে প্রদর্শিত বিক্রেতার নির্দিষ্ট অ্যাকাউন্ট ও রেফারেন্স কোড মিলিয়ে পেমেন্ট সম্পন্ন করতে হবে। কখনোই বিকাশ বা নগদের গোপন পিন (PIN) বা ওটিপি (OTP) কারও সাথে শেয়ার করবেন না।
+৪. ফিজিক্যাল পণ্যের ডেলিভারি ও শিপিং
+• ফিজিক্যাল পণ্যসমূহ বিক্রেতারা অনুমোদিত কুরিয়ার সার্ভিসের (যেমন: Steadfast, Pathao, RedX, সুন্দরবন কুরিয়ার ইত্যাদি) মাধ্যমে ক্রেতার ঠিকানায় প্রেরণ করেন।
+• ডেলিভারির সময়সীমা কুরিয়ারের স্বাভাবিক কার্যক্রম ও আঞ্চলিক পরিস্থিতির উপর নির্ভরশীল।
+• সঠিক ডেলিভারি নিশ্চিত করতে ক্রেতাকে সঠিক নাম, পূর্ণাঙ্গ ঠিকানা ও সচল মোবাইল নম্বর প্রদান করতে হবে।
 
-৫. পার্সেল গ্রহণ ও তাৎক্ষণিক যাচাইকরণ
-কুরিয়ার ডেলিভারি ম্যানের সামনে পার্সেলের বাহ্যিক অবস্থা ও পণ্য যাচাই করে গ্রহণ করা ক্রেতার দায়িত্ব। পণ্যটি ভাঙা, ত্রুটিযুক্ত বা ভুল পাঠানো হলে ডেলিভারি ম্যানের সামনেই পার্সেলটি প্রত্যাখ্যান করুন এবং বিক্রেতাকে অবহিত করুন।
+৫. ডিজিটাল পণ্য ও সফটওয়্যার লাইসেন্স
+• ডিজিটাল সফটওয়্যার কি, ভাউচার ও সাবস্ক্রিপশন ক্রেতার নিকট বিক্রেতার নির্ধারিত পদ্ধতিতে পৌঁছানো হয়।
+• কেনার আগে সফটওয়্যার বা সার্ভিসের নিয়মাবলী জেনে নেওয়া ক্রেতার দায়িত্ব। ডিজিটাল অ্যাক্সেসের অপব্যবহার বা অননুমোদিত পুনর্বিক্রয় নিষিদ্ধ।
 
-৬. প্ল্যাটফর্মের দায়বদ্ধতার সীমাবদ্ধতা (Limitation of Liability)
-• স্বাধীন বিক্রেতার পণ্যের মানগত ত্রুটি, কুরিয়ারের পরিবহনজনিত বিলম্ব বা বিক্রেতা-ক্রেতা পারস্পরিক লেনদেনের বিরোধে অ্যারাইজ স্টোর সরাসরি কোনো আর্থিক বা আইনি ক্ষতিপূরণের জন্য দায়ী থাকবে না।
-• অ্যারাইজ স্টোর নিরপেক্ষ মধ্যস্থতাকারী হিসেবে অর্ডার ট্র্যাকিং, তথ্য আদান-প্রদান এবং বিরোধ নিষ্পত্তিতে সর্বাত্মক সহযোগিতা করবে।
+৬. প্ল্যাটফর্মের দায়বদ্ধতার সীমাবদ্ধতা (Limitation of Liability)
+ক্রেতা ও বিক্রেতার মধ্যকার লেনদেন, কুরিয়ারের পার্সেল সংক্রান্ত বিলম্ব, বা পণ্যের কোনো ত্রুটিজনিত পরোক্ষ ক্ষতির জন্য প্ল্যাটফর্ম কর্তৃপক্ষ আইনগতভাবে দায়ী থাকবে না। তবে প্ল্যাটফর্মে কোনো প্রতারণামূলক কার্যকলাপের প্রমাণ পেলে অ্যারাইজ স্টোর সংশ্লিষ্ট বিক্রেতার শপ ও পণ্য তাৎক্ষণিকভাবে স্থগিত বা বাতিল করার পূর্ণ অধিকার সংরক্ষণ করে।
 
-৭. নিষিদ্ধ পণ্য ও জিরো টলারেন্স নীতি
-নকল পণ্য, কপিরাইট লঙ্ঘনকারী সামগ্রী, অবৈধ দ্রব্য বা প্রতারণামূলক কর্মকাণ্ড অ্যারাইজ স্টোরে সম্পূর্ণ নিষিদ্ধ। কোনো বিক্রেতা এই নিয়ম ভঙ্গ করলে তার শপ তাৎক্ষণিকভাবে স্থায়ীভাবে বন্ধ করা হবে।
+৭. ক্রেতা সুরক্ষা ও অভিযোগ প্রতিকার
+কোনো পণ্য বা বিক্রেতার বিষয়ে প্রতারণা বা অনিয়মের অভিযোগ থাকলে ক্রেতা সরাসরি "রিপোর্ট প্রোডাক্ট" অপশন ব্যবহার করে বা প্ল্যাটফর্ম সাপোর্টে অভিযোগ জানাতে পারেন। অ্যারাইজ স্টোর নিরপেক্ষ তদন্ত ও ব্যবস্থা গ্রহণ করবে।
 
-৮. আইনি এখতিয়ার
-এই শর্তাবলী গণপ্রজাতন্ত্রী বাংলাদেশের প্রচলিত ইলেকট্রনিক লেনদেন ও ভোক্তা অধিকার সংরক্ষণ আইন দ্বারা পরিচালিত হবে।`
+৮. নিষিদ্ধ কার্যক্রম ও আইনের বাধ্যবাধকতা
+ভুয়া অর্ডার প্রদান, জাল TrxID সাবমিট করা, বিক্রেতা বা কুরিয়ার কর্মীদের সাথে অসদাচরণ করা ডিজিটাল নিরাপত্তা আইন অনুযায়ী দণ্ডনীয় অপরাধ।`
   },
+
   returns: {
-    en: `At Arise Store, we are committed to facilitating a fair, secure, and transparent shopping experience. Because products on Arise Store are sold and fulfilled directly by independent sellers, the following marketplace returns and refund policy applies to all orders:
+    en: `At Arise Store, we strive to ensure a fair, transparent, and trustworthy shopping experience across all independent shops on our marketplace. Please review our Returns & Refund Policy carefully.
 
-1. Delivery Inspection for Physical Products
-Customers are strongly advised to inspect all parcels immediately upon arrival in the presence of the courier delivery representative:
-• Damaged or Broken Items: If the item was damaged during transit, you have the right to refuse acceptance on the spot.
-• Mismatched or Incorrect Product: If you receive an incorrect size, color, or different product, refuse delivery or notify the seller within 24 to 48 hours with clear unboxing photographs or video proof.
+1. Merchant-Managed Returns & Refunds
+Each independent shop on Arise Store fulfills its own orders. Returns, replacements, and refunds are managed directly by the respective merchant shop in accordance with their shop policy and Bangladesh Consumer Rights Protection regulations.
 
-2. Return & Exchange Eligibility
-To qualify for an exchange, return, or refund:
-• The product must be unused, unwashed, unworn, and in its original condition.
-• Original product packaging, manufacturer tags, barcodes, warranties, and all bundled accessories must remain intact.
-• Return requests must be initiated within the return window stated on the product page (standard window: 48 hours from delivery).
+2. Physical Goods Inspection & Reporting Window
+• Customers must inspect their parcel immediately upon receiving it from the delivery courier.
+• In case of a defective, damaged, incorrect item, or missing parts, the customer must notify the seller or submit a dispute within 48 hours of delivery.
+• Mandatory Unboxing Evidence: We strongly advise recording an uninterrupted video while opening the courier package. This serves as critical evidence for damaged, wrong, or missing item claims.
 
-3. Courier Advance Delivery Charge Policy
-• For Cash on Delivery (COD) orders where an advance delivery charge was paid: If the customer arbitrarily cancels or refuses the parcel upon delivery without any product defect or valid reason, the advance delivery charge is strictly non-refundable, as it pays the courier company for transit logistics costs.
-• If the return is due to seller error (defective, damaged, or incorrect item sent), the seller is responsible for replacement courier shipping costs.
+3. Eligibility for Return & Replacement
+To qualify for an exchange or return:
+• The product must be unused, unwashed, unaltered, and returned in its original packaging with all tags, labels, manuals, and accessories intact.
+• Non-Returnable Items: Perishable goods, personal hygiene items, intimate apparel, customized/personalized items, and clearance items marked as non-returnable cannot be returned unless sent in error by the seller.
 
-4. Digital Products & Software Licenses
-• Digital licenses, software keys, and electronic vouchers that have been verified, revealed, or redeemed cannot be returned or refunded due to their irreversible digital nature.
-• If a digital code is proven non-functional upon initial delivery, the seller will verify and replace the key within 24 hours.
+4. Return Shipping & Advance Payment Refunds
+• Seller Error: If an incorrect, damaged, or significantly non-conforming item was delivered, the seller covers return shipping and must provide a replacement or full refund.
+• Change of Mind: Where a seller accepts returns for personal preference (e.g., size change), return shipping charges may be borne by the customer.
+• Advance Payment Refund: If an order is cancelled by the seller before dispatch or cannot be fulfilled, the seller must refund any advance payment within 5-7 business days via the original payment channel (bKash/Nagad/Bank).
+• Return Inspection: Once the returned item reaches the seller and passes physical inspection, the refund or replacement will be processed within 5-7 business days.
 
-5. Refund Processing Timeline
-• Once the returned physical product is received, inspected, and approved by the seller, refunds are issued within 3 to 7 business days.
-• Refunds are transferred directly to the customer's mobile financial wallet (bKash, Nagad) or bank account used for payment.
+5. Digital Products & Software Licenses
+Due to the digital and instantly redeemable nature of software keys and digital credentials:
+• Digital products are generally non-refundable once the activation key or account credential has been delivered.
+• If an activation key is provably invalid, expired, or non-functional upon delivery, the customer must report it within 24 hours. The seller will verify and issue a working replacement or full refund.
 
-6. Platform Dispute Mediation
-If an independent seller fails to respond to a legitimate return or refund request within 72 hours, please escalate the issue to Arise Store Support at support@arisesell.com with your Order Reference ID. Our team will investigate and intervene.`,
-    bn: `অ্যারাইজ স্টোরে প্রতিটি ক্রেতা ও বিক্রেতার স্বার্থ সুরক্ষায় একটি স্বচ্ছ ও ভারসাম্যপূর্ণ রিটার্ন ও রিফান্ড পলিসি অনুসরণ করা হয়। যেহেতু পণ্যগুলো স্বাধীন বিক্রেতাদের মাধ্যমে সরাসরি সরবরাহ করা হয়, তাই নিম্নোক্ত নিয়মাবলী প্রযোজ্য হবে:
+6. Dispute Escalation & Platform Assistance
+If a seller is unresponsive, unfairly refuses a valid return, or fails to issue an approved refund, buyers can escalate the issue through the "My Purchases" page or email support@arisesell.com. Arise Store will intervene to protect the buyer and take disciplinary action against defaulting sellers.`,
+    bn: `অ্যারাইজ স্টোর-এ ক্রেতাদের স্বচ্ছ ও সুরক্ষিত কেনাকাটার অভিজ্ঞতা নিশ্চিত করতে একটি নিয়মতান্ত্রিক রিটার্ন ও রিফান্ড নীতিমালা অনুসরণ করা হয়।
 
-১. পার্সেল গ্রহণ ও ডেলিভারির সময় যাচাইকরণ
-• কুরিয়ার ডেলিভারি পার্সন যখন পার্সেল নিয়ে আসবেন, তখন তার সামনে পার্সেলটি পরীক্ষা করে গ্রহণ করুন।
-• পণ্যটি যদি ভাঙা, ফাটা, নষ্ট বা ভুল পাঠানো হয়ে থাকে, তবে ডেলিভারি ম্যানের সামনেই পার্সেলটি গ্রহণ না করে ফেরত দিন (রিটার্ন করুন)।
-• কোনো লুকানো ত্রুটি থাকলে ডেলিভারি পাওয়ার ২৪ থেকে ৪৮ ঘণ্টার মধ্যে আনবক্সিং ভিডিও বা ছবিসহ বিক্রেতার সাথে যোগাযোগ করুন।
+১. বিক্রেতা-ভিত্তিক রিটার্ন ও রিফান্ড
+অ্যারাইজ স্টোরের প্রতিটি স্বাধীন শপ নিজস্ব রিটার্ন ও রিফান্ড পলিসি পরিচালনা করে। পণ্য ফেরত, পরিবর্তন বা টাকা ফেরতের আবেদন সংশ্লিষ্ট বিক্রেতার মাধ্যমে বাস্তবায়িত হয়।
 
-২. রিটার্ন ও পরিবর্তনের শর্তাবলী
-• পণ্যটি অব্যবহৃত, অক্ষত এবং পুনর্বিক্রয়যোগ্য অবস্থায় থাকতে হবে।
-• মূল প্যাকেজিং, ট্যাগ, ক্যাশ মেমো এবং সাথে থাকা অন্যান্য এক্সেসরিজ অক্ষত থাকতে হবে।
-• সুনির্দিষ্ট কারণ ছাড়া ব্যবহৃত বা গ্রাহকের নিজের অসাবধানতায় ক্ষতিগ্রস্ত পণ্য রিটার্নযোগ্য নয়।
+২. পণ্য গ্রহণ ও ত্রুটি রিপোর্ট করার সময়সীমা
+• কুরিয়ার থেকে পার্সেল গ্রহণের পর অনতিবিলম্বে পণ্যটি পরীক্ষা করুন।
+• যদি পণ্যটি ভাঙা, ত্রুটিপূর্ণ, নষ্ট বা ভুল মডেলের হয়ে থাকে, তবে ডেলিভারি পাওয়ার সর্বোচ্চ ৪৮ ঘণ্টার মধ্যে বিক্রেতা বা সাপোর্ট টিমে অভিযোগ জানাতে হবে।
+• আনবক্সিং ভিডিও প্রমাণ: পার্সেল খোলার সময় একটি নিরবচ্ছিন্ন ভিডিও ধারণ করার পরামর্শ দেওয়া হচ্ছে। কোনো ত্রুটি বা ভুল পণ্যের ক্ষেত্রে এই ভিডিওটি মূল প্রমাণ হিসেবে বিবেচিত হবে।
 
-৩. অগ্রিম ডেলিভারি চার্জ সংক্রান্ত নিয়ম
-• ক্যাশ অন ডেলিভারি (COD) অর্ডারের ক্ষেত্রে যদি গ্রাহক পণ্য কোনো ত্রুটি ছাড়াই অহেতুক গ্রহণ না করেন বা ডেলিভারি ফিরিয়ে দেন, তবে প্রদত্ত অগ্রিম ডেলিভারি চার্জটি অফেরতযোগ্য (Non-refundable), কারণ এটি কুরিয়ার কোম্পানিকে পরিবহন খরচ বাবদ পরিশোধিত হয়।
-• কিন্তু বিক্রেতার ভুলের কারণে (ভুল পণ্য বা নষ্ট পণ্য) রিটার্ন হলে পুনঃডেলিভারির কুরিয়ার খরচ বিক্রেতা বহন করবেন।
+৩. রিটার্নের সাধারণ শর্তাবলী
+• পণ্যটি অবশ্যই অব্যবহৃত, অক্ষত এবং আসল প্যাকেজিং, ট্যাগ ও এক্সেসরিজসহ থাকতে হবে।
+• ব্যক্তিগত ব্যবহারের জিনিসপত্র (যেমন অন্তর্বাস, কসমেটিক্স, হাইজিন প্রোডাক্ট) বা কাস্টমাইজড পণ্য ত্রুটিহীন থাকলে ফেরতযোগ্য নয়।
 
-৪. ডিজিটাল পণ্য সংক্রান্ত রিফান্ড নীতি
-• ডিজিটাল সফটওয়্যার কোড বা লাইসেন্স একবার সরবরাহ ও সক্রিয় (Activated) হয়ে গেলে তা পরিবর্তন বা রিফান্ডযোগ্য নয়।
-• সরবরাহকৃত কী (Key) যদি প্রথম থেকেই অকার্যকর প্রমাণিত হয়, তবে বিক্রেতা নতুন কোড প্রদান করবেন।
+৪. অগ্রিম টাকা ও রিফান্ড প্রক্রিয়া
+• যদি বিক্রেতা পণ্য ডেলিভারি দিতে ব্যর্থ হন বা ডেলিভারির পূর্বে অর্ডার বাতিল করা হয়, তবে ক্রেতার প্রদত্ত অগ্রিম টাকা ৫-৭ কার্যদিবসের মধ্যে যে মাধ্যমে টাকা পাঠানো হয়েছিল (বিকাশ/নগদ/ব্যাংক) সে মাধ্যমেই ফেরত দেওয়া হবে।
+• বিক্রেতার ভুলের কারণে (ভুল বা ভাঙা পণ্য) রিটার্ন হলে কুরিয়ার খরচ বিক্রেতা বহন করবেন।
+• রিটার্নকৃত পণ্য বিক্রেতার নিকট পৌঁছানোর পর যাচাই শেষ করে ৫-৭ কার্যদিবসের মধ্যে রিফান্ড বা রিপ্লেসমেন্ট প্রদান করা হবে।
 
-৫. রিফান্ড সম্পন্ন হওয়ার সময়সীমা
-• বিক্রেতা ফেরত আসা পণ্যটি পাওয়ার পর যাচাই-বাছাই শেষে ৩ থেকে ৭ কার্যদিবসের মধ্যে রিফান্ডের টাকা ক্রেতার বিকাশ/নগদ বা ব্যাংক অ্যাকাউন্টে পাঠিয়ে দেওয়া হয়।
+৫. ডিজিটাল পণ্য ও লাইসেন্সের ক্ষেত্রে
+ডিজিটাল লাইসেন্স কি, সফটওয়্যার বা সাবস্ক্রিপশন ডেলিভারি হওয়ার পর সাধারণত তা ফেরতযোগ্য নয়। তবে ডেলিভারির সময় কি (Key) অকার্যকর বা মেয়াদোত্তীর্ণ প্রমাণিত হলে ২৪ ঘণ্টার মধ্যে জানালে বিক্রেতা নতুন সচল কি বা রিফান্ড প্রদান করবেন।
 
-৬. প্ল্যাটফর্ম সহায়তা ও মধ্যস্থতা
-বিক্রেতার সাথে যোগাযোগ করে ৭২ ঘণ্টার মধ্যে যৌক্তিক সমাধান না পেলে, আপনার অর্ডার আইডি সহ অ্যারাইজ স্টোর সাপোর্টে (support@arisesell.com) যোগাযোগ করুন। আমাদের টিম দ্রুত তদন্তপূর্বক সমাধান নিশ্চিত করবে।`
+৬. প্ল্যাটফর্ম বিরোধ নিষ্পত্তি
+কোনো বিক্রেতা যদি ন্যায্য রিটার্ন বা রিফান্ডে অনীহা দেখান, তবে ক্রেতা "মাই পারচেজ" থেকে রিপোর্ট করতে পারবেন। প্ল্যাটফর্ম কর্তৃপক্ষ ক্রেতার স্বার্থ সুরক্ষায় যথাযথ ব্যবস্থা গ্রহণ করবে।`
   },
+
   privacy: {
-    en: `Arise Store values and respects your personal privacy. This Privacy Policy outlines how your information is collected, utilized, and safeguarded across our multi-vendor marketplace platform.
+    en: `Your privacy is of paramount importance to Arise Store. This Privacy Policy explains how we collect, use, store, and safeguard your personal information when you use our marketplace platform.
 
 1. Information We Collect
-When you browse, register, or place an order on Arise Store, we collect only information necessary to process transactions:
-• Order Fulfillment Data: Recipient full name, mobile phone number, complete delivery address, and district.
-• Transaction Verification Data: Mobile wallet transaction identifiers (TrxID), payment method, and order reference codes.
-• Technical Session Data: Browser type, device operating system, IP address, and secure cookie tokens for session integrity and CSRF protection.
+When you browse, search, or place orders on Arise Store, we may collect:
+• Customer Identity & Contact Data: Full name, phone number, email address, and order notes.
+• Delivery Details: Shipping address, city/division, and district for courier logistics.
+• Transaction References: Order references, chosen payment provider (bKash, Nagad, COD), and customer-submitted Transaction IDs (TrxID) for verification.
+• Device & Technical Data: Browser type, operating system, IP address, and session timestamps to ensure security, prevent fraud, and optimize browsing speed.
 
 2. How We Use Your Information
-Your information is used strictly for:
-• Routing and fulfilling your orders with the relevant independent seller.
-• Generating shipping labels and facilitating parcel delivery via integrated courier partners (e.g. SteadFast, Pathao).
-• Communicating order status updates, tracking links, and payment verification notices.
-• Detecting, preventing, and mitigating fraudulent transactions and unauthorized activities.
+We collect and use your data strictly for legitimate operational purposes:
+• Processing, confirming, and updating your purchases and quotes.
+• Providing essential delivery details to the merchant shop and courier service delivering your parcel.
+• Facilitating real-time order tracking, delivery status SMS, and payment confirmation.
+• Detecting, preventing, and mitigating fraudulent transactions or platform abuse.
 
-3. Information Sharing with Sellers and Couriers
-To fulfill your purchase, your contact details (name, phone, delivery address) are shared strictly with:
-• The specific independent seller whose products you purchased.
-• The designated courier logistics service assigned to deliver your parcel.
-Neither sellers nor courier services are authorized to use your personal information for unrelated marketing purposes.
+3. Sharing with Third Parties
+• Independent Sellers: Your name, delivery address, and phone number are shared solely with the shop fulfilling your order.
+• Courier Partners: Necessary shipping details are provided to licensed courier services (e.g., Steadfast, Pathao) solely for parcel delivery.
+• Legal Obligations: We may disclose data if required by law enforcement or competent judicial authorities of Bangladesh.
+• We NEVER sell, rent, lease, or monetize customer personal data to third-party advertising or telemarketing networks.
 
-4. Financial Security & No PIN Storage
-Arise Store never asks for, collects, or stores your personal mobile banking PINs, account passwords, or one-time passcodes (OTPs). Payments are processed securely via direct wallet provider channels (bKash, Nagad, Bank).
+4. Financial Data Protection
+Arise Store does NOT store or collect your mobile financial service PINs, OTPs, bank passwords, or debit/credit card CVV codes. All payments are conducted through external official apps (bKash, Nagad) or direct merchant accounts.
 
-5. Zero Third-Party Data Monetization
-We do not sell, rent, lease, or distribute your personal contact information to third-party advertising companies or marketing aggregators.
+5. Data Security Standards
+We implement industry-standard encryption (HTTPS/TLS), HttpOnly cookies, and strict CSRF tokens to protect your sessions and order history against unauthorized access.
 
-6. Data Retention and Buyer Rights
-Order details are maintained in accordance with accounting and commercial record-keeping regulations. Customers may request review, correction, or deletion of their account records by contacting support@arisesell.com.`,
-    bn: `অ্যারাইজ স্টোর আপনার ব্যক্তিগত তথ্যের গোপনীয়তা রক্ষায় দৃঢ় প্রতিশ্রুতিবদ্ধ। আমাদের প্ল্যাটফর্মে আপনার তথ্য কীভাবে সংরক্ষিত ও ব্যবহৃত হয় তা নিচে স্পষ্ট করা হলো:
+6. Your Rights & Inquiries
+You may review your order history at any time via "My Purchases" or request data corrections by contacting our privacy desk at privacy@arisesell.com.`,
+    bn: `অ্যারাইজ স্টোর আপনার ব্যক্তিগত তথ্যের গোপনীয়তা ও সুরক্ষায় প্রতিশ্রুতিবদ্ধ। এই নীতিমালায় আমরা ব্যাখ্যা করছি কীভাবে আপনার তথ্য সংগৃহীত, ব্যবহৃত ও সুরক্ষিত হয়।
 
-১. যেসব তথ্য আমরা সংগ্রহ করি
-অর্ডার সম্পন্ন ও ডেলিভারির সুবিধার্থে আমরা নিম্নোক্ত তথ্যসমূহ সংগ্রহ করি:
-• ক্রেতার নাম, যোগাযোগের মোবাইল নম্বর, পূর্ণাঙ্গ ডেলিভারি ঠিকানা ও জেলা।
-• পেমেন্ট ভেরিফিকেশনের জন্য ট্রানজাকশন আইডি (TrxID) এবং অর্ডার রেফারেন্স।
-• ব্রাউজার সেশন নিরাপত্তা ও সিএসআরএফ (CSRF) সুরক্ষার জন্য প্রযুক্তিগত কুকিজ।
+১. আমরা কী কী তথ্য সংগ্রহ করি
+আমাদের প্ল্যাটফর্মে কেনাকাটার সময় আমরা নিম্নোক্ত তথ্যসমূহ সংগ্রহ করে থাকি:
+• যোগাযোগের তথ্য: গ্রাহকের পূর্ণ নাম, সক্রিয় মোবাইল নম্বর, ইমেইল ঠিকানা (ঐচ্ছিক)।
+• ডেলিভারির ঠিকানা: ফিজিক্যাল পণ্য কুরিয়ারে পৌঁছানোর জন্য গ্রাহকের জেলা, থানা ও পূর্ণাঙ্গ ডেলিভারি ঠিকানা।
+• লেনদেনের রেফারেন্স: পেমেন্ট মেথড (বিকাশ/নগদ/সিওডি), অর্ডার আইডি ও ট্রানজাকশন আইডি (TrxID)।
+• প্রযুক্তিগত তথ্য: ব্রাউজার ও ডিভাইসের তথ্য, আইপি অ্যাড্রেস যা প্ল্যাটফর্মের নিরাপত্তা বজায় রাখা ও প্রতারণা রোধে সহায়ক।
 
 ২. তথ্যের ব্যবহার
-সংগৃহীত তথ্য শুধুমাত্র নিচের কাজগুলোতে ব্যবহৃত হয়:
-• সংশ্লিষ্ট বিক্রেতার মাধ্যমে আপনার অর্ডারটি প্রস্তুত ও নিশ্চিতকরণ।
-• কুরিয়ার সার্ভিসের মাধ্যমে আপনার ঠিকানায় পার্সেল পৌঁছানো এবং ট্র্যাকিং আপডেট প্রদান।
-• প্রতারণামূলক লেনদেন রোধ এবং নিরাপদ কেনাকাটা নিশ্চিতকরণ।
+সংগৃহীত তথ্য শুধুমাত্র নিম্নোক্ত উদ্দেশ্যে ব্যবহৃত হয়:
+• অর্ডার প্রসেসিং ও পণ্য ডেলিভারি সম্পন্ন করা।
+• অর্ডার ট্র্যাকিং এবং ডেলিভারি সংক্রান্ত প্রয়োজনীয় আপডেট প্রদান করা।
+• পেমেন্ট ভেরিফিকেশন ও গ্রাহক সেবা নিশ্চিত করা।
+• প্ল্যাটফর্মের নিরাপত্তা নিশ্চিত করা ও জালিয়াতি রোধ করা।
 
-৩. বিক্রেতা ও কুরিয়ারের সাথে তথ্য আদান-প্রদান
-অর্ডার ডেলিভারির স্বার্থে আপনার নাম, ঠিকানা ও ফোন নম্বর শুধুমাত্র সংশ্লিষ্ট বিক্রেতা এবং দায়িত্বপ্রাপ্ত কুরিয়ার কোম্পানির সাথে শেয়ার করা হয়। কোনো অবস্থাতেই বাণিজ্যিক প্রচারের উদ্দেশ্যে এই তথ্য অন্য কারও কাছে বিক্রি বা ভাড়া দেওয়া হয় না।
+৩. তথ্য আদান-প্রদান
+• সংশ্লিষ্ট বিক্রেতা ও কুরিয়ার: শুধুমাত্র যে বিক্রেতার কাছ থেকে পণ্য কিনছেন, তাকে এবং ডেলিভারির কাজে নিয়োজিত কুরিয়ার সংস্থাকে (যেমন: Steadfast, Pathao) পার্সেল পৌঁছে দেওয়ার জন্য আপনার নাম, ঠিকানা ও ফোন নম্বর সরবরাহ করা হয়।
+• কোনো অবস্থাতেই আমরা গ্রাহকের ব্যক্তিগত তথ্য তৃতীয় কোনো বিপণন বা বিজ্ঞাপনী সংস্থার কাছে বিক্রি বা অপব্যবহার করি না।
 
 ৪. আর্থিক তথ্যের নিরাপত্তা
-অ্যারাইজ স্টোর কখনোই গ্রাহকের বিকাশ, নগদ বা ব্যাংক অ্যাকাউন্টের পিন (PIN) বা ওটিপি (OTP) সংগ্রহ বা সংরক্ষণ করে না। সকল আর্থিক লেনদেন সরাসরি নিরাপদ মোবাইল ব্যাংকিং চ্যানেলে সম্পন্ন হয়।
+অ্যারাইজ স্টোর কখনোই আপনার বিকাশ/নগদ পিন, পাসওয়ার্ড বা ওটিপি সংগ্রহ বা সংরক্ষণ করে না। সকল পেমেন্ট সরাসরি মোবাইল ওয়ালেটের মাধ্যমে সম্পন্ন হয়।
 
-৫. গ্রাহক অধিকার
-আপনার সংরক্ষিত তথ্যের কোনো সংশোধন বা অনুসন্ধানের প্রয়োজন হলে সরাসরি আমাদের সাপোর্ট টিমে (support@arisesell.com) যোগাযোগ করতে পারেন।`
+৫. তথ্যের সুরক্ষা
+আমরা আধুনিক এনক্রিপশন ও সাইবার সিকিউরিটি মানদণ্ড বজায় রেখে গ্রাহকের ডাটা সুরক্ষিত রাখি।`
   },
+
   about: {
-    en: `Welcome to Arise Store — Bangladesh's modern, unified multi-vendor commerce marketplace powered by AriseSell.
+    en: `Welcome to Arise Store — Bangladesh's modern, transparent multi-vendor marketplace connecting you directly with verified independent merchant shops, fashion brands, and digital creators.
 
-1. Who We Are
-Arise Store originated as a verified destination for digital tools, software licenses, and productivity assets. Today, Arise Store has evolved into a comprehensive multi-category marketplace hosting independent sellers and artisan brands across Bangladesh. From modern fashion, leather footwear, and lifestyle essentials to technology accessories and digital products, Arise Store brings independent commerce into one cohesive, beautifully designed storefront.
+Powered by the AriseSell commerce ecosystem, Arise Store empowers passionate local shop owners and entrepreneurs while offering shoppers a secure, unified browsing and checkout experience for both physical lifestyle products and digital goods.
 
-2. Powered by AriseSell
-Every merchant on Arise Store operates through AriseSell — an advanced merchant operating engine providing live inventory management, direct carrier courier integrations, transparent order tracking, and flexible payment processing. This ensures that every order you place is synced in real-time directly with the seller's actual stock and fulfillment pipeline.
+What Defines Arise Store:
+• Direct-from-Merchant Shopping: Discover independent stores from across Bangladesh. Every purchase directly supports genuine local entrepreneurs and growing brands.
+• Multi-Category Variety: Explore diverse collections — trendy footwear, apparel, fashion accessories, electronics, lifestyle goods, productivity software licenses, educational resources, and digital subscriptions.
+• Real-Time Order & Delivery Tracking: Seamlessly track physical courier parcels with Steadfast and leading logistics partners, or monitor payment verification steps directly from your orders page.
+• Verified Buyer Reviews: Every review published on our marketplace originates exclusively from real customers who placed a verified, delivered purchase.
+• Strict Marketplace Standards: We actively monitor shop performance and customer feedback to ensure fair pricing, genuine products, and responsive customer service.
 
-3. Our Core Pillars
-• Direct Support for Independent Businesses: When you shop on Arise Store, your purchase directly supports independent creators, local entrepreneurs, and growing retail brands.
-• Transparent Pricing & Real Stock: No inflated discounts, fake countdowns, or phantom products. All prices, stock levels, and delivery charges are source-owned and transparent.
-• Buyer Security & Clear Tracking: With courier integration, SMS/WhatsApp order status, and clear payment verification, you always know the status of your purchase.
+Our Vision:
+To foster a trustworthy digital commerce economy in Bangladesh where local businesses thrive independently and customers shop with complete peace of mind.`,
+    bn: `অ্যারাইজ স্টোর (Arise Store)-এ আপনাকে স্বাগতম — বাংলাদেশের আধুনিক ও নির্ভরযোগ্য মাল্টি-ভেন্ডার ই-কমার্স মার্কেটপ্লেস।
 
-4. Join Our Marketplace
-Are you an independent seller or creator? Launch your store effortlessly on AriseSell and showcase your catalog to buyers across the country. Visit "Open your shop" to get started today.`,
-    bn: `অ্যারাইজ স্টোরে (Arise Store) স্বাগতম — AriseSell প্রযুক্তিতে পরিচালিত বাংলাদেশের আধুনিক মাল্টি-ভেন্ডার ই-কমার্স মার্কেটপ্লেস।
+অ্যারাইজসেল (AriseSell)-এর উন্নত প্রযুক্তি সহায়তায় পরিচালিত অ্যারাইজ স্টোর দেশের শীর্ষস্থানীয় স্বাধীন উদ্যোক্তা, ফ্যাশন ব্র্যান্ড এবং ডিজিটাল নির্মাতাদের সাথে ক্রেতাদের সরাসরি সংযুক্ত করে।
 
-১. আমাদের পরিচয়
-অ্যারাইজ স্টোরের যাত্রা শুরু হয়েছিল ডিজিটাল সফটওয়্যার লাইসেন্স ও টেকনোলজি সমাধানের মাধ্যমে। বর্তমানে অ্যারাইজ স্টোর বাংলাদেশের স্বাধীন বিক্রেতা, বুটিক ও ব্র্যান্ডগুলোর জন্য একটি উন্মুক্ত মাল্টি-ক্যাটাগরি মার্কেটপ্লেসে রূপান্তরিত হয়েছে। ফ্যাশন, জুতো, ইলেকট্রনিক্স, দৈনন্দিন লাইফস্টাইল পণ্য থেকে শুরু করে ডিজিটাল সামগ্রী—সবকিছুই এখন এক ঠিকানায় সহজ ও নির্ভরযোগ্যভাবে পাওয়া যায়।
+আমাদের বিশেষত্ব:
+• স্বাধীন শপ থেকে সরাসরি কেনাকাটা: দেশের যেকোনো প্রান্তের নির্ভরযোগ্য মার্চেন্ট শপ থেকে সহজে পছন্দের পণ্য বেছে নিন।
+• বৈচিত্র্যময় পণ্যসম্ভার: প্রিমিয়াম ফ্যাশন, জুতা, পোশাক থেকে শুরু করে সফটওয়্যার লাইসেন্স ও ডিজিটাল সাবস্ক্রিপশন — সবকিছু একই প্ল্যাটফর্মে।
+• স্বচ্ছ ও নিরাপদ ডেলিভারি: কুরিয়ার ট্র্যাকিং, ডেলিভারি চার্জের স্বচ্ছতা এবং সরাসরি বিক্রেতার অনুমোদিত একাউন্টে নিরাপদ লেনদেন।
+• ভেরিফায়েড রিভিউ: প্রতিটি রিভিউ শুধুমাত্র আসল ক্রেতাদের বাস্তব ক্রয়ের অভিজ্ঞতার ভিত্তিতে প্রকাশিত হয়।
+• ক্রেতা সুরক্ষা: বিক্রেতাদের মানদণ্ড নিয়মিত পর্যবেক্ষণ ও মনিটরিং করা হয় যাতে ক্রেতারা পান সর্বোচ্চ সেবা।
 
-২. AriseSell এর প্রযুক্তি
-অ্যারাইজ স্টোরের প্রতিটি শপ AriseSell সিস্টেমের সাথে সরাসরি যুক্ত। এর ফলে পণ্যের লাইভ স্টক, কুরিয়ার ট্র্যাকিং, বিক্রেতার নিজস্ব পেমেন্ট মেথড এবং স্বচ্ছ ডেলিভারি চার্জ স্বয়ংক্রিয়ভাবে সিঙ্ক থাকে।
-
-৩. আমাদের মূল লক্ষ্য
-• স্বাধীন উদ্যোক্তাদের ক্ষমতায়ন: অ্যারাইজ স্টোরে কেনাকাটার মাধ্যমে আপনি সরাসরি দেশীয় উদ্যোক্তা ও স্বাধীন ব্র্যান্ডগুলোকে উৎসাহিত করছেন।
-• শতভাগ স্বচ্ছতা: কোনো কৃত্রিম ডিসকাউন্ট বা ফেক স্টক নয়; বিক্রেতার মূল মূল্য এবং বাস্তব স্টক প্রদর্শিত হয়।
-• নিরাপদ কেনাকাটা: স্বচ্ছ অর্ডার ট্র্যাকিং ও কুরিয়ার ডেলিভারি নিশ্চিতকরণ।
-
-৪. বিক্রেতা হিসেবে যুক্ত হোন
-আপনি কি একজন স্বাধীন ব্যবসায়ী বা পণ্যের প্রস্তুতকারক? AriseSell-এ আপনার শপ খুলে আজই যুক্ত হোন আমাদের মার্কেটপ্লেসে।`
+আমাদের লক্ষ্য:
+বাংলাদেশের ডিজিটাল কমার্সকে আরও নির্ভরযোগ্য, স্বচ্ছ এবং উদ্যোক্তাবান্ধব করে গড়ে তোলা, যেখানে প্রতিটি লেনদেন হয় নিরাপদ ও নির্ভরযোগ্য।`
   },
+
   contact: {
-    en: `We are here to help you have the best possible shopping experience on Arise Store.
+    en: `We are here to assist you with any inquiries, order updates, or support needs across the Arise Store marketplace.
 
-1. Product & Order Inquiries (Contact the Seller Directly)
-Because products are sold and fulfilled by independent merchants, the quickest way to resolve questions regarding item sizing, material details, delivery status, or parcel tracking is to contact the shop owner directly:
-• Check the seller's contact details, phone number, and WhatsApp link displayed on the product page and shop profile.
-• You can also click the floating WhatsApp button on any shop or product page for instant communication.
+1. Marketplace Helpdesk & Platform Inquiries
+For general marketplace questions, account assistance, technical issues, or reporting seller misconduct:
+• Email Support: support@arisesell.com
+• Live WhatsApp Support: Click the floating WhatsApp button on the bottom-right of any page to message our support team directly.
+• Helpdesk Hours: Saturday to Thursday, 10:00 AM – 10:00 PM (BST).
 
-2. Marketplace Platform Support
-For platform-level questions, merchant onboarding inquiries, technical support, or unresolved seller disputes:
-• Email: support@arisesell.com / contact@arise.store
-• Helpline Hours: Saturday to Thursday, 10:00 AM – 8:00 PM (BST)
-• Order Tracking: Use the "Track Order" link in the footer with your Order Reference ID.
+2. Order, Sizing & Delivery Inquiries (Shop Support)
+Because Arise Store is a marketplace of independent merchant shops:
+• For questions regarding specific product sizes, colors, material specifications, courier dispatch status, or exchange requests, please contact the specific seller directly.
+• You can find each shop's direct phone number, WhatsApp link, and address on their respective Shop Page or by clicking their shop name on any product listing.
 
-3. Reporting a Problem
-If you suspect an unauthorized listing, fraudulent seller, or copyright infringement, please notify our moderation team immediately via support@arisesell.com.`,
-    bn: `অ্যারাইজ স্টোরে আপনার কেনাকাটা নিরাপদ ও নির্বিঘ্ন রাখতে আমাদের টিম সর্বদা প্রস্তুত।
+3. Merchant Onboarding & Selling on Arise Store
+Are you a business owner, manufacturer, or digital creator?
+• Launch your own branded storefront on Arise Store in minutes using AriseSell.
+• Manage products, payments, stock, and orders with automated courier integrations.
+• Click "Open your shop" in the top navigation bar to get started today.`,
+    bn: `অ্যারাইজ স্টোরে আপনার কেনাকাটা বা যেকোনো প্রয়োজনে আমরা সহায়তায় প্রস্তুত।
 
-১. পণ্য ও অর্ডার সংক্রান্ত তথ্য (সরাসরি বিক্রেতার সাথে যোগাযোগ)
-যেহেতু পণ্যগুলো স্বাধীন বিক্রেতাদের নিজস্ব শপ থেকে সরাসরি সরবরাহ করা হয়, তাই পণ্যের সাইজ, ফেব্রিক, ডেলিভারি বা ট্র্যাকিং সংক্রান্ত যেকোনো তথ্যের জন্য সরাসরি বিক্রেতার সাথে যোগাযোগ করুন:
-• প্রতিটি শপ ও প্রোডাক্ট পেজে বিক্রেতার ফোন ও হোয়াটসঅ্যাপ লিংক দেওয়া রয়েছে।
-• দ্রুত যোগাযোগের জন্য পেজের নিচে থাকা ভাসমান হোয়াটসঅ্যাপ (WhatsApp) বাটনে ক্লিক করতে পারেন।
+১. প্ল্যাটফর্ম সাপোর্ট ও হেল্পডেস্ক
+মার্কেটপ্লেস সংক্রান্ত যেকোনো সাধারণ তথ্য, প্রযুক্তিগত সমস্যা বা অভিযোগের জন্য আমাদের সাথে যোগাযোগ করুন:
+• ইমেইল: support@arisesell.com
+• লাইভ হোয়াটসঅ্যাপ সাপোর্ট: স্ক্রিনের নিচে ডানপাশে থাকা সবুজ হোয়াটসঅ্যাপ বাটনে ক্লিক করুন।
+• হেল্পডেস্ক সময়সূচী: শনিবার থেকে বৃহস্পতিবার, সকাল ১০:০০ টা থেকে রাত ১০:০০ টা।
 
-২. অ্যারাইজ স্টোর প্ল্যাটফর্ম সাপোর্ট
-প্ল্যাটফর্ম সংক্রান্ত কোনো জিজ্ঞাসা, নতুন শপ খোলা, টেকনিক্যাল সমস্যা বা বিক্রেতার সাথে কোনো বিরোধ নিষ্পত্তির জন্য:
-• ইমেইল: support@arisesell.com / contact@arise.store
-• হেল্পলাইন সময়: শনিবার থেকে বৃহস্পতিবার, সকাল ১০:০০ টা থেকে রাত ৮:০০ টা পর্যন্ত।
-• অর্ডার ট্র্যাক: ফুটারের "অর্ডার ট্র্যাক" লিংকে গিয়ে আপনার রেফারেন্স আইডি দিয়ে বর্তমান অবস্থা দেখতে পারেন।`
-  }
+২. নির্দিষ্ট পণ্য ও ডেলিভারি সম্পর্কিত তথ্য (শপ সাপোর্ট)
+যেহেতু অ্যারাইজ স্টোর একটি মাল্টি-ভেন্ডার মার্কেটপ্লেস:
+• নির্দিষ্ট পণ্যের সাইজ, স্টক, ডেলিভারি বা এক্সচেঞ্জ সংক্রান্ত যেকোনো তথ্যের জন্য সরাসরি সংশ্লিষ্ট বিক্রেতার সাথে যোগাযোগ করুন।
+• প্রতিটি প্রডাক্ট পেজে বিক্রেতার নাম ও শপ পেজে তাদের সরাসরি হোয়াটসঅ্যাপ ও ফোন নম্বর দেওয়া আছে।
+
+৩. বিক্রেতা হিসেবে যুক্ত হতে চান?
+আপনি কি আপনার শপ বা পণ্য অ্যারাইজ স্টোরে বিক্রি করতে চান?
+• AriseSell-এর মাধ্যমে যুক্ত হয়ে আপনার স্বাধীন শপ চালু করুন এবং খুব সহজেই সারা বাংলাদেশে পণ্য বিক্রি শুরু করুন।
+• উপরের মেনুবারে "Open your shop" বাটনে ক্লিক করে আজই শুরু করুন।`
+  },
 };
