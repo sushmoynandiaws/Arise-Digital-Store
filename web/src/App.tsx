@@ -3443,6 +3443,17 @@ export function detectPaymentAccountType(payment: any, shop?: Shop | null): "mer
   return "personal";
 }
 
+function formatCountdown(totalSecs: number): string {
+  const secs = Math.max(0, Math.floor(totalSecs));
+  const hours = Math.floor(secs / 3600);
+  const minutes = Math.floor((secs % 3600) / 60);
+  const seconds = secs % 60;
+  if (hours > 0) {
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 export function PaymentInstructionCard({
   order,
   session,
@@ -3460,7 +3471,9 @@ export function PaymentInstructionCard({
     account: extractAccountDigits(order.shop?.contact?.phone || order.shop?.contact?.whatsapp || order.shop?.support) || "Contact seller",
     amount: (Number(order.advance_amount || 0) > 0 ? order.advance_amount : order.total) || order.total,
     trx_id: null,
-    expires_at: new Date(Date.now() + 86400000).toISOString(),
+    expires_at: order.created_at && !isNaN(Date.parse(order.created_at))
+      ? new Date(Date.parse(order.created_at) + 86400000).toISOString()
+      : new Date(Date.now() + 86400000).toISOString(),
     instructions: order.seller_message || undefined,
   } : null);
 
@@ -3616,7 +3629,7 @@ export function PaymentInstructionCard({
           <Clock size={18} aria-hidden="true" />
           <span>{lang === "bn" ? "পেমেন্টের বাকি সময়:" : "Time left to pay:"}</span>
           <strong role="timer" aria-live="off">
-            {String(Math.floor(remainingSeconds / 60)).padStart(2, "0")}:{String(remainingSeconds % 60).padStart(2, "0")}
+            {formatCountdown(remainingSeconds)}
           </strong>
         </p>
       )}
@@ -3644,7 +3657,17 @@ function PurchasePage() {
     );
   const navigate = useNavigate();
   const [now, setNow] = useState(Date.now);
-  const paymentDeadline = order?.payment ? Date.parse(order.payment.expires_at) : (Number(order?.advance_amount || 0) > 0 ? Date.now() + 86400000 : NaN);
+  const fallbackDeadlineRef = useRef<number | null>(null);
+  if (fallbackDeadlineRef.current === null && order) {
+    fallbackDeadlineRef.current = order.created_at && !isNaN(Date.parse(order.created_at))
+      ? Date.parse(order.created_at) + 86400000
+      : Date.now() + 86400000;
+  }
+  const paymentDeadline = order?.payment
+    ? Date.parse(order.payment.expires_at)
+    : (order?.created_at && !isNaN(Date.parse(order.created_at))
+        ? Date.parse(order.created_at) + 86400000
+        : (fallbackDeadlineRef.current ?? NaN));
   const paymentOpen = !!order && (["unpaid", "pending_verification", "review_required"].includes(order.payment_status) || order.delivery_status === "awaiting_advance");
   const ticking = paymentOpen && order?.delivery_status !== "cancelled" && paymentDeadline > now;
   useEffect(() => {
