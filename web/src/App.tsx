@@ -11,6 +11,8 @@ import {
 } from "react";
 import { LangProvider, useLang } from "./i18n.js";
 import { generateQrMatrix } from "./qr.js";
+import { CraftCheckout } from "./CraftCheckout";
+import { ShoppingAssistant } from "./ShoppingAssistant";
 import {
   Link,
   NavLink,
@@ -109,6 +111,13 @@ type Market = {
 };
 const Context = createContext<Market>(null!);
 const useMarket = () => useContext(Context);
+function ShoppingHelp() {
+  const {catalog, session} = useMarket();
+  const shop = useRouteShop();
+  const {pathname} = useLocation();
+  if (!catalog || !session || /^\/(admin|seller|checkout|purchases)(\/|$)/.test(pathname)) return null;
+  return <ShoppingAssistant key={shop?.id || "all-shops"} catalog={catalog} shop={shop}/>;
+}
 const paymentLogos: Record<string, string> = {
   bkash: "/payment-methods/bkash.svg",
   nagad: "/payment-methods/nagad.svg",
@@ -2732,7 +2741,7 @@ function ProductPage() {
                 <button type="button" aria-label="Increase quantity" disabled={!available || quantity >= maximum}
                   onClick={() => setQuantity(Math.min(maximum, quantity + 1))}>+</button>
               </div>
-          <button type="button" className="button secondary" disabled={!canBuy} onClick={() => selected && cart.add(product,selected.id,quantity)}>{lang === "bn" ? "ব্যাগে যোগ করুন" : "Add to bag"}</button>
+          {!product.custom_order && <button type="button" className="button secondary" disabled={!canBuy} onClick={() => selected && cart.add(product,selected.id,quantity)}>{lang === "bn" ? "ব্যাগে যোগ করুন" : "Add to bag"}</button>}
           {canBuy && selected ? (
             <Link
               className="button primary buy-now"
@@ -2859,6 +2868,12 @@ function ProductPage() {
   );
 }
 function Checkout() {
+  const {id} = useParams();
+  const {catalog} = useMarket();
+  const product = catalog?.products.find(p => p.id === id);
+  return product?.custom_order && product.checkout_available !== false ? <CraftCheckout key={product.id} product={product}><CheckoutDetails /></CraftCheckout> : <CheckoutDetails />;
+}
+function CheckoutDetails() {
   const { id } = useParams();
   const { catalog, session } = useMarket();
   const { lang, t } = useLang();
@@ -2926,6 +2941,7 @@ function Checkout() {
             provider,
             coupon_code: couponCode.trim().toUpperCase() || undefined,
             buyer: fields,
+            custom_draft_id: params.get("craft") || undefined,
           }),
         });
         setQuote(result);
@@ -3866,6 +3882,7 @@ function PurchasePage() {
           </div>
         )}
         {order.fulfilment_kind === "physical" && <section className="purchase-buyer-info" aria-label="Delivery details">
+          {!!order.custom_summary?.length && <><h3>{lang === "bn" ? "কাস্টম পণ্যের বিবরণ" : "Custom product details"}</h3>{order.custom_summary.map((text, i) => <p key={i}>{text}</p>)}</>}
           <h3>Delivery details</h3><p className="preserve-lines">{order.address}, {order.district}</p>
           <p>Payment method: {paymentMethodLabel(order.payment_method || "cod")}</p>
           {order.delivery_charge !== undefined && <p>Delivery charge: {money(order.delivery_charge, order.currency)}</p>}
@@ -4913,6 +4930,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
         {!adminRoute && <><RecentlyViewed catalog={catalog} renderProduct={product => <ProductCard product={product}/>}/><Footer /><StickyBottomSponsoredStrip /></>}
+        {!adminRoute && <ShoppingHelp/>}
         </CartProvider>
       </Context.Provider>
       </PromotionsProvider>

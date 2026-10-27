@@ -4,7 +4,7 @@ Write simple, direct English for people buying products in Bangladesh. Use the s
 
 Shop category comes from AriseSell's `Business.kind`. Commerce mode is `standard` or `digital`; each product's `fulfilment_kind` determines checkout and delivery wording. Never label every shop digital or ask sellers to choose their category again. Unknown types show a neutral label and unavailable checkout.
 
-Physical checkout requests the source-required delivery address, district, phone and optional seller-required landmark/alternative phone. Show source-quoted shipping and any required advance before consent. Physical orders show courier tracking, never private digital access. COD delivery does not prove payment settlement. Keep refund/cancellation messages ahead of fulfillment updates. Custom requirements or unsupported source payment capabilities must show an unavailable reason rather than a Buy now promise. Discounts, warranties and expiry dates require source data; browser settings cannot create them.
+Physical checkout requests the source-required delivery address, district, phone and optional seller-required landmark/alternative phone. Show source-quoted shipping and any required advance before consent. Physical orders show courier tracking, never private digital access. COD delivery does not prove payment settlement. Keep refund/cancellation messages ahead of fulfillment updates. Custom products collect source-owned questions, designs and artwork before the final quote. Seller review and customer approval must use the current source proof. Complete one custom product per checkout; a changed selection invalidates the previous review. Unavailable rules or unsupported source payment capabilities must show an unavailable reason rather than a Buy now promise. Discounts, warranties and expiry dates require source data; browser settings cannot create them.
 
 ## Voice
 
@@ -83,3 +83,7 @@ Use the semantic CSS tokens documented in [MASTER.md](MASTER.md). Use native sys
 ## Maintenance
 
 For new screens and states, reuse these terms and typography tokens. Update this guide, relevant copy assertions and the state matrix when the actual product behavior changes. Check rendered mobile and desktop layouts rather than relying on string length alone.
+
+## Shopping assistant
+
+The first version finds published products and matching in-stock options. Use source-returned product data for card prices and stock, then revalidate at checkout. The model interprets search intent; it never writes sales facts or executes orders. Ask for a product category when a gift request is vague. Show unavailable AI distinctly from no matching inventory. Link policy and tracking questions to the appropriate existing pages. Never promise popularity, delivery dates, automatic payment or order confirmation in chat. Voice transcripts remain editable and require explicit submission.

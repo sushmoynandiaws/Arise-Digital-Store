@@ -234,6 +234,7 @@ export function CartProvider({
         row.product &&
         row.variant &&
         canCheckout(row.product, shop) &&
+        !row.product.custom_order &&
         row.product.shop_id === shop.id &&
         productFulfilment(row.product) === productFulfilment(first!) &&
         row.product.currency === first?.currency &&
@@ -247,6 +248,11 @@ export function CartProvider({
     0,
   );
   function add(product: Product, variant: string, quantity: number) {
+    if (product.custom_order) {
+      setError("Complete custom product details using Buy now.");
+      setShown(true);
+      return;
+    }
     setError("");
     setShown(true);
     if (

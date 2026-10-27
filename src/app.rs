@@ -64,6 +64,13 @@ fn build_router(state: AppState, serve_web: bool) -> Router {
         .route("/api/seller/stores/{id}/catalog", get(seller_catalog))
         .route("/api/seller/stores/{id}/listing", put(save_listing))
         .route("/api/checkout/quote", post(quote))
+        .route("/api/assistant", post(shopping_search))
+        .route(
+            "/api/craft",
+            post(save_craft).layer(DefaultBodyLimit::max(1_500_000)),
+        )
+        .route("/api/craft/{id}", get(craft_selection))
+        .route("/api/craft/{id}/approve", post(approve_craft))
         .route("/api/checkout/accept", post(accept))
         .route("/api/orders", get(orders))
         .route("/api/orders/{id}", get(order))
@@ -162,6 +169,11 @@ async fn security(State(state): State<AppState>, request: Request, next: Next) -
             })
             .unwrap_or_else(|| "test".into());
         if let Err(error) = state.rate_limit(&format!("ip:{ip}"), 6000).await {
+            return error.into_response();
+        }
+        if request.uri().path() == "/api/assistant"
+            && let Err(error) = state.rate_limit(&format!("shopping-ip:{ip}"), 120).await
+        {
             return error.into_response();
         }
         if let Some(buyer) = cookie(request.headers(), "arise_buyer")
@@ -611,6 +623,99 @@ async fn quote(
         &headers,
         reqwest::Method::POST,
         "/marketplace/checkout/quote",
+        Some(body),
+    )
+    .await
+}
+async fn save_craft(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> Result<Json<Value>> {
+    ensure_visible(&state, &body).await?;
+    commerce(
+        &state,
+        &headers,
+        reqwest::Method::POST,
+        "/marketplace/craft",
+        Some(body),
+    )
+    .await
+}
+async fn shopping_search(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(mut body): Json<Value>,
+) -> Result<Json<Value>> {
+    if !body.is_object() {
+        return Err(AppError::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Enter a shopping search.",
+        ));
+    }
+    let visitor = buyer(&headers)?;
+    state
+        .rate_limit(&format!("shopping:{}", digest(&visitor)), 30)
+        .await?;
+    let catalog = feed(&state).await?;
+    let shop = body["shop_id"].as_str().map(str::to_owned);
+    if let Some(id) = &shop {
+        uuid(id)?;
+    }
+    let allowed: Vec<Value> = catalog["products"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|p| shop.as_ref().is_none_or(|id| p["shop_id"] == *id))
+        .map(|p| p["id"].clone())
+        .collect();
+    if allowed.len() > 10000 {
+        return Err(AppError::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Choose a shop before searching this catalog.",
+        ));
+    }
+    body["allowed_product_ids"] = json!(allowed);
+    let mut result = commerce(
+        &state,
+        &headers,
+        reqwest::Method::POST,
+        "/marketplace/assistant",
+        Some(body),
+    )
+    .await?;
+    if let Some(matches) = result.0["matches"].as_array_mut() {
+        matches.retain(|m| allowed.contains(&m["product_id"]));
+    }
+    Ok(result)
+}
+async fn craft_selection(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<Value>> {
+    uuid(&id)?;
+    commerce(
+        &state,
+        &headers,
+        reqwest::Method::GET,
+        &format!("/marketplace/craft/{id}"),
+        None,
+    )
+    .await
+}
+async fn approve_craft(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(body): Json<Value>,
+) -> Result<Json<Value>> {
+    uuid(&id)?;
+    commerce(
+        &state,
+        &headers,
+        reqwest::Method::POST,
+        &format!("/marketplace/craft/{id}/approve"),
         Some(body),
     )
     .await

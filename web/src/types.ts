@@ -1,10 +1,14 @@
 export type Variant = {
+  pieces_per_set?: number;
+  size?: string | null;
+  color?: string | null;
   id: string;
   name: string;
   price: string;
   stock: number;
 };
 export type Product = {
+  custom_order?: {revision: string; fields: {id: string; label: string; question: string; type: "text" | "number" | "date" | "select" | "image"; required: boolean; minimum?: number; maximum?: number; options: {label: string; extra_price: string}[]}[]; craft?: {enabled: boolean; allow_mixing: boolean; allow_artwork: boolean; proof_required: boolean; production_days?: number; production_days_to?: number; designs: {code: string; label: string; image_url?: string}[]} | null} | null;
   url_slug?: string;
   id: string;
   shop_id: string;
@@ -104,6 +108,7 @@ export type Quote = {
   };
 };
 export type Purchase = {
+  custom_summary?: string[];
   items?: Quote["snapshot"]["items"];
   fulfilment_kind?: "physical" | "digital";
   payment_method?: string;

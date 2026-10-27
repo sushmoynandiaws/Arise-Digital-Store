@@ -62,5 +62,39 @@
       "Update AriseSell bridge",
       "Deploy storefront"
     ]
+  },
+  "craft_extension": {
+    "source_repository": "nazmulh0/arise-sell",
+    "base_revision": "8331e0ebb0adcb1cbe953e3e8a8b797075904961",
+    "patch": "arisesell-craft.patch",
+    "files": [
+      ".github/workflows/backend-postgres.yml",
+      "backend/app/api/v1/craft.py",
+      "backend/app/api/v1/marketplace.py",
+      "backend/app/services/marketplace_checkout.py",
+      "backend/tests/test_marketplace.py",
+      "frontend/components/orders/CraftReview.tsx",
+      "frontend/lib/api-client.ts",
+      "backend/app/services/marketplace_craft.py",
+      "backend/tests/test_marketplace_craft.py",
+      "backend/app/services/marketplace_assistant.py",
+      "backend/tests/test_marketplace_assistant.py",
+      "backend/docs/marketplace_assistant.md"
+    ],
+    "production_deployed": false,
+    "database_migration_required": false,
+    "new_environment_variables": [],
+    "deployment_order": [
+      "Update AriseSell source bridge and merchant review",
+      "Deploy storefront"
+    ],
+    "capabilities": [
+      "custom_craft_checkout",
+      "read_only_bangla_shopping_assistant"
+    ],
+    "runtime_requirements": [
+      "Existing configured AriseSell AI Gateway",
+      "Existing Redis admission service"
+    ]
   }
 }

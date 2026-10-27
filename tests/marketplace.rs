@@ -40,10 +40,21 @@ async fn setup_with_pool(pool: sqlx::AnyPool) -> (AppState, Requests, tokio::tas
     let calls: Requests = Arc::new(Mutex::new(Vec::new()));
     let captured = calls.clone();
     let listing_calls = calls.clone();
+    let shopping_calls = calls.clone();
     let source=Router::new()
         .route("/index.html",get(||async {axum::response::Html("<!doctype html><html><head><title>Arise Store</title></head><body><div id='root'></div><script src='/assets/app.js'></script></body></html>")}))
         .route("/api/v1/marketplace/feed",get(||async {Json(json!({"shops":[{"id":SHOP,"slug":"test-shop","name":"Test shop"}],"products":[{"id":PRODUCT,"shop_id":SHOP,"name":"Owned product","url_slug":"owned-product","description":"Plain text <img src=x onerror=alert(1)>","currency":"BDT","variants":[{"price":"12.50","stock":2}]}]}))}))
         .route("/api/v1/marketplace/checkout/{id}/scope",get(||async {Json(json!({"shop_id":SHOP,"product_id":PRODUCT,"items":[{"product_id":"99999999-9999-4999-8999-999999999999"}]}))}))
+        .route("/api/v1/marketplace/craft",post(|headers:axum::http::HeaderMap, Json(value):Json<Value>|async move {
+            assert_eq!(headers["x-marketplace-buyer"], BUYER);
+            Json(json!({"id":"custom-draft","bytes":value["artwork"].as_str().unwrap().len()}))
+        }))
+        .route("/api/v1/marketplace/assistant",post(move |Json(value):Json<Value>| {
+            let calls=shopping_calls.clone(); async move {
+                calls.lock().unwrap().push(("assistant".into(),value));
+                Json(json!({"state":"results","matches":[{"product_id":PRODUCT,"variant_ids":[]},{"product_id":"99999999-9999-4999-8999-999999999999","variant_ids":[]}]}))
+            }
+        }))
         .route("/api/v1/marketplace/me",get(|headers:axum::http::HeaderMap|async move {
             if headers.get("authorization").and_then(|v|v.to_str().ok())==Some("Bearer revoked") {return (StatusCode::UNAUTHORIZED,Json(json!({"detail":"Session revoked"}))).into_response();}
             Json(json!({"user":{"id":"user-1","admin":headers.get("authorization").and_then(|v|v.to_str().ok())==Some("Bearer admin")},"shops":[]})).into_response()
@@ -1827,5 +1838,54 @@ async fn cart_checkout_checks_every_line_and_accept_uses_source_scope_instead_of
         app.oneshot(accept).await.unwrap().status(),
         StatusCode::CONFLICT
     );
+    server.abort();
+}
+
+#[tokio::test]
+async fn custom_images_use_a_bounded_route_and_source_buyer_capability() {
+    let (state, _, server) = setup().await;
+    let app = router(state);
+    let mut request = write(
+        "/api/craft",
+        json!({"shop_id":SHOP,"product_id":PRODUCT,"artwork":"a".repeat(70000)}),
+    );
+    *request.method_mut() = axum::http::Method::POST;
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(body(response).await["bytes"], 70000);
+    let mut request = write(
+        "/api/craft",
+        json!({"shop_id":SHOP,"product_id":PRODUCT,"artwork":"a".repeat(1_500_000)}),
+    );
+    *request.method_mut() = axum::http::Method::POST;
+    assert_eq!(
+        app.oneshot(request).await.unwrap().status(),
+        StatusCode::PAYLOAD_TOO_LARGE
+    );
+    server.abort();
+}
+
+#[tokio::test]
+async fn shopping_search_overwrites_client_catalog_scope_and_filters_source_results() {
+    let (state, calls, server) = setup().await;
+    let app = router(state);
+    let mut request = write(
+        "/api/assistant",
+        json!({"message":"জুতা","shop_id":SHOP,"allowed_product_ids":["99999999-9999-4999-8999-999999999999"]}),
+    );
+    *request.method_mut() = axum::http::Method::POST;
+    let response = app.oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        body(response).await["matches"],
+        json!([{"product_id":PRODUCT,"variant_ids":[]}])
+    );
+    let calls = calls.lock().unwrap();
+    let payload = &calls
+        .iter()
+        .find(|(name, _)| name == "assistant")
+        .unwrap()
+        .1;
+    assert_eq!(payload["allowed_product_ids"], json!([PRODUCT]));
     server.abort();
 }

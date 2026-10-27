@@ -57,7 +57,7 @@ jobs:
           mkdir -p ../artifacts
           npx vite preview --host 127.0.0.1 --port 5173 --strictPort > ../artifacts/vite-preview.log 2>&1 &
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:5173/ >/dev/null && break; sleep 1; done
-          npx playwright test tests/admin-console.spec.ts tests/payment-countdown.spec.ts tests/shop-pages.spec.ts tests/shop-support.spec.ts tests/product-purchase.spec.ts tests/checkout.spec.ts tests/reviews.spec.ts tests/store-types.spec.ts tests/growth.spec.ts --workers=1
+          npx playwright test tests/admin-console.spec.ts tests/payment-countdown.spec.ts tests/shop-pages.spec.ts tests/shop-support.spec.ts tests/product-purchase.spec.ts tests/checkout.spec.ts tests/reviews.spec.ts tests/store-types.spec.ts tests/growth.spec.ts tests/craft-checkout.spec.ts tests/shopping-assistant.spec.ts --workers=1
           npx playwright test tests/ui-refresh.spec.ts --grep "keyboard|moderation errors" --workers=1
           npx playwright test tests/product-purchase.spec.ts --repeat-each=5 --workers=1
       - uses: actions/upload-artifact@v4
