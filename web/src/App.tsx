@@ -90,6 +90,7 @@ import type { Catalog, Shop, Product, Session, Quote, Purchase } from "./types";
 import { productForRoute, productPath, productSection, type ProductSection } from "./product";
 import { ProductReviews, PurchaseReview, ShopReviews } from "./Reviews";
 import { shopPageSections, defaultPlatformPolicies } from "./shopPages";
+import { StoreFaqAccordion } from "./Faq";
 import { LiveTracking, CourierStatus, CartProvider, CartButton, useCart, rememberProduct, RecentlyViewed, ShopBadge, FlashDeals, VisitTracker, ProductQuestions, SellerQuestions, OffersEditor } from "./Commerce";
 import {
   PromotionsProvider,
@@ -1220,7 +1221,11 @@ function ShopInformationPage() {
         <h1>{title}</h1>
       </div>
       <article className="panel shop-policy-content">
-        {text ? <p className="preserve-lines">{text}</p> : (
+        {section.key === "faq" ? (
+          <StoreFaqAccordion shop={shop} standalone={true} />
+        ) : (
+          <>
+            {text ? <p className="preserve-lines">{text}</p> : (
           (!shop || section.key !== "contact") && <p className="muted">{lang === "bn"
             ? "এই তথ্য এখনও যোগ করা হয়নি। বিস্তারিত জানতে যোগাযোগ করুন।"
             : "This information has not been added yet. Contact support for details."}</p>
@@ -1235,6 +1240,8 @@ function ShopInformationPage() {
                 <Phone size={16} aria-hidden="true" />{lang === "bn" ? "সাপোর্টে যোগাযোগ করুন" : "Contact support"}<ArrowRight size={16} aria-hidden="true" />
               </a>
             </div>}
+          </>
+        )}
           </>
         )}
       </article>
@@ -2417,6 +2424,9 @@ function ShopPage() {
       </section>
       <div className="container"><ShopBadge shop={shop}/></div><FlashDeals catalog={catalog} shopId={shop.id}/>
       <Products shop={shop} />
+      <div className="container section">
+        <StoreFaqAccordion shop={shop} />
+      </div>
       <WhatsAppFloatingButton shop={shop} />
     </main>
   );
@@ -2842,6 +2852,7 @@ function ProductPage() {
             )}
           </details>
         </aside>
+        <StoreFaqAccordion shop={shop} product={product} />
         <ProductQuestions productId={product.id}/>
         <WhatsAppFloatingButton shop={shop} product={product} />
     </main>

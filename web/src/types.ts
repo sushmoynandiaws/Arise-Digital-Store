@@ -69,7 +69,7 @@ export type Shop = {
   tagline?: string;
   social_links?: ShopSocialLinks;
   contact?: ShopContact;
-  pages?: Partial<Record<"privacy" | "returns" | "terms" | "about" | "contact", string>>;
+  pages?: Partial<Record<"privacy" | "returns" | "terms" | "about" | "contact" | "faq", string>>;
   volume_discount_enabled?: boolean;
   payment_account_types?: Record<string, "merchant" | "personal">;
 };

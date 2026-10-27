@@ -51,6 +51,7 @@ import Trash2Raw from "lucide-react/dist/esm/icons/trash-2.js";
 import MegaphoneRaw from "lucide-react/dist/esm/icons/megaphone.js";
 import EyeRaw from "lucide-react/dist/esm/icons/eye.js";
 import TrendingUpRaw from "lucide-react/dist/esm/icons/trending-up.js";
+import HelpCircleRaw from "lucide-react/dist/esm/icons/help-circle.js";
 
 export const ArrowUpRight = ArrowUpRightRaw as LucideIcon;
 export const ShoppingCart = ShoppingCartRaw as LucideIcon;
@@ -101,3 +102,4 @@ export const Trash2 = Trash2Raw as LucideIcon;
 export const Megaphone = MegaphoneRaw as LucideIcon;
 export const Eye = EyeRaw as LucideIcon;
 export const TrendingUp = TrendingUpRaw as LucideIcon;
+export const HelpCircle = HelpCircleRaw as LucideIcon;

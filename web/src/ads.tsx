@@ -24,7 +24,7 @@ type PlatformSettings = {
   hero_title?: string;
   hero_description?: string;
   pages?: Partial<
-    Record<"privacy" | "returns" | "terms" | "about" | "contact", string>
+    Record<"privacy" | "returns" | "terms" | "about" | "contact" | "faq", string>
   >;
 };
 type PublicAd = Omit<SponsoredAd, "price_bdt" | "created_at" | "impressions" | "clicks">;

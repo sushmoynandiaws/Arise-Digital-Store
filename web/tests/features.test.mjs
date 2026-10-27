@@ -206,3 +206,30 @@ test("Shop social links and contact details remain available in footer and float
   assert.equal(supportHref("sushmoynandiml@gmail.com"), "mailto:sushmoynandiml@gmail.com");
   assert.equal(supportHref("https://wa.me/8801305087389"), "https://wa.me/8801305087389");
 });
+
+test("Store FAQ accordion is integrated into App.tsx, shopPages.ts, and Faq.tsx with art & crafts support", () => {
+  const faqCode = fs.readFileSync("src/Faq.tsx", "utf8");
+  const shopPagesCode = fs.readFileSync("src/shopPages.ts", "utf8");
+  const stylesCode = fs.readFileSync("src/styles.css", "utf8");
+
+  // Verify FAQ component exports and structures
+  assert.ok(faqCode.includes("export function StoreFaqAccordion"), "StoreFaqAccordion should be exported");
+  assert.ok(faqCode.includes("export const ART_CRAFTS_FAQS"), "ART_CRAFTS_FAQS should be defined");
+  assert.ok(faqCode.includes("export const GENERAL_STORE_FAQS"), "GENERAL_STORE_FAQS should be defined");
+  assert.ok(faqCode.includes("export function parseFaqText"), "parseFaqText should be exported");
+  assert.ok(faqCode.includes("export function isArtAndCraftShop"), "isArtAndCraftShop should be exported");
+
+  // Verify App.tsx integration
+  assert.ok(appCode.includes('import { StoreFaqAccordion } from "./Faq";'), "App.tsx should import StoreFaqAccordion");
+  assert.ok(appCode.includes("<StoreFaqAccordion shop={shop} product={product} />"), "Product page should render StoreFaqAccordion");
+  assert.ok(appCode.includes("<StoreFaqAccordion shop={shop} />"), "Shop page should render StoreFaqAccordion");
+
+  // Verify shopPages.ts includes faq section
+  assert.ok(shopPagesCode.includes('key: "faq"'), "shopPages.ts should include faq section");
+  assert.ok(shopPagesCode.includes('faq: {'), "defaultPlatformPolicies should include faq policies");
+
+  // Verify styles.css contains required styling
+  assert.ok(stylesCode.includes(".store-faq-section"), "styles.css should style .store-faq-section");
+  assert.ok(stylesCode.includes(".store-faq-summary"), "styles.css should style .store-faq-summary");
+  assert.ok(stylesCode.includes(".faq-verified-pill"), "styles.css should style .faq-verified-pill");
+});

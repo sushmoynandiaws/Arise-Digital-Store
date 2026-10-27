@@ -4,6 +4,7 @@ export const shopPageSections = [
   { key: "terms", title: "Terms & conditions", titleBn: "নিয়ম ও শর্তাবলী", hint: "Describe the conditions customers should read before buying from your shop." },
   { key: "about", title: "About us", titleBn: "আমাদের সম্পর্কে", hint: "Tell customers about your shop and the products you sell." },
   { key: "contact", title: "Contact us", titleBn: "যোগাযোগ করুন", hint: "Share your support channels, contact details and working hours." },
+  { key: "faq", title: "FAQ", titleBn: "সাধারণ প্রশ্নোত্তর", hint: "Frequently asked questions and verified answers for your shop." },
 ] as const;
 
 export type ShopPageSectionKey = typeof shopPageSections[number]["key"];
@@ -224,6 +225,41 @@ To foster a trustworthy digital commerce economy in Bangladesh where local busin
 বাংলাদেশের ডিজিটাল কমার্সকে আরও নির্ভরযোগ্য, স্বচ্ছ এবং উদ্যোক্তাবান্ধব করে গড়ে তোলা, যেখানে প্রতিটি লেনদেন হয় নিরাপদ ও নির্ভরযোগ্য।`
   },
 
+
+  faq: {
+    en: `Frequently Asked Questions (FAQ)
+
+1. How do I place an order on Arise Store?
+Browse products from any independent merchant shop, select your desired options, frame sizes or quantity, and click "Buy now" or add them to your cart. Follow the streamlined checkout steps to submit your order.
+
+2. What payment methods are supported?
+You can pay via Cash on Delivery (COD) upon receiving your parcel, or make direct payment to the merchant via verified mobile financial services (bKash, Nagad, Rocket). For COD orders, courier delivery charges may be collected in advance.
+
+3. Can I track my delivery status in real-time?
+Yes! As soon as your order is placed, you receive an instant order tracking page link. You can monitor courier transit status (e.g., Steadfast) live until delivery.
+
+4. Can I inspect the parcel in front of the courier rider?
+Yes, you can inspect the package in the presence of the courier rider. If you notice any defect or discrepancy, contact the merchant's support helpline immediately before releasing payment.
+
+5. How do returns and replacements work?
+Every independent merchant shop follows transparent return and replacement terms. If you receive a defective or incorrect item, reach out to the shop via their WhatsApp or support number for prompt replacement.`,
+    bn: `সাধারণ প্রশ্নোত্তর (FAQ)
+
+১. অ্যারাইজ স্টোরে কীভাবে অর্ডার করব?
+যেকোনো স্বাধীন শপ থেকে আপনার পছন্দের প্রোডাক্ট সিলেক্ট করুন, ফ্রেম সাইজ বা কোয়ান্টিটি বেছে নিন এবং "Buy now" অথবা কার্টে যোগ করে সহজে অর্ডার কনফার্ম করুন।
+
+২. পেমেন্টের নিয়ম কী এবং ক্যাশ অন ডেলিভারি (COD) আছে কি?
+হ্যাঁ, ক্যাশ অন ডেলিভারি (COD) এবং সরাসরি বিকাশ, নগদ ও রকেটের মাধ্যমে বিক্রেতার ভেরিফাইড একাউন্টে পেমেন্ট সুবিধা রয়েছে। সিওডি অর্ডারে কুরিয়ার ডেলিভারি চার্জ অগ্রিম প্রযোজ্য হতে পারে।
+
+৩. আমি কি ডেলিভারির সার্বক্ষণিক লাইভ ট্র্যাকিং দেখতে পারব?
+হ্যাঁ, অর্ডার সম্পন্ন হওয়ার সাথে সাথে আপনাকে একটি রিয়েল-টাইম ট্র্যাকিং লিংক দেওয়া হবে। সেখানে কুরিয়ারের (যেমনঃ Steadfast) বর্তমান অবস্থান ও ডেলিভারি স্ট্যাটাস সরাসরি ট্র্যাক করতে পারবেন।
+
+৪. ডেলিভারি রাইডারের সামনে পার্সেল খুলে চেক করা যাবে কি?
+হ্যাঁ, কুরিয়ার ডেলিভারি রাইডারের সামনেই পার্সেল খুলে পণ্যের মান ও অবস্থা পরীক্ষা করে নিতে পারবেন। কোনো সমস্যা পেলে তাৎক্ষণিক বিক্রেতার হেল্পলাইনে কল করুন।
+
+৫. রিটার্ন বা রিপ্লেসমেন্ট পলিসি কী?
+প্রতিটি শপের নিজস্ব স্বচ্ছ রিটার্ন ও রিপ্লেসমেন্ট পলিসি রয়েছে। পণ্য প্রাপ্তির পর কোনো ক্ষতি বা ত্রুটি পরিলক্ষিত হলে বিক্রেতার সাথে যোগাযোগ করে দ্রুত রিপ্লেসমেন্ট সুবিধা গ্রহণ করতে পারবেন।`
+  },
   contact: {
     en: `We are here to assist you with any inquiries, order updates, or support needs across the Arise Store marketplace.
 
