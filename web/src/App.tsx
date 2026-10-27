@@ -88,7 +88,7 @@ import {
 import type { Catalog, Shop, Product, Session, Quote, Purchase } from "./types";
 import { productForRoute, productPath, productSection, type ProductSection } from "./product";
 import { ProductReviews, PurchaseReview, ShopReviews } from "./Reviews";
-import { shopPageSections } from "./shopPages";
+import { shopPageSections, defaultPlatformPolicies } from "./shopPages";
 import {
   PromotionsProvider,
   usePlatformSettings,
@@ -1195,8 +1195,9 @@ function ShopInformationPage() {
   if (slug && catalogError && !catalog) return <main id="main" className="container section"><ErrorBox message={catalogError} retry={() => void reloadCatalog()} /></main>;
   if (slug && !catalog) return <Loading />;
   if (!section || (slug && !shop)) return <NotFound />;
-  const text = (shop ? shop.pages?.[section.key]?.trim() || (section.key === "about" ? shop.description : "") : platform.pages?.[section.key]?.trim());
-  const support = shop?.support || (!shop ? platform.support_email || "" : "");
+  const defaultPolicy = !shop ? (defaultPlatformPolicies[section.key]?.[lang] || defaultPlatformPolicies[section.key]?.en) : undefined;
+  const text = (shop ? shop.pages?.[section.key]?.trim() || (section.key === "about" ? shop.description : "") : platform.pages?.[section.key]?.trim()) || defaultPolicy;
+  const support = shop?.support || (!shop ? platform.support_email || "support@arisesell.com" : "");
   return (
     <main id="main" className="container narrow-page shop-policy-page">
       <Link className="text-link" to={shop ? `/shops/${shop.slug}` : "/"}>
