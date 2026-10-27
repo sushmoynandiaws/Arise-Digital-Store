@@ -2184,10 +2184,6 @@ function Products({ shop }: { shop?: Shop }) {
         <p className="catalog-context">{shop ? shop.name : (lang === "bn" ? "স্বাধীন বিক্রেতাদের পণ্যসমূহ" : "Products from independent sellers")}</p>
       </div>
       <div className="catalog-toolbar-row">
-        {!shop && <label className="field">Shop type<select value={storeType} onChange={e => update("store_type", e.target.value)}>
-          <option value="">All shop types</option>
-          {[...new Set((catalog?.shops || []).map(s => s.kind).filter((kind): kind is string => Boolean(kind)))].sort().map(kind => <option key={kind} value={kind}>{kind}</option>)}
-        </select></label>}
         <div className="filter-chips">
           <button
             className={!category ? "chip selected" : "chip"}

@@ -3589,7 +3589,7 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
 .navigation-menu-scroll { display: flex; flex-direction: column; max-height: min(380px, calc(100dvh - 200px)); overflow-y: auto; overscroll-behavior: contain; padding: 8px; margin: -8px; }
 .admin-dialog > form { max-height: calc(90dvh - var(--panel-padding) - var(--panel-padding)); overflow-y: auto; overscroll-behavior: contain; padding: 8px; margin: -8px; }
 .site-header :is(.navigation-link, .navigation-help-button, .navigation-contact, .store-brand small), .navigation-menu-label, .navigation-menu-empty, .mobile-navigation-label { color: var(--ink-soft); }
-.site-header .navigation-products.is-current > .navigation-link { color: var(--primary); }
+.site-header :is(.navigation-products, .navigation-shops).is-current > .navigation-link { color: var(--primary); }
 .card-wishlist-btn { background: var(--glass); -webkit-backdrop-filter: blur(4px); }
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   :is(.site-header, .category-dropdown-menu, .mobile-nav, .product-info-dialog, .moderation-form, .wishlist-modal, .admin-dialog, .admin-mobile-toggle) { background: transparent; }
