@@ -396,6 +396,13 @@ textarea { resize: vertical; }
 .payment-method > svg { display: none; }
 .payment-method.chosen { border-color: var(--primary); background: var(--primary-light); }
 .payment-logo { display: block; width: 88px; height: 32px; object-fit: contain; }
+.payment-method-desc { font-size: var(--text-small); color: var(--muted); margin-top: 10px; line-height: 1.5; padding: 10px 14px; background: var(--wash); border-radius: var(--radius-control); }
+.advance-notice-box { margin: 16px 0; padding: 16px; border-radius: var(--radius-control); background: var(--primary-light); border: 1px solid var(--primary); }
+.advance-notice-header { display: flex; align-items: center; gap: 8px; font-size: var(--text-label); color: var(--primary); font-weight: 700; margin-bottom: 6px; }
+.advance-notice-desc { font-size: var(--text-small); color: var(--ink); margin: 0; line-height: 1.5; }
+.advance-order-info { margin-top: 10px; padding: 12px 14px; background: var(--wash); border-radius: var(--radius-control); font-size: var(--text-label); line-height: 1.5; }
+.advance-order-info strong { color: var(--primary); }
+.badge-paid { color: #16a34a; font-weight: 700; }
 .checkout-payable { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 24px; margin-top: 12px; border-top: 1px solid var(--line); font-size: var(--text-label); font-weight: 650; }
 .checkout-payable small { display: block; color: var(--muted); font-size: var(--text-small); font-weight: 500; margin-top: 4px; }
 .checkout-payable strong { font-size: var(--text-price); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }

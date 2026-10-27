@@ -369,11 +369,16 @@ index 00000000..a408e388
 +def payment_methods(business):
 +    from app.services.digital_inventory import receiving_accounts
 +    from app.services.sales_reply import merchant_facts
++    receiving = list(receiving_accounts(business))
 +    if business.commerce_mode == "digital":
-+        return list(receiving_accounts(business))
++        return receiving
 +    facts = merchant_facts(business.settings_data or {})
 +    allowed = facts.get("cod_enabled") is True or facts.get("cod_policy") in {"full_cod", "selected_locations", "advance_delivery"}
-+    return ["cod"] if allowed and facts.get("cod_enabled") is not False and facts.get("cod_policy") not in {"disabled", "prepaid", "advance_only"} else []
++    methods = ["cod"] if allowed and facts.get("cod_enabled") is not False and facts.get("cod_policy") not in {"disabled", "prepaid", "advance_only"} else []
++    for acc in receiving:
++        if acc not in methods:
++            methods.append(acc)
++    return methods
 +
 +
 +def unavailable_reason(business, product):
@@ -455,7 +460,8 @@ index 00000000..a408e388
 +
 +
 +async def create_quote(db, business, channel, conversation, identity, req):
-+    if req.provider != "cod":
++    allowed = payment_methods(business)
++    if req.provider not in allowed:
 +        raise HTTPException(409, "Choose a source-supported payment method")
 +    snap = await snapshot(db, business, req.product_id, req.variant_id, req.quantity, req.buyer.model_dump(), req.coupon_code)
 +    draft = await db.scalar(select(CheckoutDraft).where(CheckoutDraft.business_id == business.id,
@@ -464,7 +470,7 @@ index 00000000..a408e388
 +        draft = CheckoutDraft(business_id=business.id, channel_id=channel.id, conversation_id=conversation.id, recipient=identity)
 +        db.add(draft)
 +    draft.data = {"physical": True, "snapshot": snap, "quote_hash": fingerprint({"snapshot": snap, "nonce": secrets.token_hex(16)}),
-+        "quoted_at": utcnow().isoformat(), "provider": "cod"}
++        "quoted_at": utcnow().isoformat(), "provider": req.provider}
 +    draft.order_id, draft.confirmation_token = None, secrets.token_hex(4)
 +    await db.flush()
 +    return draft
@@ -474,7 +480,8 @@ index 00000000..a408e388
 +    data = draft.data
 +    if not data.get("physical") or draft.business_id != business.id or draft.channel_id != channel.id or draft.conversation_id != conversation.id or draft.recipient != identity:
 +        raise HTTPException(404, "Checkout not found")
-+    if req.quote_hash != data["quote_hash"] or req.provider != "cod":
++    allowed = payment_methods(business)
++    if req.quote_hash != data["quote_hash"] or req.provider not in allowed:
 +        raise HTTPException(409, "The purchase changed; review the current quote")
 +    if draft.order_id:
 +        from app.models.order import Order
@@ -500,7 +507,9 @@ index 00000000..a408e388
 +        raise HTTPException(409, reply)
 +    from app.models.order import Order, OrderLine
 +    order = await db.get(Order, draft.order_id)
-+    order.checkout_data = {**order.checkout_data, "marketplace_quote": snap, "buyer_fields": snap["buyer"], "marketplace_message": reply}
++    if req.provider != "cod":
++        order.payment_method = req.provider
++    order.checkout_data = {**order.checkout_data, "marketplace_quote": snap, "buyer_fields": snap["buyer"], "marketplace_message": reply, "payment_method": req.provider, "advance_amount": snap.get("advance_amount", "0")}
 +    for line in await db.scalars(select(OrderLine).where(OrderLine.order_id == order.id)):
 +        line.product_id, line.variant_id, line.item_snapshot = uuid.UUID(snap["product_id"]), variant.id, snap
 +    return order

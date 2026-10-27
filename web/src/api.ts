@@ -58,12 +58,15 @@ export function extractAccountDigits(val?: string | null): string {
   return cleaned.trim() || "";
 }
 export function productPayments(product: Product, shop: Shop) {
-  if (Array.isArray(product?.payment_methods)) {
-    if (product.payment_methods.length === 0) return [];
-    const shopMethods = shop?.payment_methods ?? [];
-    return [...new Set([...product.payment_methods, ...shopMethods])];
+  const shopMethods = Array.isArray(shop?.payment_methods) ? shop.payment_methods : [];
+  const accountTypes = Object.keys(shop?.payment_account_types || {});
+  const prodMethods = Array.isArray(product?.payment_methods) ? product.payment_methods : undefined;
+
+  if (prodMethods !== undefined) {
+    if (prodMethods.length === 0) return [];
+    return [...new Set([...prodMethods, ...shopMethods, ...accountTypes])].filter(Boolean);
   }
-  return shop?.payment_methods ?? [];
+  return [...new Set([...shopMethods, ...accountTypes])].filter(Boolean);
 }
 export function canCheckout(product: Product, shop: Shop) {
   return product.sales_enabled && product.checkout_available !== false && productFulfilment(product) !== "unknown" && productPayments(product, shop).length > 0;

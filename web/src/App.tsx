@@ -3101,9 +3101,22 @@ function Checkout() {
                   </label>
                 ))}
               </div>
-              {!paymentMethods.length && <ErrorBox message="This seller has no payment method available. Please contact the seller." />}
+              {provider === "cod" ? (
+                <p className="payment-method-desc">
+                  {lang === "bn"
+                    ? "ক্যাশ অন ডেলিভারি — পণ্য হাতে পেয়ে মূল্য পরিশোধ করবেন (প্রযোজ্য ক্ষেত্রে অগ্রিম ডেলিভারি চার্জ প্রযোজ্য হতে পারে)।"
+                    : "Cash on delivery — pay the remaining amount when you receive the product (advance delivery charge may apply)."}
+                </p>
+              ) : provider ? (
+                <p className="payment-method-desc">
+                  {lang === "bn"
+                    ? `${paymentMethodLabel(provider)}-এর মাধ্যমে পেমেন্ট করতে পারবেন। অর্ডার নিশ্চিত করার পর অ্যাকাউন্ট নম্বর ও সরাসরি স্ক্যান করে পেমেন্ট করার কিউআর কোড পেয়ে যাবেন।`
+                    : `Pay via ${paymentMethodLabel(provider)}. Account details and payment QR code will be shown after confirming your order.`}
+                </p>
+              ) : null}
+              {!paymentMethods.length && <ErrorBox message={lang === "bn" ? "এই বিক্রেতার কোনো পেমেন্ট মাধ্যম উপলব্ধ নেই। অনুগ্রহ করে বিক্রেতার সাথে যোগাযোগ করুন।" : "This seller has no payment method available. Please contact the seller."} />}
               <p className="form-hint muted">
-                You’ll get payment instructions after reviewing and confirming your order.
+                {lang === "bn" ? "অর্ডারটি রিভিউ এবং নিশ্চিত করার পর পেমেন্ট নির্দেশিকা পাবেন।" : "You’ll get payment instructions after reviewing and confirming your order."}
               </p>
               </fieldset>
             </>
@@ -3143,7 +3156,19 @@ function Checkout() {
                 </div>
               )}
               <div className="terms-box">
-                {!digital && Number(quote.snapshot.advance_amount || 0) > 0 && <p>Required advance: {money(quote.snapshot.advance_amount!, product.currency)}. The seller verifies payment before dispatch. Further verification may be required after the source checks the order.</p>}
+                {!digital && Number(quote.snapshot.advance_amount || 0) > 0 && (
+                  <div className="advance-notice-box">
+                    <div className="advance-notice-header">
+                      <ShieldCheck size={18} />
+                      <strong>{lang === "bn" ? "প্রয়োজনীয় অগ্রিম পেমেন্ট:" : "Required advance payment:"}</strong> {money(quote.snapshot.advance_amount!, product.currency)}
+                    </div>
+                    <p className="advance-notice-desc">
+                      {lang === "bn"
+                        ? `ডেলিভারি বুকিং নিশ্চিত করতে ${money(quote.snapshot.advance_amount!, product.currency)} অগ্রিম পরিশোধ করতে হবে (বাকি টাকা ডেলিভারির সময় প্রদেয়)। পরবর্তী স্ক্রিনে ${paymentMethodLabel(provider)}-এর অ্যাকাউন্ট নম্বর ও কিউআর কোড পেয়ে যাবেন।`
+                        : `An advance payment of ${money(quote.snapshot.advance_amount!, product.currency)} is required for delivery confirmation (remaining amount payable on delivery). You will receive payment details for ${paymentMethodLabel(provider)} in the next step.`}
+                    </p>
+                  </div>
+                )}
                 <h3>Seller’s purchase terms</h3>
                 <p className="preserve-lines">
                   {quote.snapshot.digital_config?.purchase_terms || product.purchase_terms || "Contact the seller for purchase terms."}
@@ -3420,12 +3445,12 @@ export function PaymentInstructionCard({
   remainingSeconds: number | null;
 }) {
   const { t, lang } = useLang();
-  const payment = order.payment || ((Number(order.advance_amount || 0) > 0 || order.delivery_status === "awaiting_advance") && order.payment_status !== "paid" ? {
+  const payment = order.payment || ((Number(order.advance_amount || 0) > 0 || order.delivery_status === "awaiting_advance" || (order.payment_method && order.payment_method !== "cod")) && order.payment_status !== "paid" ? {
     provider: order.payment_method && order.payment_method !== "cod"
       ? order.payment_method
-      : (order.shop?.payment_methods && order.shop.payment_methods.find(m => m !== "cod")) || (order.shop?.payment_methods && order.shop.payment_methods[0]) || "bkash",
+      : (order.shop?.payment_methods && order.shop.payment_methods.find(m => m !== "cod")) || (order.shop?.payment_account_types && Object.keys(order.shop.payment_account_types)[0]) || (order.shop?.payment_methods && order.shop.payment_methods[0]) || "bkash",
     account: extractAccountDigits(order.shop?.contact?.phone || order.shop?.contact?.whatsapp || order.shop?.support) || "Contact seller",
-    amount: order.advance_amount || order.total,
+    amount: (Number(order.advance_amount || 0) > 0 ? order.advance_amount : order.total) || order.total,
     trx_id: null,
     expires_at: new Date(Date.now() + 86400000).toISOString(),
     instructions: order.seller_message || undefined,
