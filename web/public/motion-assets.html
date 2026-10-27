@@ -3,27 +3,44 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Arise Store × AriseSell — Motion Graphic Video Assets</title>
+  <title>Arise Store × AriseSell — 100% Real Live Video Motion Assets</title>
   <link rel="stylesheet" href="/fonts/fonts.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Urbanist:wght@500;600;700;800;900&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
   <style>
     :root {
       --primary: #6336d6;
       --primary-hover: #5025c4;
-      --primary-light: #f3f0ff;
+      --primary-light: #f5f3ff;
+      --primary-focus: rgba(99, 54, 214, 0.2);
       --accent: #ff6b00;
+      --accent-hover: #e05e00;
       --ink: #0f172a;
       --muted: #64748b;
       --line: #e2e8f0;
       --surface: #ffffff;
+      --wash: #f8fafc;
+      --canvas: #f1f5f9;
       --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
       --font-heading: 'Urbanist', system-ui, sans-serif;
       --font-body: 'Hind Siliguri', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --radius: 14px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+      --shadow-md: 0 6px 16px rgba(0,0,0,0.08);
+      --shadow-lg: 0 20px 40px rgba(0,0,0,0.14);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       background: #090d16;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(99, 54, 214, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(255, 107, 0, 0.12) 0%, transparent 40%);
       color: #f8fafc;
       font-family: var(--font-body);
       min-height: 100vh;
@@ -31,27 +48,27 @@
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      padding: 24px;
+      padding: 16px 20px 40px;
       overflow-x: hidden;
     }
 
-    /* Studio Controller Bar */
+    /* Top Studio Controller Bar */
     .studio-bar {
       width: 100%;
-      max-width: 1200px;
+      max-width: 1240px;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
-      padding: 14px 20px;
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 16px;
-      backdrop-filter: blur(16px);
-      margin-bottom: 24px;
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
-      z-index: 100;
+      gap: 12px;
+      padding: 12px 20px;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 18px;
+      backdrop-filter: blur(20px);
+      margin-bottom: 20px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+      z-index: 200;
     }
 
     .studio-brand {
@@ -59,14 +76,14 @@
       align-items: center;
       gap: 10px;
       font-family: var(--font-heading);
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 800;
-      letter-spacing: -0.02em;
+      color: #fff;
     }
 
     .scene-tabs {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       flex-wrap: wrap;
     }
 
@@ -86,19 +103,19 @@
       background: var(--primary);
       color: #ffffff;
       border-color: var(--primary);
-      box-shadow: 0 4px 16px rgba(99, 54, 214, 0.4);
+      box-shadow: 0 4px 14px rgba(99, 54, 214, 0.5);
     }
 
     .studio-actions {
       display: flex;
-      gap: 10px;
+      gap: 8px;
     }
 
     .btn-action {
       background: #1e293b;
       color: #f1f5f9;
       border: 1px solid rgba(255, 255, 255, 0.15);
-      padding: 7px 16px;
+      padding: 6px 14px;
       border-radius: 8px;
       font-size: 13px;
       font-weight: 600;
@@ -111,518 +128,1715 @@
 
     .btn-action:hover { background: #334155; }
     .btn-action.highlight {
-      background: var(--accent);
-      border-color: var(--accent);
+      background: var(--primary);
+      border-color: var(--primary);
       color: #fff;
+      box-shadow: 0 4px 14px rgba(99, 54, 214, 0.4);
     }
 
-    /* Screen Stage Viewport */
+    /* Screen Stage Viewport & Aspect Ratios */
     .stage-container {
       width: 100%;
-      max-width: 1100px;
+      max-width: 1200px;
       display: grid;
       place-items: center;
-      perspective: 1000px;
+      perspective: 1200px;
     }
 
     .viewport {
       position: relative;
-      background: radial-gradient(circle at 50% 20%, #1e1538 0%, #0c0818 70%);
-      border: 2px solid rgba(99, 54, 214, 0.3);
-      border-radius: 28px;
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
       overflow: hidden;
-      box-shadow: 0 32px 80px rgba(0, 0, 0, 0.7), 0 0 80px rgba(99, 54, 214, 0.15);
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.65), 0 0 50px rgba(99, 54, 214, 0.12);
       transition: all 400ms cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
     }
 
-    /* Aspect Ratio Modes */
     .viewport.mode-16-9 {
-      width: 1000px;
-      height: 562.5px; /* 16:9 */
+      width: 1040px;
+      height: 585px; /* 16:9 HD standard */
     }
 
     .viewport.mode-9-16 {
-      width: 380px;
-      height: 675px; /* 9:16 vertical reel */
+      width: 375px;
+      height: 667px; /* 9:16 mobile reel standard */
     }
 
-    /* Scene Elements Common */
-    .scene-frame {
-      position: absolute;
-      inset: 0;
-      padding: 40px;
+    /* Realistic Browser Chrome (macOS / Chrome Window) */
+    .browser-chrome {
+      width: 100%;
+      height: 48px;
+      background: #1e293b;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 14px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .window-dots {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+    }
+    .dot-close { background: #ff5f56; }
+    .dot-min { background: #ffbd2e; }
+    .dot-max { background: #27c93f; }
+
+    .browser-nav-icons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #64748b;
+    }
+
+    .browser-url-bar {
+      flex: 1;
+      height: 32px;
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: #cbd5e1;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .browser-url-bar .lock-icon {
+      color: #10b981;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+    }
+
+    .browser-url-bar strong {
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    .browser-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #94a3b8;
+    }
+
+    /* Live Webpage Viewport Container */
+    .browser-viewport {
+      flex: 1;
+      background: var(--canvas);
+      color: var(--ink);
+      position: relative;
+      overflow-y: auto;
+      overflow-x: hidden;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      pointer-events: none;
-      transform: scale(0.94) translateY(20px);
-      transition: opacity 400ms ease, transform 450ms cubic-bezier(0.16, 1, 0.3, 1);
     }
 
-    .scene-frame.visible {
+    /* Scene Transitions inside Web Viewport */
+    .scene-view {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.97) translateY(10px);
+      transition: opacity 350ms ease, transform 400ms cubic-bezier(0.16, 1, 0.3, 1);
+      background: var(--canvas);
+      overflow-y: auto;
+    }
+
+    .scene-view.visible {
       opacity: 1;
       pointer-events: auto;
       transform: scale(1) translateY(0);
     }
 
-    /* Scene 1: Pain Point / Inbox Chaos */
-    .chat-bubble {
-      position: absolute;
-      padding: 12px 20px;
-      border-radius: 20px;
-      background: rgba(30, 41, 59, 0.9);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-      font-size: 15px;
-      font-weight: 500;
+    /* Real Header Component (matches web/src/App.tsx) */
+    .real-header {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--line);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+
+    .real-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: var(--ink);
+      font-family: var(--font-heading);
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .real-brand svg {
+      width: 28px;
+      height: 28px;
+    }
+
+    .real-brand span.store-tag {
+      font-weight: 400;
+      color: var(--muted);
+      margin-left: 2px;
+    }
+
+    .real-search-bar {
+      flex: 1;
+      max-width: 440px;
+      height: 38px;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 8px;
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    .real-header-actions {
       display: flex;
       align-items: center;
       gap: 10px;
-      animation: floatBubble 3s ease-in-out infinite alternate;
     }
 
-    .b-1 { top: 18%; left: 12%; animation-delay: 0s; }
-    .b-2 { top: 28%; right: 14%; animation-delay: 0.6s; }
-    .b-3 { bottom: 24%; left: 16%; animation-delay: 1.2s; }
-    .b-4 { bottom: 20%; right: 18%; animation-delay: 1.8s; }
-
-    @keyframes floatBubble {
-      0% { transform: translateY(0) scale(1); }
-      100% { transform: translateY(-12px) scale(1.03); }
+    .lang-pill {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #cbd5e1;
     }
 
-    .danger-badge {
+    .btn-real-open-shop {
+      background: var(--primary);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 7px 16px;
+      border-radius: 9999px;
+      border: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 3px 10px rgba(99, 54, 214, 0.3);
+    }
+
+    /* SCENE 1: REAL PAIN POINT (Facebook Page Inbox Jam) */
+    .s1-split-layout {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      height: 100%;
+      padding: 24px;
+      gap: 20px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+      color: #fff;
+      align-items: center;
+    }
+
+    .mode-9-16 .s1-split-layout {
+      grid-template-columns: 1fr;
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    .fb-inbox-mock {
+      background: #ffffff;
+      color: #0f172a;
+      border-radius: 18px;
+      box-shadow: 0 20px 45px rgba(0,0,0,0.4);
+      border: 1px solid #cbd5e1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 440px;
+    }
+
+    .fb-inbox-header {
+      background: #0084ff;
+      color: #fff;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .fb-inbox-title {
+      font-family: var(--font-heading);
+      font-weight: 700;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .fb-badge-unread {
       background: #ef4444;
       color: #fff;
-      font-weight: 700;
-      padding: 8px 18px;
-      border-radius: 9999px;
-      font-size: 14px;
-      margin-bottom: 16px;
-      animation: pulseAlert 1.5s infinite;
-    }
-
-    @keyframes pulseAlert {
-      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
-      50% { transform: scale(1.05); box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); }
-    }
-
-    /* Scene 2: AriseSell -> Free Shop Link */
-    .url-bar-card {
-      width: 100%;
-      max-width: 640px;
-      background: rgba(15, 23, 42, 0.95);
-      border: 1.5px solid var(--primary);
-      border-radius: 20px;
-      padding: 24px;
-      box-shadow: 0 20px 60px rgba(99, 54, 214, 0.35);
-      text-align: center;
-      position: relative;
-    }
-
-    .mock-browser-nav {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: #0f172a;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      padding: 10px 16px;
-      margin-top: 14px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 14px;
-      color: #a5b4fc;
-    }
-
-    .free-pill-glow {
-      position: absolute;
-      top: -14px;
-      right: 24px;
-      background: linear-gradient(135deg, #ff6b00, #ff8800);
-      color: #fff;
+      font-size: 11px;
       font-weight: 800;
-      font-size: 12px;
-      padding: 4px 14px;
+      padding: 2px 7px;
       border-radius: 9999px;
-      box-shadow: 0 4px 14px rgba(255, 107, 0, 0.5);
-      animation: bouncePill 2s infinite;
     }
 
-    @keyframes bouncePill {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-4px); }
-    }
-
-    /* Scene 3: Product Card Mockup */
-    .product-mock-card {
-      width: 320px;
-      background: #ffffff;
-      color: #0f172a;
-      border-radius: 20px;
-      overflow: hidden;
-      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
-      border: 1px solid #e2e8f0;
-      animation: cardPop 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .mock-art {
-      width: 100%;
-      height: 220px;
-      background: #f8fafc;
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-    }
-
-    .mock-art img {
-      width: 85%;
-      height: 85%;
-      object-fit: contain;
-      filter: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.15));
-      transition: transform 300ms ease;
-    }
-
-    .mock-body {
-      padding: 18px 20px;
-    }
-
-    .mock-title {
-      font-family: var(--font-heading);
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 6px;
-    }
-
-    .mock-sizes {
-      display: flex;
-      gap: 6px;
-      margin: 10px 0;
-    }
-
-    .mock-size-chip {
-      width: 34px;
-      height: 34px;
-      display: grid;
-      place-items: center;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .mock-size-chip.selected {
-      background: var(--primary);
-      color: #fff;
-      border-color: var(--primary);
-    }
-
-    .mock-btn-buy {
-      width: 100%;
-      background: var(--primary);
-      color: #fff;
-      border: none;
-      padding: 12px;
-      border-radius: 9999px;
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      margin-top: 8px;
-      box-shadow: 0 4px 14px rgba(99, 54, 214, 0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-
-    /* Scene 4: bKash/Nagad Payment & Advance Box */
-    .payment-mock-card {
-      width: 100%;
-      max-width: 440px;
-      background: #ffffff;
-      color: #0f172a;
-      border-radius: 24px;
-      padding: 24px;
-      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
-    }
-
-    .advance-box {
-      background: #f5f3ff;
-      border: 1.5px dashed var(--primary);
+    .fb-chat-body {
+      flex: 1;
       padding: 14px;
-      border-radius: 12px;
-      margin-top: 14px;
-      font-size: 14px;
-      color: #431407;
+      background: #f0f2f5;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+
+    .chat-bubble-buyer {
+      align-self: flex-start;
+      background: #ffffff;
+      padding: 9px 14px;
+      border-radius: 16px 16px 16px 2px;
+      max-width: 82%;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+      line-height: 1.4;
+    }
+
+    .chat-bubble-seller {
+      align-self: flex-end;
+      background: #0084ff;
+      color: #fff;
+      padding: 9px 14px;
+      border-radius: 16px 16px 2px 16px;
+      max-width: 82%;
+      line-height: 1.4;
+    }
+
+    .fb-alert-box {
+      background: #fee2e2;
+      border: 1.5px solid #ef4444;
+      color: #991b1b;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 8px;
+      animation: alertPulse 2s infinite;
     }
 
-    /* Scene 5: Live Courier Tracking & Reviews */
-    .courier-card {
-      width: 100%;
-      max-width: 480px;
-      background: rgba(15, 23, 42, 0.95);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 20px;
-      padding: 24px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    @keyframes alertPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
     }
 
-    .tracking-progress-bar {
-      width: 100%;
-      height: 8px;
-      background: #334155;
+    .s1-copy-card {
+      padding: 20px;
+    }
+
+    .s1-copy-card .pill-problem {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      border: 1px solid #ef4444;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 12px;
       border-radius: 9999px;
-      margin: 16px 0 10px;
-      overflow: hidden;
-      position: relative;
+      display: inline-block;
+      margin-bottom: 12px;
     }
 
-    .tracking-fill {
-      width: 75%;
-      height: 100%;
-      background: linear-gradient(90deg, #10b981, #34d399);
-      border-radius: 9999px;
-      animation: fillProgress 2s ease-out;
-    }
-
-    @keyframes fillProgress {
-      0% { width: 0; }
-      100% { width: 75%; }
-    }
-
-    /* Scene 6: Final CTA */
-    .cta-hero-title {
-      font-family: var(--font-heading);
-      font-size: 38px;
+    .s1-copy-card h2 {
+      font-size: 26px;
       font-weight: 800;
-      text-align: center;
-      line-height: 1.25;
-      margin-bottom: 20px;
-      background: linear-gradient(135deg, #ffffff 30%, #c4b5fd 100%);
+      line-height: 1.3;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
 
-    .cta-btn-glow {
-      background: linear-gradient(135deg, #6336d6, #8b5cf6);
-      color: #fff;
-      font-size: 18px;
-      font-weight: 700;
-      padding: 16px 36px;
-      border-radius: 9999px;
-      border: none;
-      box-shadow: 0 10px 30px rgba(99, 54, 214, 0.6);
-      cursor: pointer;
-      transition: transform 180ms ease;
+    .s1-copy-card p {
+      font-size: 14px;
+      color: #94a3b8;
+      line-height: 1.6;
+      margin-bottom: 18px;
     }
 
-    .cta-btn-glow:hover { transform: scale(1.05); }
+    .s1-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
 
-    /* Animated Cursor Simulation */
-    .mouse-cursor {
+    .s1-list-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #e2e8f0;
+      background: rgba(255,255,255,0.06);
+      padding: 8px 12px;
+      border-radius: 8px;
+    }
+
+    /* SCENE 2: REAL SHOP PAGE & FREE SHOP LINK */
+    .s2-shop-container {
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .arisesell-banner-alert {
+      background: linear-gradient(90deg, #6336d6, #8b5cf6);
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 4px 16px rgba(99, 54, 214, 0.3);
+    }
+
+    .arisesell-banner-alert .left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .arisesell-banner-alert .shop-url-tag {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+    }
+
+    .btn-copy-link {
+      background: #ffffff;
+      color: var(--primary);
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .real-shop-hero {
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 20px 24px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .shop-hero-top {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .shop-avatar {
+      width: 58px;
+      height: 58px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #6336d6, #ff6b00);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-family: var(--font-heading);
+      font-size: 26px;
+      font-weight: 900;
+      box-shadow: 0 4px 12px rgba(99, 54, 214, 0.25);
+    }
+
+    .shop-meta {
+      flex: 1;
+    }
+
+    .shop-name-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .shop-name-row h1 {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .seller-verified-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #ecfdf5;
+      color: #059669;
+      border: 1px solid #a7f3d0;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 9999px;
+    }
+
+    .shop-rating-row {
+      font-size: 13px;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .shop-rating-row .stars {
+      color: #f59e0b;
+      font-weight: 700;
+    }
+
+    .shop-contact-chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .contact-chip {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #334155;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* SCENE 3: REAL PRODUCT DETAIL VIEW */
+    .s3-product-detail-view {
+      padding: 20px 24px;
+      max-width: 980px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .product-breadcrumbs {
+      font-size: 12px;
+      color: #64748b;
+      margin-bottom: 14px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .product-breadcrumbs a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .product-layout-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.1fr;
+      gap: 28px;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .mode-9-16 .product-layout-grid {
+      grid-template-columns: 1fr;
+      gap: 16px;
+      padding: 16px;
+    }
+
+    .product-photo-wrap {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: #f8fafc;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+      position: relative;
+      display: grid;
+      place-items: center;
+    }
+
+    .product-photo-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 300ms ease;
+    }
+
+    .product-photo-wrap .badge-floating {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: #10b981;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 9999px;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+    }
+
+    .product-info-column {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .prod-category-tag {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--primary);
+    }
+
+    .prod-title {
+      font-family: var(--font-heading);
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1.25;
+    }
+
+    .prod-price-box {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .prod-price-now {
+      font-size: 26px;
+      font-weight: 900;
+      color: var(--primary);
+    }
+
+    .prod-price-old {
+      font-size: 16px;
+      color: #94a3b8;
+      text-decoration: line-through;
+    }
+
+    .prod-discount {
+      background: #fee2e2;
+      color: #ef4444;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 6px;
+    }
+
+    .size-selector-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .size-selector-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    .size-chips-list {
+      display: flex;
+      gap: 8px;
+    }
+
+    .size-btn {
+      width: 44px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #1e293b;
+      background: #fff;
+      cursor: pointer;
+      transition: all 150ms ease;
+    }
+
+    .size-btn.active {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(99, 54, 214, 0.35);
+    }
+
+    .prod-stock-note {
+      font-size: 13px;
+      color: #059669;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-buy-now {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 13px 24px;
+      border-radius: 9999px;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 6px 18px rgba(99, 54, 214, 0.4);
+      transition: all 180ms ease;
+    }
+
+    .btn-buy-now:hover {
+      background: var(--primary-hover);
+      transform: translateY(-2px);
+    }
+
+    .prod-guarantee-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: #475569;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* SCENE 4: REAL ARISE STORE PAYMENT INSTRUCTION CARD & BKASH */
+    .s4-payment-container {
+      padding: 20px 24px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      height: 100%;
+    }
+
+    .payment-instruction-card {
+      width: 100%;
+      max-width: 580px;
+      background: #ffffff;
+      border: 1.5px solid var(--line);
+      border-radius: 20px;
+      padding: 22px 24px;
+      box-shadow: var(--shadow-lg);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .payment-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 12px;
+    }
+
+    .payment-provider-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .payment-provider-badge img.provider-logo {
+      height: 28px;
+      width: auto;
+    }
+
+    .payment-provider-badge h3 {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .account-type-badge.merchant {
+      background: #eef2ff;
+      color: #4338ca;
+      border: 1px solid #c7d2fe;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .payment-type-alert.merchant-alert {
+      background: #fffbeb;
+      border: 1.5px solid #fcd34d;
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13px;
+      color: #92400e;
+    }
+
+    .dynamic-qr-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .qr-svg-wrapper {
+      background: #ffffff;
+      padding: 10px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      border: 1px solid #e2e8f0;
+      position: relative;
+    }
+
+    .qr-center-logo {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 32px;
+      height: 32px;
+      background: #fff;
+      border-radius: 6px;
+      padding: 3px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+
+    .payment-advance-alert {
+      background: #f5f3ff;
+      border: 1.5px dashed var(--primary);
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .advance-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .advance-amount {
+      font-size: 18px;
+      font-weight: 900;
+      color: var(--primary);
+    }
+
+    .payment-step-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+    }
+
+    .btn-copy-code {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      color: #1e293b;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .live-timer-chip {
+      background: #fee2e2;
+      color: #dc2626;
+      border: 1px solid #fca5a5;
+      font-weight: 800;
+      font-size: 13px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      align-self: center;
+    }
+
+    /* SCENE 5: REAL COURIER TRACKING & VERIFIED REVIEW */
+    .s5-track-container {
+      padding: 24px;
+      max-width: 820px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .track-order-card {
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 20px 24px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .track-top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+    }
+
+    .track-top-bar h3 {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .track-courier-pill {
+      background: #ecfdf5;
+      color: #059669;
+      border: 1px solid #a7f3d0;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .track-steps-horizontal {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      position: relative;
+      margin: 20px 0;
+    }
+
+    .track-step-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 6px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .node-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      color: #64748b;
+      display: grid;
+      place-items: center;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .node-icon.completed {
+      background: #10b981;
+      color: #ffffff;
+      box-shadow: 0 0 0 4px #d1fae5;
+    }
+
+    .node-icon.active {
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 0 0 5px var(--primary-light);
+      animation: pulseNode 1.5s infinite;
+    }
+
+    @keyframes pulseNode {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.12); }
+    }
+
+    .node-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+
+    .node-sub {
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    .review-real-card {
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px 22px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .reviewer-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #e0e7ff;
+      color: var(--primary);
+      font-weight: 800;
+      font-size: 18px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .review-body {
+      flex: 1;
+    }
+
+    .review-user-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+
+    .reviewer-name {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .verified-buyer-tag {
+      background: #ecfdf5;
+      color: #059669;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 9999px;
+    }
+
+    .review-rating-stars {
+      color: #f59e0b;
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+
+    .review-text {
+      font-size: 13.5px;
+      color: #334155;
+      line-height: 1.5;
+    }
+
+    /* SCENE 6: REAL FINAL CALL TO ACTION */
+    .s6-cta-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 30px;
+      text-align: center;
+      background: radial-gradient(circle at 50% 30%, #1e1b4b 0%, #090d16 85%);
+      color: #ffffff;
+    }
+
+    .cta-logos-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .s6-heading {
+      font-family: var(--font-heading);
+      font-size: 32px;
+      font-weight: 900;
+      line-height: 1.25;
+      margin-bottom: 14px;
+      background: linear-gradient(135deg, #ffffff 40%, #c4b5fd 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .s6-features-grid {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 680px;
+      margin-bottom: 24px;
+    }
+
+    .s6-feature-chip {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 7px 16px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-cta-giant {
+      background: linear-gradient(135deg, #6336d6, #7c3aed);
+      color: #ffffff;
+      font-family: var(--font-heading);
+      font-size: 18px;
+      font-weight: 800;
+      padding: 16px 40px;
+      border-radius: 9999px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 12px 36px rgba(99, 54, 214, 0.6);
+      transition: all 200ms ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-cta-giant:hover {
+      transform: scale(1.04);
+      box-shadow: 0 16px 45px rgba(99, 54, 214, 0.8);
+    }
+
+    .s6-domains-text {
+      margin-top: 18px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: #a5b4fc;
+      letter-spacing: 0.03em;
+    }
+
+    /* Subtitle / Voiceover Prompter Box below Stage */
+    .prompter-box {
+      width: 100%;
+      max-width: 1040px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      padding: 12px 20px;
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 14px;
+      color: #e2e8f0;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .prompter-badge {
+      background: #ff6b00;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 8px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+
+    .prompter-text {
+      flex: 1;
+      font-weight: 600;
+      line-height: 1.4;
+      color: #f1f5f9;
+    }
+
+    /* Simulated Animated Mouse Pointer */
+    .sim-mouse {
       position: absolute;
       width: 24px;
       height: 24px;
       pointer-events: none;
       z-index: 1000;
-      transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
     }
   </style>
 </head>
 <body>
 
-  <!-- Studio Controller Bar -->
+  <!-- Studio Header Controls -->
   <header class="studio-bar">
     <div class="studio-brand">
-      <svg width="28" height="28" viewBox="0 0 48 48"><rect width="48" height="48" rx="14" fill="#6336d6"/><path d="M12 32 24 12l12 20h-8l-4-7-4 7Z" fill="#fff"/><circle cx="35" cy="13" r="4" fill="#ff6b00"/></svg>
-      <span>Motion Studio · Arise</span>
+      <svg width="26" height="26" viewBox="0 0 48 48">
+        <rect width="48" height="48" rx="14" fill="#6336d6"/>
+        <path d="M12 32 24 12l12 20h-8l-4-7-4 7Z" fill="#fff"/>
+        <circle cx="35" cy="13" r="4" fill="#ff6b00"/>
+      </svg>
+      <span>Arise Store × AriseSell · Real Motion Studio</span>
     </div>
 
     <nav class="scene-tabs">
-      <button class="btn-tab active" onclick="showScene(1)">১. হুক & মেসেজ জ্যাম</button>
-      <button class="btn-tab" onclick="showScene(2)">২. ফ্রি ওয়েবসাইট লিঙ্ক</button>
-      <button class="btn-tab" onclick="showScene(3)">৩. প্রডাক্ট & সাইজ অর্ডার</button>
-      <button class="btn-tab" onclick="showScene(4)">৪. বিকাশ/নগদ অ্যাডভান্স</button>
-      <button class="btn-tab" onclick="showScene(5)">৫. কুরিয়ার ট্র্যাকিং</button>
-      <button class="btn-tab" onclick="showScene(6)">৬. ফাইনাল কল-টু-অ্যাকশন</button>
+      <button class="btn-tab active" onclick="goToScene(1)">১. ইনবক্স জ্যাম & সমস্যা</button>
+      <button class="btn-tab" onclick="goToScene(2)">২. ফ্রি শপ লিঙ্ক</button>
+      <button class="btn-tab" onclick="goToScene(3)">৩. রিয়েল প্রডাক্ট পেজ</button>
+      <button class="btn-tab" onclick="goToScene(4)">৪. বিকাশ পেমেন্ট & QR</button>
+      <button class="btn-tab" onclick="goToScene(5)">৫. স্টেডফাস্ট ট্র্যাকিং</button>
+      <button class="btn-tab" onclick="goToScene(6)">৬. ফাইনাল কল-টু-অ্যাকশন</button>
     </nav>
 
     <div class="studio-actions">
-      <button class="btn-action" onclick="toggleAspect()">📐 <span id="aspect-label">16:9 Landscape</span></button>
-      <button class="btn-action highlight" onclick="autoplaySequence()">▶ ফুল ভিডিও প্লে</button>
+      <button class="btn-action" onclick="toggleAspect()" title="ভিডিও ফরম্যাট পরিবর্তন">📐 <span id="aspect-label">16:9 Landscape</span></button>
+      <button class="btn-action highlight" onclick="startAutoplay()" id="btn-autoplay">▶ সম্পূর্ণ ভিডিও প্লে</button>
     </div>
   </header>
 
-  <!-- Screen Stage Viewport -->
+  <!-- Real Video Viewport -->
   <main class="stage-container">
     <div class="viewport mode-16-9" id="viewport">
 
-      <!-- SCENE 1: Problem / Inbox Chaos -->
-      <section class="scene-frame visible" id="scene-1">
-        <span class="danger-badge">⚠️ ফেসবুক পেজের ইনবক্স জ্যাম?</span>
-        <h2 style="font-size: 32px; font-weight: 800; text-align: center; margin-bottom: 24px;">
-          ম্যানুয়াল অর্ডার আর ডেলিভারি চার্জ নিয়ে হয়রানি?
-        </h2>
-        <div class="chat-bubble b-1">
-          <span>💬</span> <strong>"ভাইয়া এই জুতার দাম কত?"</strong>
+      <!-- Realistic Browser Chrome -->
+      <div class="browser-chrome">
+        <div class="window-dots">
+          <span class="dot dot-close"></span>
+          <span class="dot dot-min"></span>
+          <span class="dot dot-max"></span>
         </div>
-        <div class="chat-bubble b-2">
-          <span>💬</span> <strong>"ক্যাশ অন ডেলিভারিতে পাঠাবেন?"</strong>
-        </div>
-        <div class="chat-bubble b-3">
-          <span>💬</span> <strong>"ছবি দেখান তো ভাই, সাইজ আছে?"</strong>
-        </div>
-        <div class="chat-bubble b-4">
-          <span>❌</span> <strong style="color: #f87171;">"কাস্টমার পার্সেল রিসিভ করেনি..."</strong>
-        </div>
-      </section>
 
-      <!-- SCENE 2: AriseSell -> Free Shop Link -->
-      <section class="scene-frame" id="scene-2">
-        <span class="free-pill-glow">১০০% ফ্রি লাইফটাইম শপ লিঙ্ক</span>
-        <h2 style="font-size: 30px; font-weight: 800; text-align: center; margin-bottom: 16px;">
-          AriseSell-এ লগইন করলেই পাচ্ছেন আপনার নিজস্ব ওয়েবসাইট!
-        </h2>
-        <div class="url-bar-card">
-          <p style="font-size: 14px; color: #cbd5e1; margin-bottom: 8px;">আপনার ব্র্যান্ডের প্রফেশনাল ই-কমার্স শপ:</p>
-          <div class="mock-browser-nav">
-            <span style="color: #10b981;">🔒 https://</span>
-            <strong style="color: #ffffff; font-size: 16px;">arise-store.com/shops/arise-fashion</strong>
-          </div>
-          <p style="margin-top: 14px; font-size: 13px; color: #94a3b8;">
-            জিরো কোডিং • জিরো সেটআপ ফি • মাত্র ৫ মিনিটে রেডি!
-          </p>
+        <div class="browser-nav-icons">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24L21 8"/><path d="M21 3v5h-5"/></svg>
         </div>
-      </section>
 
-      <!-- SCENE 3: Product Card Mockup -->
-      <section class="scene-frame" id="scene-3">
-        <div class="product-mock-card">
-          <div class="mock-art">
-            <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="#6336d6" stroke-width="1.5">
-              <path d="M4 16l3-6 4 2 5-6 4 3v7H4z"/>
-              <circle cx="9" cy="8" r="2"/>
-            </svg>
-          </div>
-          <div class="mock-body">
-            <span style="font-size: 12px; font-weight: 700; color: var(--primary);">Arise Fashion</span>
-            <h3 class="mock-title">Chunky Sneakers White</h3>
-            <div style="font-size: 18px; font-weight: 800; color: #0f172a;">৳ ১,৪৫০</div>
-            <div style="font-size: 12px; color: #64748b; margin-top: 6px;">সাইজ নির্বাচন করুন:</div>
-            <div class="mock-sizes">
-              <div class="mock-size-chip">40</div>
-              <div class="mock-size-chip">41</div>
-              <div class="mock-size-chip selected">42</div>
-              <div class="mock-size-chip">43</div>
+        <div class="browser-url-bar">
+          <span class="lock-icon">🔒</span>
+          <span>https://</span><strong id="browser-url-text">arise-store.com/shops/arise-fashion</strong>
+        </div>
+
+        <div class="browser-actions">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="12" r="2"/></svg>
+        </div>
+      </div>
+
+      <!-- Live Web Viewport -->
+      <div class="browser-viewport">
+
+        <!-- SCENE 1: Problem / Facebook Inbox Chaos -->
+        <section class="scene-view visible" id="scene-1">
+          <div class="s1-split-layout">
+            <div class="fb-inbox-mock">
+              <div class="fb-inbox-header">
+                <div class="fb-inbox-title">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.87 1.5 5.43 3.86 7.02V22l3.78-2.08c.76.21 1.55.33 2.36.33 5.52 0 10-4.03 10-9s-4.48-9-10-9z"/></svg>
+                  <span>Arise Fashion — Inbox</span>
+                </div>
+                <span class="fb-badge-unread">18 Unread</span>
+              </div>
+              <div class="fb-chat-body">
+                <div class="chat-bubble-buyer">
+                  ভাইয়া Chunky Sneakers White এর ৪২ সাইজ আছে? দাম কত?
+                </div>
+                <div class="chat-bubble-seller">
+                  জি ভাইয়া এভেইলেবল আছে। প্রাইস ১৪৫০ টাকা।
+                </div>
+                <div class="chat-bubble-buyer">
+                  ডেলিভারি চার্জ কত? ক্যাশ অন ডেলিভারিতে পাঠান, টাকা এখন দেব না।
+                </div>
+                <div class="fb-alert-box">
+                  <span>⚠️</span>
+                  <div>
+                    <strong>পার্সেল ডেলিভারি ব্যর্থ!</strong>
+                    <div>কাস্টমার ফোন ধরেননি। কুরিয়ার চার্জ ৳ ১৩০ লোকসান!</div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <button class="mock-btn-buy">
-              <span>Buy now</span>
-              <span>➔</span>
+
+            <div class="s1-copy-card">
+              <span class="pill-problem">❌ সনাতন ফেসবুক বিক্রির সমস্যা</span>
+              <h2>ইনবক্সে চ্যাটিং আর ফেক অর্ডারে ডেলিভারি চার্জ লস?</h2>
+              <p>কাস্টমার ঘণ্টার পর ঘণ্টা দাম আর সাইজ জিজ্ঞেস করে হারিয়ে যায়, আর ক্যাশ অন ডেলিভারিতে ফেক অর্ডারের রিটার্ন চার্জ গুনতে হয় আপনাকে।</p>
+              <div class="s1-list">
+                <div class="s1-list-item">❌ দিনরাত ম্যানুয়ালি সাইজ আর দামের রিপ্লাই দেওয়া</div>
+                <div class="s1-list-item">❌ কাস্টমার পার্সেল না নিলে কুরিয়ার ফি লস</div>
+                <div class="s1-list-item">❌ কোন প্রফেশনাল অনলাইন ব্র্যান্ডিং নেই</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SCENE 2: AriseSell -> Free Lifetime Storefront -->
+        <section class="scene-view" id="scene-2">
+          <!-- Real Site Header -->
+          <header class="real-header">
+            <a href="#" class="real-brand">
+              <svg viewBox="0 0 48 48">
+                <rect width="48" height="48" rx="14" fill="#6336d6"/>
+                <path d="M12 32 24 12l12 20h-8l-4-7-4 7Z" fill="#fff"/>
+                <circle cx="35" cy="13" r="4" fill="#ff6b00"/>
+              </svg>
+              <span>arise<span class="store-tag">/ store</span></span>
+            </a>
+            <div class="real-search-bar">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <span>Search products, sneakers and shops...</span>
+            </div>
+            <div class="real-header-actions">
+              <span class="lang-pill">বাং / EN</span>
+              <button class="btn-real-open-shop">
+                <span>Open your shop</span>
+              </button>
+            </div>
+          </header>
+
+          <div class="s2-shop-container">
+            <!-- AriseSell Merchant Alert Banner -->
+            <div class="arisesell-banner-alert">
+              <div class="left">
+                <span>🎉 <strong>AriseSell Merchant:</strong> আপনার অনলাইন শপ এখন সম্পূর্ণ লাইভ!</span>
+                <span class="shop-url-tag">arise-store.com/shops/arise-fashion</span>
+              </div>
+              <button class="btn-copy-link" onclick="this.innerHTML='কপি হয়েছে! ✔'">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>কপি লিঙ্ক</span>
+              </button>
+            </div>
+
+            <!-- Real Shop Hero Header -->
+            <div class="real-shop-hero">
+              <div class="shop-hero-top">
+                <div class="shop-avatar">A</div>
+                <div class="shop-meta">
+                  <div class="shop-name-row">
+                    <h1>Arise Fashion</h1>
+                    <span class="seller-verified-badge">✔ Verified Seller</span>
+                  </div>
+                  <div class="shop-rating-row">
+                    <span class="stars">★★★★★ 4.9</span>
+                    <span>(128 verified reviews)</span>
+                    <span>•</span>
+                    <span>Top Rated Merchant</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="shop-contact-chips">
+                <span class="contact-chip">💬 WhatsApp: 01712-345678</span>
+                <span class="contact-chip">📞 01987-654321</span>
+                <span class="contact-chip">🚚 ২ দিনে স্টেডফাস্ট ডেলিভারি</span>
+                <span class="contact-chip">🔄 ৭ দিনের ইজি রিটার্ন</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SCENE 3: Real Product Detail & Size Picker with Real Sneaker Photo -->
+        <section class="scene-view" id="scene-3">
+          <header class="real-header">
+            <a href="#" class="real-brand">
+              <svg viewBox="0 0 48 48">
+                <rect width="48" height="48" rx="14" fill="#6336d6"/>
+                <path d="M12 32 24 12l12 20h-8l-4-7-4 7Z" fill="#fff"/>
+                <circle cx="35" cy="13" r="4" fill="#ff6b00"/>
+              </svg>
+              <span>arise<span class="store-tag">/ store</span></span>
+            </a>
+            <div class="real-header-actions">
+              <span class="lang-pill">বাং / EN</span>
+              <button class="btn-real-open-shop">Track order</button>
+            </div>
+          </header>
+
+          <div class="s3-product-detail-view">
+            <nav class="product-breadcrumbs">
+              <a href="#">Arise Fashion</a>
+              <span>/</span>
+              <a href="#">Footwear</a>
+              <span>/</span>
+              <span>Chunky Sneakers White</span>
+            </nav>
+
+            <div class="product-layout-grid">
+              <!-- Real Product Image -->
+              <div class="product-photo-wrap">
+                <img src="/products/chunky-sneakers-white.jpg" alt="Chunky Sneakers White" onerror="this.src='https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=800&q=80'">
+                <span class="badge-floating">New Arrival</span>
+              </div>
+
+              <!-- Product Info & Purchase Controls -->
+              <div class="product-info-column">
+                <span class="prod-category-tag">Men's Footwear / Sneakers</span>
+                <h2 class="prod-title">Chunky Sneakers White — Air Edition</h2>
+
+                <div class="prod-price-box">
+                  <span class="prod-price-now">৳ ১,৪৫০</span>
+                  <span class="prod-price-old">৳ ২,২০০</span>
+                  <span class="prod-discount">-৩৪% ছাড়</span>
+                </div>
+
+                <div class="size-selector-wrap">
+                  <div class="size-selector-label">সাইজ নির্বাচন করুন:</div>
+                  <div class="size-chips-list">
+                    <button class="size-btn" onclick="selectSize(this, 40)">40</button>
+                    <button class="size-btn" onclick="selectSize(this, 41)">41</button>
+                    <button class="size-btn active" id="btn-size-42" onclick="selectSize(this, 42)">42</button>
+                    <button class="size-btn" onclick="selectSize(this, 43)">43</button>
+                  </div>
+                </div>
+
+                <div class="prod-stock-note">
+                  <span>●</span>
+                  <span>ইন স্টক (মাত্র ৫ জোড়া বাকি আছে)</span>
+                </div>
+
+                <button class="btn-buy-now" id="btn-buy-now" onclick="goToScene(4)">
+                  <span>Buy now</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                </button>
+
+                <div class="prod-guarantee-box">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6336d6" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                  <span>স্টেডফাস্ট কুরিয়ারের মাধ্যমে সারা বাংলাদেশে ২-৩ দিনে হোম ডেলিভারি</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SCENE 4: Real Arise Store Payment Instruction Card & bKash Advance QR -->
+        <section class="scene-view" id="scene-4">
+          <div class="s4-payment-container">
+            <div class="payment-instruction-card">
+
+              <!-- Card Header -->
+              <div class="payment-card-header">
+                <div class="payment-provider-badge">
+                  <img src="/payment-methods/bkash.svg" alt="bKash" class="provider-logo" onerror="this.style.display='none'">
+                  <h3>Pay with bKash</h3>
+                </div>
+                <div class="account-type-badge merchant">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  <span>Merchant Verified</span>
+                </div>
+              </div>
+
+              <!-- Merchant Alert -->
+              <div class="payment-type-alert merchant-alert">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <div>
+                  <strong>মার্চেন্ট একাউন্ট সতর্কতা:</strong>
+                  <p>বিকাশ অ্যাপে ঢুকে অবশ্যই <strong>Payment</strong> অপশন সিলেক্ট করবেন। সেন্ড মানি (Send Money) অপশন কাজ করবে না।</p>
+                </div>
+              </div>
+
+              <!-- Dynamic QR Code & Center Logo -->
+              <div class="dynamic-qr-box">
+                <div class="qr-svg-wrapper">
+                  <svg width="130" height="130" viewBox="0 0 100 100">
+                    <rect width="100" height="100" fill="#ffffff"/>
+                    <!-- QR Corner 1 -->
+                    <rect x="5" y="5" width="26" height="26" fill="#000"/>
+                    <rect x="9" y="9" width="18" height="18" fill="#fff"/>
+                    <rect x="13" y="13" width="10" height="10" fill="#000"/>
+                    <!-- QR Corner 2 -->
+                    <rect x="69" y="5" width="26" height="26" fill="#000"/>
+                    <rect x="73" y="9" width="18" height="18" fill="#fff"/>
+                    <rect x="77" y="13" width="10" height="10" fill="#000"/>
+                    <!-- QR Corner 3 -->
+                    <rect x="5" y="69" width="26" height="26" fill="#000"/>
+                    <rect x="9" y="73" width="18" height="18" fill="#fff"/>
+                    <rect x="13" y="77" width="10" height="10" fill="#000"/>
+                    <!-- Data Pixels Pattern -->
+                    <rect x="36" y="8" width="8" height="6" fill="#000"/>
+                    <rect x="50" y="14" width="10" height="6" fill="#000"/>
+                    <rect x="8" y="36" width="6" height="12" fill="#000"/>
+                    <rect x="18" y="42" width="8" height="6" fill="#000"/>
+                    <rect x="36" y="36" width="8" height="8" fill="#000"/>
+                    <rect x="56" y="36" width="8" height="8" fill="#000"/>
+                    <rect x="72" y="36" width="18" height="6" fill="#000"/>
+                    <rect x="36" y="56" width="14" height="6" fill="#000"/>
+                    <rect x="60" y="56" width="10" height="8" fill="#000"/>
+                    <rect x="78" y="56" width="14" height="6" fill="#000"/>
+                    <rect x="36" y="72" width="8" height="18" fill="#000"/>
+                    <rect x="50" y="78" width="14" height="8" fill="#000"/>
+                    <rect x="72" y="72" width="8" height="8" fill="#000"/>
+                    <rect x="84" y="84" width="8" height="8" fill="#000"/>
+                  </svg>
+                  <div class="qr-center-logo">
+                    <svg viewBox="0 0 48 48"><rect width="48" height="48" rx="8" fill="#e2136e"/><path d="M12 28l12-16 12 16h-8l-4-6-4 6z" fill="#fff"/></svg>
+                  </div>
+                </div>
+                <small style="color: #64748b; font-weight: 600;">bKash অ্যাপ দিয়ে QR কোড স্ক্যান করে পেমেন্ট করুন</small>
+              </div>
+
+              <!-- Advance Delivery Security Highlight -->
+              <div class="payment-advance-alert">
+                <div>
+                  <div class="advance-title">🛡️ অগ্রিম কুরিয়ার চার্জ নিরাপত্তা</div>
+                  <small style="color: #64748b;">ফেক অর্ডার বন্ধে কুরিয়ার চার্জ অগ্রিম গ্রহণ করা হচ্ছে</small>
+                </div>
+                <div class="advance-amount">৳ ১৩০.০০</div>
+              </div>
+
+              <!-- Step Details & Copy Buttons -->
+              <div class="payment-step-row">
+                <span>মার্চেন্ট অ্যাকাউন্ট: <strong>01712-345678</strong></span>
+                <button class="btn-copy-code" onclick="this.innerHTML='Copied!'">Copy</button>
+              </div>
+
+              <div class="payment-step-row">
+                <span>রেফারেন্স কোড: <strong>ORD-4921</strong></span>
+                <button class="btn-copy-code" onclick="this.innerHTML='Copied!'">Copy</button>
+              </div>
+
+              <!-- Live Countdown Timer -->
+              <div class="live-timer-chip">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span>পেমেন্টের বাকি সময়: <strong id="live-timer-display">23:59:45</strong></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SCENE 5: Real Steadfast Courier Tracking & Real Customer Review -->
+        <section class="scene-view" id="scene-5">
+          <div class="s5-track-container">
+
+            <!-- Real Tracking Card -->
+            <div class="track-order-card">
+              <div class="track-top-bar">
+                <div>
+                  <h3>Order #ORD-4921</h3>
+                  <small style="color: #64748b;">Consignment ID: SF-8921447</small>
+                </div>
+                <div class="track-courier-pill">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                  <span>Steadfast Logistics</span>
+                </div>
+              </div>
+
+              <div class="track-steps-horizontal">
+                <div class="track-step-node">
+                  <div class="node-icon completed">✔</div>
+                  <span class="node-label">অর্ডার নিশ্চিত</span>
+                  <span class="node-sub">অ্যাডভান্স পেইড</span>
+                </div>
+                <div class="track-step-node">
+                  <div class="node-icon completed">✔</div>
+                  <span class="node-label">প্যাকিং সম্পন্ন</span>
+                  <span class="node-sub">মার্চেন্ট হাব</span>
+                </div>
+                <div class="track-step-node">
+                  <div class="node-icon active">🚚</div>
+                  <span class="node-label">ইন ট্রানজিট</span>
+                  <span class="node-sub">ঢাকা ➔ চট্টগ্রাম হাব</span>
+                </div>
+                <div class="track-step-node">
+                  <div class="node-icon">4</div>
+                  <span class="node-label">আউট ফর ডেলিভারি</span>
+                  <span class="node-sub">আগামীকাল বিকেল</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Real Verified Buyer Review -->
+            <div class="review-real-card">
+              <div class="reviewer-avatar">তা</div>
+              <div class="review-body">
+                <div class="review-user-row">
+                  <span class="reviewer-name">তানভীর আহমেদ</span>
+                  <span class="verified-buyer-tag">✔ Verified Buyer</span>
+                </div>
+                <div class="review-rating-stars">★★★★★ 5.0</div>
+                <p class="review-text">
+                  "স্নিকার্সটা এককথায় অসাধারণ! ছবি আর আসল জুতো একদম ১০০% সেইম। সবচেয়ে বড় কথা bKash দিয়ে অ্যাডভান্স দিয়েছিলাম, পরদিনই স্টেডফাস্টের ডেলিভারি পেয়েছি। ধন্যবাদ Arise Fashion ও Arise Store!"
+                </p>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- SCENE 6: Real Final Call To Action -->
+        <section class="scene-view" id="scene-6">
+          <div class="s6-cta-container">
+            <div class="cta-logos-row">
+              <svg width="52" height="52" viewBox="0 0 48 48">
+                <rect width="48" height="48" rx="14" fill="#6336d6"/>
+                <path d="M12 32 24 12l12 20h-8l-4-7-4 7Z" fill="#fff"/>
+                <circle cx="35" cy="13" r="4" fill="#ff6b00"/>
+              </svg>
+            </div>
+
+            <h2 class="s6-heading">
+              আজই AriseSell-এ ফ্রি অ্যাকাউন্ট খুলুন<br>
+              ৫ মিনিটেই চালু করুন আপনার নিজস্ব অনলাইন শপ!
+            </h2>
+
+            <div class="s6-features-grid">
+              <span class="s6-feature-chip">🌐 নিজস্ব ওয়েবসাইট শপ লিঙ্ক</span>
+              <span class="s6-feature-chip">💳 বিকাশ/নগদ অটো পেমেন্ট</span>
+              <span class="s6-feature-chip">🛡️ অগ্রিম ডেলিভারি সিকিউরিটি</span>
+              <span class="s6-feature-chip">📦 স্টেডফাস্ট অটো ট্র্যাকিং</span>
+            </div>
+
+            <button class="btn-cta-giant" onclick="alert('AriseSell Portal: https://arisesell.com')">
+              <span>Login & Get Free Shop Link</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
             </button>
-          </div>
-        </div>
-      </section>
 
-      <!-- SCENE 4: bKash/Nagad Payment & Advance Box -->
-      <section class="scene-frame" id="scene-4">
-        <div class="payment-mock-card">
-          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="width: 10px; height: 10px; border-radius: 50%; background: #e2136e;"></span>
-              <strong>Pay with bKash</strong>
-            </div>
-            <span style="background: #e0e7ff; color: #4338ca; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 6px;">Merchant Verified</span>
-          </div>
-
-          <div class="advance-box">
-            <span style="font-size: 22px;">🛡️</span>
-            <div>
-              <strong style="display: block; color: var(--primary);">অগ্রিম কুরিয়ার চার্জ: ৳ ১৩০</strong>
-              <small style="color: #64748b;">ফেক অর্ডার বন্ধে কুরিয়ার ফি সরাসরি আপনার একাউন্টে নিন</small>
+            <div class="s6-domains-text">
+              www.arisesell.com • www.arise-store.com
             </div>
           </div>
+        </section>
 
-          <div style="margin-top: 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; font-size: 13px;">
-            রেফারেন্স কোড: <strong>ORD-4921</strong> | TrxID সাবমিট করলেই কনফার্ম!
-          </div>
-        </div>
-      </section>
-
-      <!-- SCENE 5: Live Courier Tracking & Reviews -->
-      <section class="scene-frame" id="scene-5">
-        <div class="courier-card">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 13px; color: #94a3b8;">Courier: <strong>Steadfast Logistics</strong></span>
-            <span style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 9999px;">In Transit</span>
-          </div>
-          <div class="tracking-progress-bar">
-            <div class="tracking-fill"></div>
-          </div>
-          <div style="display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1;">
-            <span>Picked up</span>
-            <span>Hub sorting</span>
-            <strong style="color: #10b981;">Out for delivery</strong>
-          </div>
-
-          <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; gap: 12px;">
-            <div style="color: #f59e0b; font-size: 18px;">★★★★★</div>
-            <div style="font-size: 13px;">
-              <strong>"১০০% অরিজিনাল স্নিকার্স, প্যাকেজিং দারুণ!"</strong>
-              <span style="display: block; font-size: 11px; color: #94a3b8;">— তানভীর হাসান (Verified Buyer)</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- SCENE 6: Final CTA -->
-      <section class="scene-frame" id="scene-6">
-        <div style="margin-bottom: 16px;">
-          <svg width="56" height="56" viewBox="0 0 48 48"><rect width="48" height="48" rx="14" fill="#6336d6"/><path d="M12 32 24 12l12 20h-8l-4-7-4 7Z" fill="#fff"/><circle cx="35" cy="13" r="4" fill="#ff6b00"/></svg>
-        </div>
-        <h2 class="cta-hero-title">
-          আজই AriseSell-এ লগইন করুন<br>
-          ৫ মিনিটেই চালু করুন আপনার নিজস্ব অনলাইন শপ!
-        </h2>
-        <button class="cta-btn-glow" onclick="alert('AriseSell Login: https://arisesell.com')">
-          Login & Get Free Shop Link ➔
-        </button>
-        <p style="margin-top: 16px; font-size: 14px; color: #a5b4fc; font-family: 'JetBrains Mono', monospace;">
-          www.arisesell.com • www.arise-store.com
-        </p>
-      </section>
-
+      </div>
     </div>
   </main>
 
+  <!-- Voiceover Prompter Caption Box -->
+  <footer class="prompter-box">
+    <span class="prompter-badge" id="prompter-badge">ভয়েসওভার সিন ১ (০:০০ - ০:০৭)</span>
+    <p class="prompter-text" id="prompter-text">
+      "ফেসবুক পেজে ইনবক্সে কাস্টমার সামলাতে সামলাতে ক্লান্ত? কাস্টমার দাম জিজ্ঞেস করে হারিয়ে যায়, আর ডেলিভারি চার্জের টাকা নিয়ে তৈরি হয় অনিশ্চয়তা?"
+    </p>
+  </footer>
+
   <script>
-    let currentScene = 1;
+    const sceneUrls = {
+      1: "facebook.com/arisefashion/inbox",
+      2: "arise-store.com/shops/arise-fashion",
+      3: "arise-store.com/shops/arise-fashion/products/chunky-sneakers-white",
+      4: "arise-store.com/checkout/ORD-4921",
+      5: "arise-store.com/purchases/ORD-4921/track",
+      6: "arisesell.com/auth/login"
+    };
+
+    const scenePrompts = {
+      1: {
+        badge: "ভয়েসওভার সিন ১ (০:০০ - ০:০৭)",
+        text: '"ফেসবুক পেজে ইনবক্সে কাস্টমার সামলাতে সামলাতে ক্লান্ত? কাস্টমার দাম জিজ্ঞেস করে হারিয়ে যায়, আর ডেলিভারি চার্জের টাকা নিয়ে তৈরি হয় অনিশ্চয়তা?"'
+      },
+      2: {
+        badge: "ভয়েসওভার সিন ২ (০:০৭ - ০:১৫)",
+        text: '"এখন আর কোনো লক্ষ টাকার ওয়েবসাইট বানানোর ঝামেলা নেই! শুধুমাত্র AriseSell-এ ফ্রি লগইন করলেই পাচ্ছেন Arise Store-এ আপনার ব্র্যান্ডের প্রিমিয়াম ওয়েবসাইট শপ লিঙ্ক—একেবারে ফ্রিতে!"'
+      },
+      3: {
+        badge: "ভয়েসওভার সিন ৩ (০:১৫ - ০:২৪)",
+        text: '"আপনার সব পণ্য সাজিয়ে রাখুন নিজের ই-কমার্স পেজে। কাস্টমার এক ক্লিকেই রঙ, সাইজ পছন্দ করে নিজে নিজেই অর্ডার করে ফেলবে—ইনবক্সে কথা বলার প্রয়োজনই নেই!"'
+      },
+      4: {
+        badge: "ভয়েসওভার সিন ৪ (০:২৪ - ০:৩৩)",
+        text: '"সরাসরি আপনার পার্সোনাল বা মার্চেন্ট বিকাশ-নগদে কুরিয়ার চার্জ অগ্রিম গ্রহণ করুন। ফেক অর্ডার আর পার্সেল রিটার্নের লোকসান এবার হবে বন্ধ!"'
+      },
+      5: {
+        badge: "ভয়েসওভার সিন ৫ (০:৩৩ - ০:৩৯)",
+        text: '"লাইভ কুরিয়ার ট্র্যাকিং এবং আসল কাস্টমারদের ভেরিফায়েড রিভিউ আপনার ব্র্যান্ডের বিশ্বাসযোগ্যতা বাড়াবে বহু গুণ।"'
+      },
+      6: {
+        badge: "ভয়েসওভার সিন ৬ (০:৩৯ - ০:৪৫)",
+        text: '"আর দেরি কেন? এখনই AriseSell-এ ফ্রিতে লগইন করুন, আর ৫ মিনিটেই চালু করে নিন আপনার ব্র্যান্ডের প্রিমিয়াম ই-কমার্স শপ!"'
+      }
+    };
+
+    let activeScene = 1;
     const totalScenes = 6;
     let isLandscape = true;
     let autoplayTimer = null;
 
-    function showScene(n) {
-      if (autoplayTimer) clearTimeout(autoplayTimer);
-      currentScene = n;
+    function goToScene(n) {
+      if (autoplayTimer) {
+        clearTimeout(autoplayTimer);
+        autoplayTimer = null;
+        const btn = document.getElementById('btn-autoplay');
+        if (btn) btn.innerHTML = '▶ সম্পূর্ণ ভিডিও প্লে';
+      }
+
+      activeScene = n;
       for (let i = 1; i <= totalScenes; i++) {
         const frame = document.getElementById(`scene-${i}`);
         if (frame) frame.classList.remove('visible');
       }
-      const activeFrame = document.getElementById(`scene-${n}`);
-      if (activeFrame) activeFrame.classList.add('visible');
+      const target = document.getElementById(`scene-${n}`);
+      if (target) target.classList.add('visible');
 
-      // Update Tab Styles
+      // Update URL bar
+      const urlText = document.getElementById('browser-url-text');
+      if (urlText && sceneUrls[n]) {
+        urlText.textContent = sceneUrls[n];
+      }
+
+      // Update Tabs
       const tabs = document.querySelectorAll('.btn-tab');
-      tabs.forEach((tab, index) => {
-        if (index + 1 === n) tab.classList.add('active');
+      tabs.forEach((tab, idx) => {
+        if (idx + 1 === n) tab.classList.add('active');
         else tab.classList.remove('active');
       });
+
+      // Update Voiceover Prompter
+      const badge = document.getElementById('prompter-badge');
+      const text = document.getElementById('prompter-text');
+      if (badge && text && scenePrompts[n]) {
+        badge.textContent = scenePrompts[n].badge;
+        text.textContent = scenePrompts[n].text;
+      }
     }
 
     function toggleAspect() {
@@ -638,17 +1852,47 @@
       }
     }
 
-    function autoplaySequence() {
-      let scene = 1;
-      showScene(scene);
-      function next() {
-        scene++;
-        if (scene > totalScenes) scene = 1;
-        showScene(scene);
-        autoplayTimer = setTimeout(next, 5000); // 5s per scene
-      }
-      autoplayTimer = setTimeout(next, 5000);
+    function selectSize(btn, size) {
+      document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
     }
+
+    function startAutoplay() {
+      const btn = document.getElementById('btn-autoplay');
+      if (autoplayTimer) {
+        clearTimeout(autoplayTimer);
+        autoplayTimer = null;
+        btn.innerHTML = '▶ সম্পূর্ণ ভিডিও প্লে';
+        return;
+      }
+
+      btn.innerHTML = '⏸ পজ করুন';
+      let current = 1;
+      goToScene(current);
+
+      function step() {
+        current++;
+        if (current > totalScenes) {
+          current = 1;
+        }
+        goToScene(current);
+        autoplayTimer = setTimeout(step, 6500); // 6.5s per scene for smooth reading
+      }
+
+      autoplayTimer = setTimeout(step, 6500);
+    }
+
+    // Live countdown clock simulation
+    let secondsLeft = 23 * 3600 + 59 * 60 + 45;
+    setInterval(() => {
+      secondsLeft = Math.max(0, secondsLeft - 1);
+      const h = Math.floor(secondsLeft / 3600);
+      const m = Math.floor((secondsLeft % 3600) / 60);
+      const s = secondsLeft % 60;
+      const formatted = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+      const el = document.getElementById('live-timer-display');
+      if (el) el.textContent = formatted;
+    }, 1000);
   </script>
 </body>
 </html>
