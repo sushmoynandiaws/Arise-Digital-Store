@@ -779,7 +779,7 @@ function Header() {
 
   const onSearchChange = (val: string) => {
     setHeaderSearch(val);
-    const isCatalogPage = location.pathname === "/products" || (shop && location.pathname === `/shops/${shop.slug}`);
+    const isCatalogPage = location.pathname === "/products" || (shop && location.pathname === `/shops/${shop.slug}`) || location.pathname === "/shops";
     if (isCatalogPage) {
       const next = new URLSearchParams(params);
       if (val.trim()) {
@@ -797,6 +797,8 @@ function Header() {
     const q = headerSearch.trim();
     if (shop) {
       navigate(`/shops/${shop.slug}${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+    } else if (location.pathname === "/shops") {
+      navigate(`/shops${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     } else {
       navigate(`/products${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     }
@@ -834,7 +836,9 @@ function Header() {
             placeholder={
               shop
                 ? (lang === "bn" ? `${shop.name}-এর প্রোডাক্ট খুঁজুন...` : `Search in ${shop.name}...`)
-                : (lang === "bn" ? "পণ্য, দোকান বা ক্যাটাগরি খুঁজুন..." : "Search products, shops, categories...")
+                : location.pathname === "/shops"
+                  ? (lang === "bn" ? "শপের নাম বা বিবরণ দিয়ে খুঁজুন..." : "Search shop names or descriptions...")
+                  : (lang === "bn" ? "পণ্য, দোকান বা ক্যাটাগরি খুঁজুন..." : "Search products, shops, categories...")
             }
             value={headerSearch}
             onChange={(e) => onSearchChange(e.target.value)}
@@ -2178,10 +2182,6 @@ function Products({ shop }: { shop?: Shop }) {
           </p>
         </div>
       )}
-      <div className="catalog-search-row">
-        <label className="catalog-search"><Search size={18} /><span className="sr-only">{shop ? `Search ${shop.name} catalog` : "Search the catalog"}</span><input type="search" value={query} placeholder={lang === "bn" ? "প্রোডাক্ট বা ক্যাটাগরি খুঁজুন" : "Search products or categories"} onChange={event => update("q", event.target.value)} /></label>
-        <p className="catalog-context">{shop ? shop.name : (lang === "bn" ? "স্বাধীন বিক্রেতাদের পণ্যসমূহ" : "Products from independent sellers")}</p>
-      </div>
       <div className="catalog-toolbar-row">
         <div className="filter-chips">
           <button
@@ -2275,7 +2275,7 @@ function Shops() {
   const { catalog, catalogError, reloadCatalog } = useMarket();
   const { lang } = useLang();
   const [params, setParams] = useSearchParams();
-  const [query, setQuery] = useState("");
+  const query = (params.get("q") || params.get("search") || "").trim().toLowerCase();
   const storeType = params.get("type") || params.get("store_type") || "";
   const setStoreType = (val: string) => {
     const next = new URLSearchParams(params);
@@ -2293,7 +2293,7 @@ function Shops() {
   const shops = catalog?.shops.filter((s) => {
     const kind = s.kind || (s.commerce_mode === "digital" ? "Digital Products" : "");
     const matchesType = !storeType || kind.toLowerCase() === storeType.toLowerCase() || s.kind?.toLowerCase() === storeType.toLowerCase();
-    const matchesQuery = `${s.name} ${s.description} ${s.kind || ""}`.toLowerCase().includes(query.toLowerCase());
+    const matchesQuery = !query || `${s.name} ${s.description} ${s.kind || ""}`.toLowerCase().includes(query);
     return matchesType && matchesQuery;
   });
   return (
@@ -2307,18 +2307,27 @@ function Shops() {
           {lang === "bn" ? "স্বাধীন শপ এবং তাদের পণ্যগুলো ব্রাউজ করুন।" : "Browse independent shops and their products."}
         </p>
       </div>
-      <div className="catalog-search standalone-search">
-        <Search size={20} />
-        <label className="sr-only" htmlFor="shop-search">
-          {lang === "bn" ? "শপ খুঁজুন" : "Search shops"}
-        </label>
-        <input
-          id="shop-search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={lang === "bn" ? "শপের নাম বা বিবরণ দিয়ে খুঁজুন..." : "Search shop names or descriptions"}
-        />
-      </div>
+      {query && (
+        <div className="active-filter-banner" style={{ marginBottom: "20px" }}>
+          <span>
+            {lang === "bn" ? `খোঁজা হচ্ছে: "${query}"` : `Showing results for: "${query}"`}
+            <span className="active-count"> ({shops?.length || 0} {shops?.length === 1 ? (lang === "bn" ? "টি শপ পাওয়া গেছে" : "shop found") : (lang === "bn" ? "টি শপ পাওয়া গেছে" : "shops found")})</span>
+          </span>
+          <button
+            type="button"
+            className="clear-search-pill"
+            onClick={() => {
+              const next = new URLSearchParams(params);
+              next.delete("q");
+              next.delete("search");
+              setParams(next);
+            }}
+          >
+            <X size={14} />
+            <span>{lang === "bn" ? "মুছুন" : "Clear"}</span>
+          </button>
+        </div>
+      )}
       {shopKinds.length > 0 && (
         <div className="catalog-toolbar-row">
           <div className="filter-chips" role="group" aria-label={lang === "bn" ? "শপ ক্যাটাগরি ফিল্টার" : "Shop category filter"}>
