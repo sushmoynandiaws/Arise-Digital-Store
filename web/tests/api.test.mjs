@@ -22,7 +22,8 @@ test("checkout follows product fulfillment and source capability without treatin
   assert.equal(productFulfilment({delivery_mode:"unrecognized"}),"unknown");
   assert.equal(productFulfilment({fulfilment_kind:"service",delivery_mode:"automatic"}),"unknown");
   assert.equal(canCheckout({delivery_mode:"unrecognized",sales_enabled:true},shop),false);
-  assert.equal(productPayments({...physical,payment_methods:undefined},shop).length,0);
+  assert.equal(productPayments({...physical,payment_methods:undefined},shop).length,1);
+  assert.equal(productPayments({...physical,payment_methods:undefined},{payment_methods:[]}).length,0);
   assert.equal(shopType(shop),"Fashion & Clothing");
   assert.equal(shopType({}),"Shop");
 });

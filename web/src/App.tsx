@@ -83,6 +83,7 @@ import {
   productPayments,
   canCheckout,
   shopType,
+  extractAccountDigits,
 } from "./api";
 import type { Catalog, Shop, Product, Session, Quote, Purchase } from "./types";
 import { productForRoute, productPath, productSection, type ProductSection } from "./product";
@@ -3423,9 +3424,18 @@ export function PaymentInstructionCard({
   remainingSeconds: number | null;
 }) {
   const { t, lang } = useLang();
-  if (!order.payment) return null;
+  const payment = order.payment || ((Number(order.advance_amount || 0) > 0 || order.delivery_status === "awaiting_advance") && order.payment_status !== "paid" ? {
+    provider: order.payment_method && order.payment_method !== "cod"
+      ? order.payment_method
+      : (order.shop?.payment_methods && order.shop.payment_methods.find(m => m !== "cod")) || (order.shop?.payment_methods && order.shop.payment_methods[0]) || "bkash",
+    account: extractAccountDigits(order.shop?.contact?.phone || order.shop?.contact?.whatsapp || order.shop?.support) || "Contact seller",
+    amount: order.advance_amount || order.total,
+    trx_id: null,
+    expires_at: new Date(Date.now() + 86400000).toISOString(),
+    instructions: order.seller_message || undefined,
+  } : null);
 
-  const payment = order.payment;
+  if (!payment) return null;
   const provider = paymentMethodLabel(payment.provider);
   const accountType = detectPaymentAccountType(payment, order.shop);
   const isMerchant = accountType === "merchant";
@@ -3463,6 +3473,15 @@ export function PaymentInstructionCard({
           </div>
         </div>
       </div>
+
+      {payment.account && (payment.provider.toLowerCase().includes("bkash") || payment.provider.toLowerCase().includes("nagad")) && (
+        <DynamicPaymentQR
+          provider={payment.provider}
+          account={payment.account}
+          amount={payment.amount}
+          orderRef={order.ref}
+        />
+      )}
 
       <div className="payment-steps-container">
         <h4 className="payment-steps-heading">
@@ -3596,8 +3615,8 @@ function PurchasePage() {
     );
   const navigate = useNavigate();
   const [now, setNow] = useState(Date.now);
-  const paymentDeadline = order?.payment ? Date.parse(order.payment.expires_at) : NaN;
-  const paymentOpen = !!order && ["unpaid", "pending_verification", "review_required"].includes(order.payment_status);
+  const paymentDeadline = order?.payment ? Date.parse(order.payment.expires_at) : (Number(order?.advance_amount || 0) > 0 ? Date.now() + 86400000 : NaN);
+  const paymentOpen = !!order && (["unpaid", "pending_verification", "review_required"].includes(order.payment_status) || order.delivery_status === "awaiting_advance");
   const ticking = paymentOpen && order?.delivery_status !== "cancelled" && paymentDeadline > now;
   useEffect(() => {
     if (!ticking) return;
@@ -3732,7 +3751,7 @@ function PurchasePage() {
             )}
           </div>
         )}
-        {paymentOpen && !cancelled && order.payment && !expired && (
+        {paymentOpen && !cancelled && (order.payment || (Number(order.advance_amount || 0) > 0 && order.payment_status !== "paid")) && !expired && (
           <>
             <PaymentInstructionCard order={order} session={session} remainingSeconds={remainingSeconds} />
             <form
@@ -3773,10 +3792,11 @@ function PurchasePage() {
                 <ArrowRight size={17} />
               </button>
             </form>
-            {order.payment.trx_id && (
+            {(order.payment?.trx_id || trx) && (
               <p className="notice">
-                Submitted: {order.payment.trx_id}. We’re matching it with the
-                seller’s payment receipt.
+                {lang === "bn"
+                  ? `সাবমিট করা হয়েছে: ${order.payment?.trx_id || trx}। বিক্রেতার পেমেন্ট রিসিটের সাথে এটি মেলানো হচ্ছে।`
+                  : `Submitted: ${order.payment?.trx_id || trx}. We're matching it with the seller's payment receipt.`}
               </p>
             )}
           </>
@@ -3797,7 +3817,16 @@ function PurchasePage() {
           <h3>Delivery details</h3><p className="preserve-lines">{order.address}, {order.district}</p>
           <p>Payment method: {paymentMethodLabel(order.payment_method || "cod")}</p>
           {order.delivery_charge !== undefined && <p>Delivery charge: {money(order.delivery_charge, order.currency)}</p>}
-          {Number(order.advance_amount || 0) > 0 && <p>Required advance: {money(order.advance_amount!, order.currency)}. Contact the seller for verification.</p>}
+          {Number(order.advance_amount || 0) > 0 && (
+            <p className="advance-order-info">
+              <strong>{lang === "bn" ? "প্রয়োজনীয় অগ্রিম:" : "Required advance:"}</strong> {money(order.advance_amount!, order.currency)}
+              {order.payment_status === "paid" ? (
+                <span className="badge-paid"> {lang === "bn" ? "(পরিশোধিত)" : "(Paid)"}</span>
+              ) : (
+                <span> {lang === "bn" ? "— উপরে দেওয়া অ্যাকাউন্টে অগ্রিম পাঠিয়ে TrxID সাবমিট করুন।" : "— Please pay the advance using the instructions above and submit your TrxID."}</span>
+              )}
+            </p>
+          )}
           {order.tracking ? <p>{order.tracking.provider} · Tracking number: {order.tracking.tracking} · {order.tracking.status}</p> : <p>Courier tracking will appear when the seller books delivery.</p>}
           {order.tracking?.tracking_url?.startsWith("https://") && <a className="button secondary" href={order.tracking.tracking_url} target="_blank" rel="noopener noreferrer">Track with courier<ExternalLink size={16} /></a>}
         </section>}

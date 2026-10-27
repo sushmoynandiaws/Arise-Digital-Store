@@ -46,8 +46,24 @@ export function productFulfilment(product: Pick<Product, "fulfilment_kind" | "de
   // The original bridge returned only digital products, identified by these delivery modes.
   return product.delivery_mode === "automatic" || product.delivery_mode === "manual" ? "digital" : "unknown";
 }
+export function extractAccountDigits(val?: string | null): string {
+  if (!val) return "";
+  const cleaned = val
+    .replace(/^(https?:\/\/)?(wa\.me\/|api\.whatsapp\.com\/send\?phone=)/i, "")
+    .replace(/^mailto:/i, "")
+    .replace(/^tel:/i, "");
+  const digits = cleaned.replace(/\D/g, "");
+  if (digits.startsWith("8801") && digits.length === 13) return digits.slice(2);
+  if (digits.startsWith("01") && digits.length === 11) return digits;
+  return cleaned.trim() || "";
+}
 export function productPayments(product: Product, shop: Shop) {
-  return product.payment_methods ?? (productFulfilment(product) === "digital" ? shop.payment_methods ?? [] : []);
+  if (Array.isArray(product?.payment_methods)) {
+    if (product.payment_methods.length === 0) return [];
+    const shopMethods = shop?.payment_methods ?? [];
+    return [...new Set([...product.payment_methods, ...shopMethods])];
+  }
+  return shop?.payment_methods ?? [];
 }
 export function canCheckout(product: Product, shop: Shop) {
   return product.sales_enabled && product.checkout_available !== false && productFulfilment(product) !== "unknown" && productPayments(product, shop).length > 0;
