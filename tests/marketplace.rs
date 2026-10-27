@@ -1869,9 +1869,15 @@ async fn custom_images_use_a_bounded_route_and_source_buyer_capability() {
 async fn shopping_search_overwrites_client_catalog_scope_and_filters_source_results() {
     let (state, calls, server) = setup().await;
     let app = router(state);
+    let mut missing = write("/api/assistant", json!({"message":"test"}));
+    *missing.method_mut() = axum::http::Method::POST;
+    assert_eq!(
+        app.clone().oneshot(missing).await.unwrap().status(),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
     let mut request = write(
         "/api/assistant",
-        json!({"message":"জুতা","shop_id":SHOP,"allowed_product_ids":["99999999-9999-4999-8999-999999999999"]}),
+        json!({"message":"জুতা","shop_id":SHOP,"shop_information":{"about":"FORGED KNOWLEDGE"},"allowed_product_ids":["99999999-9999-4999-8999-999999999999"]}),
     );
     *request.method_mut() = axum::http::Method::POST;
     let response = app.oneshot(request).await.unwrap();
@@ -1887,5 +1893,6 @@ async fn shopping_search_overwrites_client_catalog_scope_and_filters_source_resu
         .unwrap()
         .1;
     assert_eq!(payload["allowed_product_ids"], json!([PRODUCT]));
+    assert_eq!(payload["shop_information"], json!({}));
     server.abort();
 }

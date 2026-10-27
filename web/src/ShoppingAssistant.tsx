@@ -7,7 +7,7 @@ import {Bot, X, Search, Mic} from "./icons";
 import type {Catalog, Product, Shop} from "./types";
 
 type Match = {product_id: string; variant_ids: string[]; product: Product};
-type Reply = {state: "results" | "no_matches" | "unavailable" | "clarify" | "tracking" | "policy"; matches: Match[]};
+type Reply = {state: "results" | "no_matches" | "unavailable" | "quota_exhausted" | "clarify" | "tracking" | "policy"; matches: Match[]; information?: {id:string;label:string;content:string}[]};
 type Turn = {question: string; reply?: Reply; error?: string};
 type Recognition = {lang: string; continuous: boolean; interimResults: boolean; start(): void; abort(): void;
   onresult: ((event: {results: ArrayLike<ArrayLike<{transcript: string}>>}) => void) | null;
@@ -31,7 +31,7 @@ function ResultCard({product, match, shop, catalog, choose, close}: {product: Pr
   </article>;
 }
 
-export function ShoppingAssistant({catalog, shop}: {catalog: Catalog; shop?: Shop}) {
+export function ShoppingAssistant({catalog, shop}: {catalog: Catalog; shop: Shop}) {
   const {lang} = useLang(), bn = lang === "bn";
   const dialog = useRef<HTMLDialogElement>(null), recognition = useRef<Recognition | null>(null);
   const log = useRef<HTMLDivElement>(null);
@@ -76,18 +76,21 @@ export function ShoppingAssistant({catalog, shop}: {catalog: Catalog; shop?: Sho
     return ({results:bn?"আপনার খোঁজার সাথে মেলা পণ্যগুলো দেখুন। চেকআউটে বর্তমান দাম ও স্টক আবার যাচাই হবে।":"Here are matching products. Price and availability are checked again at checkout.",
       no_matches:bn?"এই খোঁজে স্টকে থাকা পণ্য মেলেনি। পণ্যের নাম, বাজেট বা সাইজ বদলে দেখুন।":"No in-stock match for this search. Try a different product name, budget or size.",
       unavailable:bn?"AI এখন পাওয়া যাচ্ছে না। সাধারণ product search ব্যবহার করুন বা পরে চেষ্টা করুন।":"AI search is unavailable. Use product search or try again later.",
+      quota_exhausted:bn?"এই shop-এর AI সহকারী আপাতত পাওয়া যাচ্ছে না। বিক্রেতার সাথে যোগাযোগ করুন।":"This shop's assistant is currently unavailable. Please contact the seller.",
       clarify:bn?"কী ধরনের পণ্য চান? পণ্যের নাম এবং টাকায় বাজেট লিখুন; চাইলে সাইজ বা রংও জানান।":"What type of product would you like? Give its name and a BDT budget, plus size or color if needed.",
       tracking:bn?"অর্ডার জানতে নিরাপদ tracking page খুলুন। এখানে শুধু order number দিয়ে ব্যক্তিগত তথ্য দেখানো হয় না।":"Open secure order tracking. An order number alone does not give access to private details here.",
-      policy:bn?"নিয়ম shop অনুযায়ী আলাদা। সংশ্লিষ্ট shop-এর তথ্য দেখুন; delivery charge চেকআউটে যাচাই হয়।":"Policies vary by shop. Check the shop information; shipping charges are confirmed at checkout."})[state];
+      policy:bn?"এই shop-এর সংরক্ষিত তথ্য নিচে দেখুন।":"Here is information saved by this shop."})[state];
   }
   const contextProduct = catalog.products.find(p=>p.id===selected);
   return <>
-    <button className="button primary assistant-launch" onClick={()=>setOpen(true)} aria-haspopup="dialog"><Bot size={20}/>{bn?"AI সহকারী":"AI assistant"}</button>
+    <button className="button primary assistant-launch" onClick={()=>setOpen(true)} aria-haspopup="dialog" aria-label={bn?"AI সহকারী":"AI assistant"}><Bot size={22}/><span>{bn?"Shop সহকারী":"Shop assistant"}<small>{shop.name}</small></span></button>
     <dialog className="assistant-drawer" ref={dialog} aria-labelledby="assistant-title" onCancel={close} onClose={close} onClick={e=>{if(e.target===e.currentTarget)close();}}>
       <header className="assistant-heading"><div><h2 id="assistant-title">{bn?"Arise AI সহকারী":"Arise AI assistant"}</h2><p>{shop?.name || (bn?"সব shop-এর প্রকাশিত পণ্য":"Published products across shops")}</p></div><button className="icon-button" aria-label={bn?"বন্ধ করুন":"Close assistant"} onClick={close}><X/></button></header>
       <div className="assistant-log" ref={log} role="log" aria-live="polite" aria-relevant="additions text">
         {!turns.length && <p>{bn?"যেমন: ১৫০০ টাকার মধ্যে ৪২ সাইজের জুতা দেখাও। আমি product খুঁজে দিতে পারি; নিজে order বা payment confirm করি না।":"Try: Show shoes in size 42 under 1500 taka. I can find products; I do not confirm orders or payments."}</p>}
         {turns.map((turn,index)=><section className="assistant-turn" key={index}><p className="assistant-question">{turn.question}</p>{turn.error&&<p role="alert">{turn.error}</p>}{turn.reply&&<><p>{message(turn.reply.state)}</p>
+          {turn.reply.information?.map(info=><blockquote className="assistant-information" key={info.id}><strong>{info.label}</strong><p className="preserve-lines">{info.content}</p></blockquote>)}
+          {turn.reply.state==="policy"&&!turn.reply.information?.length&&<p>{bn?"এই প্রশ্নের যাচাইকৃত তথ্য পাওয়া যায়নি। বিক্রেতার সাথে যোগাযোগ করুন।":"No verified information was found for this question. Please contact the seller."}</p>}
           {turn.reply.matches.map(match=>{const visible=catalog.products.some(p=>p.id===match.product_id),product=match.product,owner=catalog.shops.find(s=>s.id===product?.shop_id);return visible&&product?.id===match.product_id&&owner&&(!shop||product.shop_id===shop.id)?<ResultCard key={`${product.id}:${match.variant_ids.join(",")}`} product={product} match={match} shop={owner} catalog={catalog} close={close} choose={()=>{setSelected(product.id);setDraft(bn?"এই পণ্যের কোন সাইজ স্টকে আছে?":"Which sizes of this product are in stock?");}}/>:null;})}
           {turn.reply.state==="tracking"&&<Link className="button secondary" to="/track" onClick={close}>{bn?"অর্ডার ট্র্যাক করুন":"Track order"}</Link>}
           {turn.reply.state==="policy"&&<Link className="button secondary" to={shop?`/shops/${shop.slug}/info/terms`:"/shops"} onClick={close}>{bn?"Shop-এর তথ্য":"Shop information"}</Link>}

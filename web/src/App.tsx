@@ -116,8 +116,8 @@ function ShoppingHelp() {
   const {catalog, session} = useMarket();
   const shop = useRouteShop();
   const {pathname} = useLocation();
-  if (!catalog || !session || /^\/(admin|seller|checkout|purchases)(\/|$)/.test(pathname)) return null;
-  return <ShoppingAssistant key={shop?.id || "all-shops"} catalog={catalog} shop={shop}/>;
+  if (!catalog || !session || !shop || !pathname.startsWith("/shops/") ) return null;
+  return <ShoppingAssistant key={shop.id} catalog={catalog} shop={shop}/>;
 }
 const paymentLogos: Record<string, string> = {
   bkash: "/payment-methods/bkash.svg",

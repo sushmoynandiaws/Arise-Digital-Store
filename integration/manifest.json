@@ -90,7 +90,9 @@
     ],
     "capabilities": [
       "custom_craft_checkout",
-      "read_only_bangla_shopping_assistant"
+      "shop_scoped_bangla_assistant",
+      "canonical_owner_message_quota",
+      "verified_shop_knowledge"
     ],
     "runtime_requirements": [
       "Existing configured AriseSell AI Gateway",

@@ -44,7 +44,7 @@ test("Bangla drawer keeps shop scope, shows source variant facts and checks out 
 });
 
 test("unavailable AI is explicit and Escape returns keyboard focus",async({page})=>{
-  const requests:any[]=[];await mock(page,requests,"unavailable");await page.goto("/products");
+  const requests:any[]=[];await mock(page,requests,"unavailable");await page.goto("/shops/shoe-shop");
   const launch=page.getByRole("button",{name:"AI সহকারী",exact:true});await launch.click();
   const drawer=page.getByRole("dialog");await drawer.getByLabel("আপনার খোঁজ").fill("জুতা চাই");await drawer.getByRole("button",{name:"খুঁজুন",exact:true}).click();
   await expect(drawer.getByText(/AI এখন পাওয়া যাচ্ছে না/)).toBeVisible();await expect(drawer.getByRole("article")).toHaveCount(0);
@@ -54,9 +54,33 @@ test("unavailable AI is explicit and Escape returns keyboard focus",async({page}
 test("voice transcript is editable and is never sent without customer submission",async({page})=>{
   const requests:any[]=[];await mock(page,requests);
   await page.addInitScript(()=>{class Voice {lang="";continuous=false;interimResults=false;onresult:any;onend:any;onerror:any;start(){this.onresult?.({results:[[{transcript:"১৫০০ টাকার জুতা"}]]});this.onend?.();}abort(){this.onend?.();}}Object.defineProperty(window,"SpeechRecognition",{value:Voice,configurable:true});});
-  await page.goto("/products");await page.getByRole("button",{name:"AI সহকারী",exact:true}).click();
+  await page.goto("/shops/shoe-shop");await page.getByRole("button",{name:"AI সহকারী",exact:true}).click();
   const drawer=page.getByRole("dialog");await drawer.getByRole("button",{name:"বাংলায় বলুন"}).click();
   await expect(drawer.getByLabel("আপনার খোঁজ")).toHaveValue("১৫০০ টাকার জুতা");expect(requests).toHaveLength(0);
   await drawer.getByLabel("আপনার খোঁজ").fill("সংশোধিত জুতা");await drawer.getByRole("button",{name:"খুঁজুন",exact:true}).click();
   await expect.poll(()=>requests.length).toBe(1);expect(requests[0].message).toBe("সংশোধিত জুতা");
+});
+
+
+test("assistant is absent outside shops",async({page})=>{
+  const requests:any[]=[];await mock(page,requests);
+  await page.goto("/products");
+  await expect(page.getByRole("button",{name:"AI সহকারী",exact:true})).toHaveCount(0);
+  await page.goto("/");
+  await expect(page.getByRole("button",{name:"AI সহকারী",exact:true})).toHaveCount(0);
+});
+
+
+test("changing shops clears conversation and product context",async({page})=>{
+  const requests:any[]=[];await mock(page,requests);
+  const second={...shop,id:"33333333-3333-4333-8333-333333333333",slug:"second-shop",name:"Second shop"};
+  await page.route("**/api/catalog",route=>route.fulfill({json:{shops:[shop,second],products:[product],synced_at:new Date().toISOString()}}));
+  await page.goto("/shops/shoe-shop");await page.getByRole("button",{name:"AI সহকারী",exact:true}).click();
+  await page.getByLabel("আপনার খোঁজ").fill("সাদা জুতা");await page.getByRole("dialog").getByRole("button",{name:"খুঁজুন",exact:true}).click();
+  await expect.poll(()=>requests.length).toBe(1);
+  await page.goto("/shops/second-shop");await page.getByRole("button",{name:"AI সহকারী",exact:true}).click();
+  await expect(page.getByRole("dialog").getByText("সাদা জুতা",{exact:true})).toHaveCount(0);
+  await page.getByLabel("আপনার খোঁজ").fill("গিফট চাই");await page.getByRole("dialog").getByRole("button",{name:"খুঁজুন",exact:true}).click();
+  await expect.poll(()=>requests.length).toBe(2);expect(requests[1].shop_id).toBe(second.id);expect(requests[1].previous_queries).toEqual([]);
+  await expect(page.getByRole("dialog").getByRole("article")).toHaveCount(0);
 });

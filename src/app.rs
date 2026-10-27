@@ -658,15 +658,36 @@ async fn shopping_search(
         .rate_limit(&format!("shopping:{}", digest(&visitor)), 30)
         .await?;
     let catalog = feed(&state).await?;
-    let shop = body["shop_id"].as_str().map(str::to_owned);
-    if let Some(id) = &shop {
-        uuid(id)?;
+    let shop = body["shop_id"]
+        .as_str()
+        .ok_or_else(|| {
+            AppError::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "Open a shop to use its assistant.",
+            )
+        })?
+        .to_owned();
+    uuid(&shop)?;
+    if !catalog["shops"]
+        .as_array()
+        .is_some_and(|rows| rows.iter().any(|s| s["id"] == shop))
+    {
+        return Err(AppError::new(StatusCode::NOT_FOUND, "Shop is unavailable."));
     }
+    let pages: Option<String> =
+        sqlx::query_scalar("SELECT content FROM shop_pages WHERE shop_id=$1")
+            .bind(&shop)
+            .fetch_optional(&state.db)
+            .await
+            .map_err(|_| AppError::internal())?;
+    body["shop_information"] = pages
+        .and_then(|p| serde_json::from_str::<Value>(&p).ok())
+        .unwrap_or(json!({}));
     let allowed: Vec<Value> = catalog["products"]
         .as_array()
         .into_iter()
         .flatten()
-        .filter(|p| shop.as_ref().is_none_or(|id| p["shop_id"] == *id))
+        .filter(|p| p["shop_id"] == shop)
         .map(|p| p["id"].clone())
         .collect();
     if allowed.len() > 10000 {
