@@ -2040,7 +2040,6 @@ function Home() {
                 >
                   <Art key={cover.id} product={cover} />
                   <span><strong>{category}</strong><small>{items.length} {lang === "bn" ? "টি প্রোডাক্ট" : items.length === 1 ? "product" : "products"}</small></span>
-                  <ArrowUpRight size={18} />
                 </Link>
               );})}
             </div>
