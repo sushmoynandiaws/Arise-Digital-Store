@@ -29,6 +29,7 @@
       --font-body: 'Hind Siliguri', system-ui, sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
       --radius: 14px;
+      --radius-pill: 9999px;
       --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
       --shadow-md: 0 6px 16px rgba(0,0,0,0.08);
       --shadow-lg: 0 20px 40px rgba(0,0,0,0.14);
@@ -157,18 +158,18 @@
 
     .viewport.mode-16-9 {
       width: 1040px;
-      height: 585px; /* 16:9 HD standard */
+      height: 585px; /* 16:9 standard */
     }
 
     .viewport.mode-9-16 {
       width: 375px;
-      height: 667px; /* 9:16 mobile reel standard */
+      height: 667px; /* 9:16 vertical reel standard */
     }
 
     /* Realistic Browser Chrome (macOS / Chrome Window) */
     .browser-chrome {
       width: 100%;
-      height: 48px;
+      height: 46px;
       background: #1e293b;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       display: flex;
@@ -203,7 +204,7 @@
 
     .browser-url-bar {
       flex: 1;
-      height: 32px;
+      height: 30px;
       background: #0f172a;
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 8px;
@@ -351,163 +352,324 @@
       align-items: center;
       gap: 6px;
       box-shadow: 0 3px 10px rgba(99, 54, 214, 0.3);
+      cursor: pointer;
     }
 
-    /* SCENE 1: REAL PAIN POINT (Facebook Page Inbox Jam) */
-    .s1-split-layout {
-      display: grid;
-      grid-template-columns: 1.1fr 1fr;
-      height: 100%;
-      padding: 24px;
-      gap: 20px;
-      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-      color: #fff;
-      align-items: center;
-    }
-
-    .mode-9-16 .s1-split-layout {
-      grid-template-columns: 1fr;
-      padding: 16px;
-      overflow-y: auto;
-    }
-
-    .fb-inbox-mock {
-      background: #ffffff;
-      color: #0f172a;
-      border-radius: 18px;
-      box-shadow: 0 20px 45px rgba(0,0,0,0.4);
-      border: 1px solid #cbd5e1;
-      overflow: hidden;
+    /* SCENE 1: 100% REAL ARISE STORE HOMEPAGE */
+    .s1-home-wrapper {
+      padding: 0 0 24px;
       display: flex;
       flex-direction: column;
-      height: 440px;
+      gap: 18px;
     }
 
-    .fb-inbox-header {
-      background: #0084ff;
+    .real-announcement-strip {
+      background: linear-gradient(90deg, #f59e0b, #d97706);
+      color: #ffffff;
+      padding: 8px 24px;
+      font-size: 12.5px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .real-home-hero {
+      padding: 24px 28px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      background: radial-gradient(circle at 50% 20%, #f3f0ff 0%, #f1f5f9 85%);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .home-hero-pill {
+      background: #ede9fe;
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 800;
+      padding: 4px 14px;
+      border-radius: 9999px;
+      margin-bottom: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #ddd6fe;
+    }
+
+    .real-home-hero h1 {
+      font-family: var(--font-heading);
+      font-size: 28px;
+      font-weight: 850;
+      color: var(--ink);
+      line-height: 1.25;
+      margin-bottom: 8px;
+      max-width: 720px;
+    }
+
+    .real-home-hero p {
+      font-size: 14px;
+      color: var(--muted);
+      max-width: 600px;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .real-hero-search-box {
+      width: 100%;
+      max-width: 520px;
+      height: 44px;
+      background: #ffffff;
+      border: 1.5px solid var(--line);
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      padding: 3px 4px 3px 18px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+      gap: 10px;
+    }
+
+    .real-hero-search-box input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-family: var(--font-body);
+      font-size: 14px;
+      background: transparent;
+      color: var(--ink);
+    }
+
+    .real-hero-search-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--primary);
       color: #fff;
-      padding: 12px 16px;
+      border: none;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+
+    .hero-tags-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .hero-tag {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      padding: 2px 10px;
+      border-radius: 9999px;
+      color: #334155;
+      font-weight: 600;
+    }
+
+    /* Real Product Grid on Homepage */
+    .s1-catalog-container {
+      padding: 16px 28px;
+    }
+
+    .catalog-section-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      margin-bottom: 14px;
     }
 
-    .fb-inbox-title {
-      font-family: var(--font-heading);
-      font-weight: 700;
-      font-size: 15px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .fb-badge-unread {
-      background: #ef4444;
-      color: #fff;
-      font-size: 11px;
+    .catalog-section-head h2 {
+      font-size: 18px;
       font-weight: 800;
-      padding: 2px 7px;
-      border-radius: 9999px;
+      color: var(--ink);
     }
 
-    .fb-chat-body {
-      flex: 1;
-      padding: 14px;
-      background: #f0f2f5;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      overflow-y: auto;
+    .catalog-section-head a {
       font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      text-decoration: none;
     }
 
-    .chat-bubble-buyer {
-      align-self: flex-start;
+    .real-product-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .mode-9-16 .real-product-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .real-product-card {
       background: #ffffff;
-      padding: 9px 14px;
-      border-radius: 16px 16px 16px 2px;
-      max-width: 82%;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.06);
-      line-height: 1.4;
-    }
-
-    .chat-bubble-seller {
-      align-self: flex-end;
-      background: #0084ff;
-      color: #fff;
-      padding: 9px 14px;
-      border-radius: 16px 16px 2px 16px;
-      max-width: 82%;
-      line-height: 1.4;
-    }
-
-    .fb-alert-box {
-      background: #fee2e2;
-      border: 1.5px solid #ef4444;
-      color: #991b1b;
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-size: 12px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      animation: alertPulse 2s infinite;
-    }
-
-    @keyframes alertPulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.02); }
-    }
-
-    .s1-copy-card {
-      padding: 20px;
-    }
-
-    .s1-copy-card .pill-problem {
-      background: rgba(239, 68, 68, 0.2);
-      color: #f87171;
-      border: 1px solid #ef4444;
-      font-size: 12px;
-      font-weight: 700;
-      padding: 4px 12px;
-      border-radius: 9999px;
-      display: inline-block;
-      margin-bottom: 12px;
-    }
-
-    .s1-copy-card h2 {
-      font-size: 26px;
-      font-weight: 800;
-      line-height: 1.3;
-      margin-bottom: 12px;
-      background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .s1-copy-card p {
-      font-size: 14px;
-      color: #94a3b8;
-      line-height: 1.6;
-      margin-bottom: 18px;
-    }
-
-    .s1-list {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      box-shadow: var(--shadow-sm);
+      transition: transform 180ms ease, box-shadow 180ms ease;
     }
 
-    .s1-list-item {
+    .real-product-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-md);
+      border-color: #cbd5e1;
+    }
+
+    .card-art-box {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: #f8fafc;
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+    }
+
+    .card-art-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .card-art-wishlist {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid #e2e8f0;
+      display: grid;
+      place-items: center;
+      color: #64748b;
+      cursor: pointer;
+    }
+
+    .card-art-wishlist.active {
+      color: #ef4444;
+    }
+
+    .card-content {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+    }
+
+    .card-cat-label {
+      font-size: 11px;
+      color: var(--primary);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .card-prod-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-shop-by {
       display: flex;
       align-items: center;
-      gap: 10px;
-      font-size: 13px;
-      color: #e2e8f0;
-      background: rgba(255,255,255,0.06);
-      padding: 8px 12px;
-      border-radius: 8px;
+      gap: 6px;
+      font-size: 11.5px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .tiny-shop-avatar {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 9px;
+      font-weight: 800;
+      display: grid;
+      place-items: center;
+    }
+
+    .card-bottom-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-top: auto;
+      padding-top: 8px;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .card-price {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .card-stock-status {
+      font-size: 11px;
+      color: #059669;
+      font-weight: 600;
+    }
+
+    /* Floating Question Toast on Homepage */
+    .s1-floating-toast {
+      position: absolute;
+      bottom: 20px;
+      right: 24px;
+      background: rgba(15, 23, 42, 0.94);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(12px);
+      max-width: 440px;
+      z-index: 50;
+      animation: floatToast 3s ease-in-out infinite alternate;
+    }
+
+    @keyframes floatToast {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-6px); }
+    }
+
+    .toast-icon {
+      font-size: 24px;
+    }
+
+    .toast-body strong {
+      display: block;
+      font-size: 13.5px;
+      font-weight: 750;
+      color: #fbbf24;
+      margin-bottom: 2px;
+    }
+
+    .toast-body span {
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.35;
+      display: block;
     }
 
     /* SCENE 2: REAL SHOP PAGE & FREE SHOP LINK */
@@ -1304,17 +1466,6 @@
       line-height: 1.4;
       color: #f1f5f9;
     }
-
-    /* Simulated Animated Mouse Pointer */
-    .sim-mouse {
-      position: absolute;
-      width: 24px;
-      height: 24px;
-      pointer-events: none;
-      z-index: 1000;
-      transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
-      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
-    }
   </style>
 </head>
 <body>
@@ -1327,11 +1478,11 @@
         <path d="M12 32 24 12l12 20h-8l-4-7-4 7Z" fill="#fff"/>
         <circle cx="35" cy="13" r="4" fill="#ff6b00"/>
       </svg>
-      <span>Arise Store × AriseSell · Real Motion Studio</span>
+      <span>Arise Store × AriseSell · 100% Real Motion Studio</span>
     </div>
 
     <nav class="scene-tabs">
-      <button class="btn-tab active" onclick="goToScene(1)">১. ইনবক্স জ্যাম & সমস্যা</button>
+      <button class="btn-tab active" onclick="goToScene(1)">১. Arise Store হোমপেজ & হুক</button>
       <button class="btn-tab" onclick="goToScene(2)">২. ফ্রি শপ লিঙ্ক</button>
       <button class="btn-tab" onclick="goToScene(3)">৩. রিয়েল প্রডাক্ট পেজ</button>
       <button class="btn-tab" onclick="goToScene(4)">৪. বিকাশ পেমেন্ট & QR</button>
@@ -1365,7 +1516,7 @@
 
         <div class="browser-url-bar">
           <span class="lock-icon">🔒</span>
-          <span>https://</span><strong id="browser-url-text">arise-store.com/shops/arise-fashion</strong>
+          <span>https://</span><strong id="browser-url-text">arise-store.com</strong>
         </div>
 
         <div class="browser-actions">
@@ -1377,45 +1528,154 @@
       <!-- Live Web Viewport -->
       <div class="browser-viewport">
 
-        <!-- SCENE 1: Problem / Facebook Inbox Chaos -->
+        <!-- SCENE 1: 100% REAL ARISE STORE HOMEPAGE & HOOK -->
         <section class="scene-view visible" id="scene-1">
-          <div class="s1-split-layout">
-            <div class="fb-inbox-mock">
-              <div class="fb-inbox-header">
-                <div class="fb-inbox-title">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.87 1.5 5.43 3.86 7.02V22l3.78-2.08c.76.21 1.55.33 2.36.33 5.52 0 10-4.03 10-9s-4.48-9-10-9z"/></svg>
-                  <span>Arise Fashion — Inbox</span>
-                </div>
-                <span class="fb-badge-unread">18 Unread</span>
+          <!-- Real Site Header -->
+          <header class="real-header">
+            <a href="#" class="real-brand">
+              <svg viewBox="0 0 48 48">
+                <rect width="48" height="48" rx="14" fill="#6336d6"/>
+                <path d="M12 32 24 12l12 20h-8l-4-7-4 7Z" fill="#fff"/>
+                <circle cx="35" cy="13" r="4" fill="#ff6b00"/>
+              </svg>
+              <span>arise<span class="store-tag">/ store</span></span>
+            </a>
+            <div class="real-search-bar">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <span>Search products, sneakers and verified shops...</span>
+            </div>
+            <div class="real-header-actions">
+              <span class="lang-pill">বাং / EN</span>
+              <button class="btn-real-open-shop">Open your shop</button>
+            </div>
+          </header>
+
+          <div class="s1-home-wrapper">
+            <!-- Top Announcement Strip -->
+            <div class="real-announcement-strip">
+              <span>📢</span>
+              <span>ফেসবুক পেজে ইনবক্স জ্যাম? AriseSell-এ অ্যাকাউন্ট করলেই পাচ্ছেন আপনার ব্র্যান্ডের নিজস্ব ফ্রি ওয়েবসাইট শপ লিঙ্ক!</span>
+            </div>
+
+            <!-- Authentic Arise Store Hero Section -->
+            <div class="real-home-hero">
+              <span class="home-hero-pill">✨ স্বাধীন উদ্যোক্তাদের বিশ্বস্ত প্ল্যাটফর্ম</span>
+              <h1>আপনার ফেসবুক ব্র্যান্ডের জন্য প্রফেশনাল অনলাইন শপ</h1>
+              <p>ইনবক্সে ঘণ্টার পর ঘণ্টা সাইজ আর দাম বলার দিন শেষ! কাস্টমার সরাসরি পণ্য বেছে অর্ডার করবে, আর বিকাশ/নগদে কুরিয়ার চার্জ পাবেন ইনস্ট্যান্ট।</p>
+              
+              <div class="real-hero-search-box">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" placeholder="যেমন: Chunky sneakers, টি-শার্ট, জুতো..." readonly value="Chunky sneakers white">
+                <button class="real-hero-search-btn" onclick="goToScene(2)">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                </button>
               </div>
-              <div class="fb-chat-body">
-                <div class="chat-bubble-buyer">
-                  ভাইয়া Chunky Sneakers White এর ৪২ সাইজ আছে? দাম কত?
-                </div>
-                <div class="chat-bubble-seller">
-                  জি ভাইয়া এভেইলেবল আছে। প্রাইস ১৪৫০ টাকা।
-                </div>
-                <div class="chat-bubble-buyer">
-                  ডেলিভারি চার্জ কত? ক্যাশ অন ডেলিভারিতে পাঠান, টাকা এখন দেব না।
-                </div>
-                <div class="fb-alert-box">
-                  <span>⚠️</span>
-                  <div>
-                    <strong>পার্সেল ডেলিভারি ব্যর্থ!</strong>
-                    <div>কাস্টমার ফোন ধরেননি। কুরিয়ার চার্জ ৳ ১৩০ লোকসান!</div>
-                  </div>
-                </div>
+
+              <div class="hero-tags-row">
+                <span>জনপ্রিয় ক্যাটাগরি:</span>
+                <span class="hero-tag">স্নিকার্স</span>
+                <span class="hero-tag">মেনস ফ্যাশন</span>
+                <span class="hero-tag">টি-শার্ট</span>
+                <span class="hero-tag">লেদার গুডস</span>
               </div>
             </div>
 
-            <div class="s1-copy-card">
-              <span class="pill-problem">❌ সনাতন ফেসবুক বিক্রির সমস্যা</span>
-              <h2>ইনবক্সে চ্যাটিং আর ফেক অর্ডারে ডেলিভারি চার্জ লস?</h2>
-              <p>কাস্টমার ঘণ্টার পর ঘণ্টা দাম আর সাইজ জিজ্ঞেস করে হারিয়ে যায়, আর ক্যাশ অন ডেলিভারিতে ফেক অর্ডারের রিটার্ন চার্জ গুনতে হয় আপনাকে।</p>
-              <div class="s1-list">
-                <div class="s1-list-item">❌ দিনরাত ম্যানুয়ালি সাইজ আর দামের রিপ্লাই দেওয়া</div>
-                <div class="s1-list-item">❌ কাস্টমার পার্সেল না নিলে কুরিয়ার ফি লস</div>
-                <div class="s1-list-item">❌ কোন প্রফেশনাল অনলাইন ব্র্যান্ডিং নেই</div>
+            <!-- Real Product Cards Grid -->
+            <div class="s1-catalog-container">
+              <div class="catalog-section-head">
+                <h2>ট্রেন্ডিং প্রোডাক্টস</h2>
+                <a href="javascript:void(0)" onclick="goToScene(2)">সব দেখুন ➔</a>
+              </div>
+
+              <div class="real-product-grid">
+                <!-- Product 1: Chunky Sneakers White -->
+                <article class="real-product-card" style="cursor: pointer;" onclick="goToScene(3)">
+                  <div class="card-art-box">
+                    <img src="/products/chunky-sneakers-white.jpg" alt="Chunky Sneakers White">
+                    <button class="card-art-wishlist active" title="Wishlist">♥</button>
+                  </div>
+                  <div class="card-content">
+                    <span class="card-cat-label">Footwear</span>
+                    <h3 class="card-prod-title">Chunky Sneakers White — Air Edition</h3>
+                    <div class="card-shop-by">
+                      <span class="tiny-shop-avatar">A</span>
+                      <span>Arise Fashion</span>
+                    </div>
+                    <div class="card-bottom-row">
+                      <span class="card-price">৳ ১,৪৫০</span>
+                      <span class="card-stock-status">● ইন স্টক</span>
+                    </div>
+                  </div>
+                </article>
+
+                <!-- Product 2: Casual Oxford Sneakers -->
+                <article class="real-product-card">
+                  <div class="card-art-box">
+                    <img src="/products/casual-sneakers.jpg" alt="Casual Oxford Sneakers">
+                    <button class="card-art-wishlist">♥</button>
+                  </div>
+                  <div class="card-content">
+                    <span class="card-cat-label">Footwear</span>
+                    <h3 class="card-prod-title">Casual Oxford Sneakers Black</h3>
+                    <div class="card-shop-by">
+                      <span class="tiny-shop-avatar">A</span>
+                      <span>Arise Fashion</span>
+                    </div>
+                    <div class="card-bottom-row">
+                      <span class="card-price">৳ ১,৮৫০</span>
+                      <span class="card-stock-status">● ইন স্টক</span>
+                    </div>
+                  </div>
+                </article>
+
+                <!-- Product 3: Classic Cotton Polo -->
+                <article class="real-product-card">
+                  <div class="card-art-box">
+                    <img src="/products/classic-polo.jpg" alt="Premium Cotton Polo">
+                    <button class="card-art-wishlist">♥</button>
+                  </div>
+                  <div class="card-content">
+                    <span class="card-cat-label">Apparel</span>
+                    <h3 class="card-prod-title">Premium Cotton Slim Fit Polo</h3>
+                    <div class="card-shop-by">
+                      <span class="tiny-shop-avatar" style="background:#059669;">U</span>
+                      <span>Urban Threads</span>
+                    </div>
+                    <div class="card-bottom-row">
+                      <span class="card-price">৳ ৭৫০</span>
+                      <span class="card-stock-status">● ইন স্টক</span>
+                    </div>
+                  </div>
+                </article>
+
+                <!-- Product 4: Leather Bi-Fold Wallet -->
+                <article class="real-product-card">
+                  <div class="card-art-box">
+                    <img src="/products/leather-wallet.jpg" alt="Handcrafted Leather Wallet">
+                    <button class="card-art-wishlist">♥</button>
+                  </div>
+                  <div class="card-content">
+                    <span class="card-cat-label">Accessories</span>
+                    <h3 class="card-prod-title">Handcrafted Leather Bi-Fold Wallet</h3>
+                    <div class="card-shop-by">
+                      <span class="tiny-shop-avatar" style="background:#d97706;">L</span>
+                      <span>Luxe Craft</span>
+                    </div>
+                    <div class="card-bottom-row">
+                      <span class="card-price">৳ ৯৫০</span>
+                      <span class="card-stock-status">● ইন স্টক</span>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </div>
+
+            <!-- Floating Question Toast on Real Homepage -->
+            <div class="s1-floating-toast">
+              <span class="toast-icon">💬</span>
+              <div class="toast-body">
+                <strong>ইনবক্সে মেসেজ জ্যাম আর ফেক অর্ডারের দিন শেষ!</strong>
+                <span>AriseSell-এ লগইন করলেই পাচ্ছেন এমন আকর্ষণীয় শপ লিঙ্ক সম্পূর্ণ ফ্রিতে।</span>
               </div>
             </div>
           </div>
@@ -1515,7 +1775,7 @@
             <div class="product-layout-grid">
               <!-- Real Product Image -->
               <div class="product-photo-wrap">
-                <img src="/products/chunky-sneakers-white.jpg" alt="Chunky Sneakers White" onerror="this.src='https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=800&q=80'">
+                <img src="/products/chunky-sneakers-white.jpg" alt="Chunky Sneakers White">
                 <span class="badge-floating">New Arrival</span>
               </div>
 
@@ -1705,7 +1965,7 @@
                 </div>
                 <div class="review-rating-stars">★★★★★ 5.0</div>
                 <p class="review-text">
-                  "স্নিকার্সটা এককথায় অসাধারণ! ছবি আর আসল জুতো একদম ১০০% সেইম। সবচেয়ে বড় কথা bKash দিয়ে অ্যাডভান্স দিয়েছিলাম, পরদিনই স্টেডফাস্টের ডেলিভারি পেয়েছি। ধন্যবাদ Arise Fashion ও Arise Store!"
+                  "স্নিকার্সটা এককথায় অসাধারণ! ছবি আর আসল জুতো একদম ১০০% সেইম। সবচেয়ে বড় কথা bKash দিয়ে অ্যাডভান্স দিয়েছিলাম, পরদিনই স্টেডফাস্টের ডেলিভারি পেয়েছি। ধন্যবাদ Arise Fashion ও Arise Store কে!"
                 </p>
               </div>
             </div>
@@ -1761,7 +2021,7 @@
 
   <script>
     const sceneUrls = {
-      1: "facebook.com/arisefashion/inbox",
+      1: "arise-store.com",
       2: "arise-store.com/shops/arise-fashion",
       3: "arise-store.com/shops/arise-fashion/products/chunky-sneakers-white",
       4: "arise-store.com/checkout/ORD-4921",
@@ -1876,7 +2136,7 @@
           current = 1;
         }
         goToScene(current);
-        autoplayTimer = setTimeout(step, 6500); // 6.5s per scene for smooth reading
+        autoplayTimer = setTimeout(step, 6500); // 6.5s per scene
       }
 
       autoplayTimer = setTimeout(step, 6500);
