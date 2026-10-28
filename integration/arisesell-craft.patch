@@ -2637,3 +2637,60 @@ new file mode 100644
 +    body = {"email": "fixture@example.test", **({"otp": "8369"} if path == "verify-otp" else {})}
 +    response = await market_api.post(PREFIX + "/orders/track/" + path, json=body)
 +    assert response.status_code == 422
+diff --git a/backend/tests/test_ai_coordination_degradation.py b/backend/tests/test_ai_coordination_degradation.py
+index 3a78b626..d3f936fe 100644
+--- a/backend/tests/test_ai_coordination_degradation.py
++++ b/backend/tests/test_ai_coordination_degradation.py
+@@ -1,6 +1,7 @@
+ """Fail closed before billable calls; retry only pre-action receipts."""
+ import asyncio
+ from datetime import datetime, timedelta, timezone
++from types import SimpleNamespace
+ from unittest.mock import AsyncMock
+ import pytest
+ from sqlalchemy import select
+@@ -42,16 +43,21 @@ async def test_outage_never_admits_provider_work(monkeypatch, configured_gateway
+         "cooldownRemainingMs": None, "reason": "coordination_unavailable"}
+
+ async def test_timeout_after_script_commit_retains_lease_and_budgets(monkeypatch, gateway_redis):
++    clock = [1_800_000_059.9]
++    monkeypatch.setattr(state, "time", SimpleNamespace(time=lambda: clock[0], monotonic=state.time.monotonic))
++    committed_minute = state.names(KEY)[2]
+     original = gateway_redis.eval
+     async def slow_ack(*args, **kwargs):
+         await original(*args, **kwargs)
++        clock[0] += 1  # The delayed acknowledgement crosses into a new rate-limit minute.
+         await asyncio.sleep(1)
+     monkeypatch.setattr(gateway_redis, "eval", slow_ack)
+     result, _, mode = await state.acquire(KEY, KeyRouting(maxConcurrent=1), 123, 2000)
+     assert (result, mode) == ("coordination_unavailable", "unavailable")
+     monkeypatch.setattr(gateway_redis, "eval", original)
+     assert (await state.acquire(KEY, KeyRouting(maxConcurrent=1), 123, 2000))[0] == "busy"
+-    assert await gateway_redis.hgetall(state.names(KEY)[2]) == {"requests": "1", "tokens": "123"}
++    assert state.names(KEY)[2] != committed_minute
++    assert await gateway_redis.hgetall(committed_minute) == {"requests": "1", "tokens": "123"}
+
+ async def test_shorter_request_cannot_expire_an_older_inflight_lease(gateway_redis):
+     routing = KeyRouting(maxConcurrent=2)
+diff --git a/backend/tests/test_whatsapp_commerce.py b/backend/tests/test_whatsapp_commerce.py
+index d2384eb5..ce2c42c9 100644
+--- a/backend/tests/test_whatsapp_commerce.py
++++ b/backend/tests/test_whatsapp_commerce.py
+@@ -23,7 +23,7 @@ from app.models.commerce import CheckoutDraft, CheckoutReceipt, CourierJob, Lead
+ from app.models.pipeline import PipelineCard
+ from app.models.payment_sms import SmsPayment
+ from app.models.restock import RestockSubscription
+-from app.models.product_image import OutboundPart
++from app.models.product_image import ImageAsset, ProductImage, OutboundPart
+ from app.models.admin import FraudBlacklist, ActivityLog
+ from app.models.ai_config import AIPersona, Guardrail
+ from app.models.knowledge import KnowledgeEntry
+@@ -50,7 +50,7 @@ async def commerce(monkeypatch):
+         return_value={"status": "accepted", "message_id": "fixture-controls"}))
+     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+     tables = [m.__table__ for m in (Organization, Business, User, SubscriptionPlan, PlaygroundSession, PlaygroundTurn, Product, Variant, ConnectedChannel,
+-        Conversation, Message, Order, OrderLine, CourierBooking, CheckoutDraft, CheckoutReceipt, CourierJob, PipelineCard, SmsPayment, FraudBlacklist, LeadFollowup, ActivityLog, RestockSubscription, OutboundPart, AIPersona, Guardrail, KnowledgeEntry)]
++        Conversation, Message, Order, OrderLine, CourierBooking, CheckoutDraft, CheckoutReceipt, CourierJob, PipelineCard, SmsPayment, FraudBlacklist, LeadFollowup, ActivityLog, RestockSubscription, ImageAsset, ProductImage, OutboundPart, AIPersona, Guardrail, KnowledgeEntry)]
+     async with engine.begin() as conn:
+         await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=tables))
+     factory = async_sessionmaker(engine, expire_on_commit=False, autoflush=False)
