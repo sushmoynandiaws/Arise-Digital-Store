@@ -25,15 +25,15 @@ test("Bangla drawer keeps shop scope, shows source variant facts and checks out 
   await page.getByRole("button",{name:"AI সহকারী",exact:true}).click();
   const drawer=page.getByRole("dialog");await expect(drawer).toBeVisible();
   await expect(drawer.getByRole("button",{name:"বাংলায় বলুন"})).toBeDisabled();
-  await drawer.getByLabel("আপনার খোঁজ").fill("১৫০০ টাকার মধ্যে ৪২ সাইজের জুতা দেখাও");
-  await drawer.getByRole("button",{name:"খুঁজুন",exact:true}).click();
+  await drawer.getByLabel("আপনার বার্তা").fill("১৫০০ টাকার মধ্যে ৪২ সাইজের জুতা দেখাও");
+  await drawer.getByRole("button",{name:"বার্তা পাঠান",exact:true}).click();
   await expect(drawer.getByText("Stock",{exact:false})).toHaveCount(0);
   await expect(drawer.getByText("স্টক: 3",{exact:false})).toBeVisible();
   await expect(drawer.getByText(/1,450.50/)).toBeVisible();
   await expect(drawer.getByRole("combobox")).toHaveValue("white42");
   expect(requests[0].shop_id).toBe(shop.id);expect(requests[0]).not.toHaveProperty("allowed_product_ids");
-  await drawer.getByRole("button",{name:"এই পণ্য নিয়ে খুঁজুন"}).click();
-  await drawer.getByRole("button",{name:"খুঁজুন",exact:true}).click();
+  await drawer.getByRole("button",{name:"এই পণ্য নিয়ে কথা বলুন"}).click();
+  await drawer.getByRole("button",{name:"বার্তা পাঠান",exact:true}).click();
   await expect.poll(()=>requests.length).toBe(2);expect(requests[1].selected_product_id).toBe(product.id);
   expect(requests[1].previous_queries).toEqual(["১৫০০ টাকার মধ্যে ৪২ সাইজের জুতা দেখাও"]);
   expect(await drawer.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBeTruthy();
@@ -46,8 +46,8 @@ test("Bangla drawer keeps shop scope, shows source variant facts and checks out 
 test("unavailable AI is explicit and Escape returns keyboard focus",async({page})=>{
   const requests:any[]=[];await mock(page,requests,"unavailable");await page.goto("/shops/shoe-shop");
   const launch=page.getByRole("button",{name:"AI সহকারী",exact:true});await launch.click();
-  const drawer=page.getByRole("dialog");await drawer.getByLabel("আপনার খোঁজ").fill("জুতা চাই");await drawer.getByRole("button",{name:"খুঁজুন",exact:true}).click();
-  await expect(drawer.getByText(/AI এখন পাওয়া যাচ্ছে না/)).toBeVisible();await expect(drawer.getByRole("article")).toHaveCount(0);
+  const drawer=page.getByRole("dialog");await drawer.getByLabel("আপনার বার্তা").fill("জুতা চাই");await drawer.getByRole("button",{name:"বার্তা পাঠান",exact:true}).click();
+  await expect(drawer.getByText(/এখন উত্তর দিতে পারছি না/)).toBeVisible();await expect(drawer.getByRole("article")).toHaveCount(0);
   await page.keyboard.press("Escape");await expect(drawer).not.toBeVisible();await expect(launch).toBeFocused();
 });
 
@@ -56,8 +56,8 @@ test("voice transcript is editable and is never sent without customer submission
   await page.addInitScript(()=>{class Voice {lang="";continuous=false;interimResults=false;onresult:any;onend:any;onerror:any;start(){this.onresult?.({results:[[{transcript:"১৫০০ টাকার জুতা"}]]});this.onend?.();}abort(){this.onend?.();}}Object.defineProperty(window,"SpeechRecognition",{value:Voice,configurable:true});});
   await page.goto("/shops/shoe-shop");await page.getByRole("button",{name:"AI সহকারী",exact:true}).click();
   const drawer=page.getByRole("dialog");await drawer.getByRole("button",{name:"বাংলায় বলুন"}).click();
-  await expect(drawer.getByLabel("আপনার খোঁজ")).toHaveValue("১৫০০ টাকার জুতা");expect(requests).toHaveLength(0);
-  await drawer.getByLabel("আপনার খোঁজ").fill("সংশোধিত জুতা");await drawer.getByRole("button",{name:"খুঁজুন",exact:true}).click();
+  await expect(drawer.getByLabel("আপনার বার্তা")).toHaveValue("১৫০০ টাকার জুতা");expect(requests).toHaveLength(0);
+  await drawer.getByLabel("আপনার বার্তা").fill("সংশোধিত জুতা");await drawer.getByRole("button",{name:"বার্তা পাঠান",exact:true}).click();
   await expect.poll(()=>requests.length).toBe(1);expect(requests[0].message).toBe("সংশোধিত জুতা");
 });
 
@@ -77,13 +77,13 @@ test("minimal empty state fits mobile and desktop and suggestions do not spend a
   for(const width of [375,1280]) {
     await page.setViewportSize({width,height:900});
     await expect(drawer.getByRole("heading",{name:"কী খুঁজছেন?"})).toBeVisible();
-    await expect(drawer.getByLabel("আপনার খোঁজ")).toBeVisible();
+    await expect(drawer.getByLabel("আপনার বার্তা")).toBeVisible();
     expect(await drawer.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBeTruthy();
     await page.screenshot({path:`../artifacts/assistant-clean-${width}.png`});
   }
   await drawer.getByRole("button",{name:"Shoes দেখাও",exact:true}).click();
-  await expect(drawer.getByLabel("আপনার খোঁজ")).toHaveValue("Shoes দেখাও");
-  await expect(drawer.getByLabel("আপনার খোঁজ")).toBeFocused();
+  await expect(drawer.getByLabel("আপনার বার্তা")).toHaveValue("Shoes দেখাও");
+  await expect(drawer.getByLabel("আপনার বার্তা")).toBeFocused();
   expect(requests).toHaveLength(0);
 });
 
@@ -93,11 +93,49 @@ test("changing shops clears conversation and product context",async({page})=>{
   const second={...shop,id:"33333333-3333-4333-8333-333333333333",slug:"second-shop",name:"Second shop"};
   await page.route("**/api/catalog",route=>route.fulfill({json:{shops:[shop,second],products:[product],synced_at:new Date().toISOString()}}));
   await page.goto("/shops/shoe-shop");await page.getByRole("button",{name:"AI সহকারী",exact:true}).click();
-  await page.getByLabel("আপনার খোঁজ").fill("সাদা জুতা");await page.getByRole("dialog").getByRole("button",{name:"খুঁজুন",exact:true}).click();
+  await page.getByLabel("আপনার বার্তা").fill("সাদা জুতা");await page.getByRole("dialog").getByRole("button",{name:"বার্তা পাঠান",exact:true}).click();
   await expect.poll(()=>requests.length).toBe(1);
   await page.goto("/shops/second-shop");await page.getByRole("button",{name:"AI সহকারী",exact:true}).click();
   await expect(page.getByRole("dialog").getByText("সাদা জুতা",{exact:true})).toHaveCount(0);
-  await page.getByLabel("আপনার খোঁজ").fill("গিফট চাই");await page.getByRole("dialog").getByRole("button",{name:"খুঁজুন",exact:true}).click();
+  await page.getByLabel("আপনার বার্তা").fill("গিফট চাই");await page.getByRole("dialog").getByRole("button",{name:"বার্তা পাঠান",exact:true}).click();
   await expect.poll(()=>requests.length).toBe(2);expect(requests[1].shop_id).toBe(second.id);expect(requests[1].previous_queries).toEqual([]);
   await expect(page.getByRole("dialog").getByRole("article")).toHaveCount(0);
+});
+
+
+test("chat sends with Enter, keeps Shift+Enter, and never renders raw knowledge cards",async({page})=>{
+  const requests:any[]=[];await mock(page,requests,"policy");
+  await page.route("**/api/assistant",route=>{
+    requests.push(route.request().postDataJSON());
+    return route.fulfill({json:{state:"policy",matches:[],reply:"হ্যাঁ, ক্যাশ অন ডেলিভারি চালু আছে। চেকআউটে প্রযোজ্য চার্জ দেখাবে।",
+      information:[{id:"policy:cod_enabled",label:"AriseSell · cod_enabled",content:"True"},{id:"policy:cod_policy",label:"cod_policy",content:"full_cod"}]}});
+  });
+  await page.goto("/shops/shoe-shop");await page.getByRole("button",{name:"AI সহকারী",exact:true}).click();
+  const drawer=page.getByRole("dialog"),input=drawer.getByLabel("আপনার বার্তা");
+  await expect(drawer.getByRole("button",{name:/Search|খুঁজুন/})).toHaveCount(0);
+  await expect(drawer.getByRole("button",{name:"বার্তা পাঠান",exact:true})).toBeDisabled();
+  await input.fill("cash on delivery possible?");await input.press("Shift+Enter");
+  expect(requests).toHaveLength(0);await input.press("Enter");
+  await expect.poll(()=>requests.length).toBe(1);
+  await expect(drawer.locator(".assistant-answer")).toContainText("ক্যাশ অন ডেলিভারি চালু আছে");
+  await expect(drawer.getByText(/cod_enabled|full_cod|AriseSell ·|^True$/)).toHaveCount(0);
+  await expect(drawer.locator("blockquote")).toHaveCount(0);
+  await expect(drawer.getByRole("link",{name:"বিক্রেতার সঙ্গে কথা বলুন"})).toHaveAttribute("href","/shops/shoe-shop/info/contact");
+  await expect(input).toBeFocused();
+  for(const width of [320,375,1280]) {
+    await page.setViewportSize({width,height:900});
+    expect(await drawer.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBeTruthy();
+    await expect(drawer.getByRole("button",{name:"বার্তা পাঠান",exact:true})).toBeVisible();
+    await page.screenshot({path:`../artifacts/assistant-conversation-${width}.png`});
+  }
+});
+
+
+test("old policy responses do not expose internal fields before the source deployment",async({page})=>{
+  const requests:any[]=[];await mock(page,requests,"policy");
+  await page.route("**/api/assistant",route=>route.fulfill({json:{state:"policy",matches:[],information:[{id:"x",label:"cod_enabled",content:"True"}]}}));
+  await page.goto("/shops/shoe-shop");await page.getByRole("button",{name:"AI সহকারী",exact:true}).click();
+  const drawer=page.getByRole("dialog");await drawer.getByLabel("আপনার বার্তা").fill("cod ache?");await drawer.getByRole("button",{name:"বার্তা পাঠান",exact:true}).click();
+  await expect(drawer.locator(".assistant-answer")).toContainText("নিশ্চিত তথ্য পাচ্ছি না");
+  await expect(drawer.getByText(/cod_enabled|^True$/)).toHaveCount(0);
 });

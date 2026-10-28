@@ -3,11 +3,11 @@ import {Link} from "react-router-dom";
 import {api, canCheckout, money} from "./api";
 import {productPath} from "./product";
 import {useLang} from "./i18n";
-import {Bot, X, Search, Mic} from "./icons";
+import {Bot, X, ArrowUp, Mic} from "./icons";
 import type {Catalog, Product, Shop} from "./types";
 
 type Match = {product_id: string; variant_ids: string[]; product: Product};
-type Reply = {state: "results" | "no_matches" | "unavailable" | "quota_exhausted" | "clarify" | "tracking" | "policy"; matches: Match[]; information?: {id:string;label:string;content:string}[]};
+type Reply = {state: "results" | "no_matches" | "unavailable" | "quota_exhausted" | "clarify" | "tracking" | "policy" | "greeting"; matches: Match[]; reply?: string};
 type Turn = {question: string; reply?: Reply; error?: string};
 type Recognition = {lang: string; continuous: boolean; interimResults: boolean; start(): void; abort(): void;
   onresult: ((event: {results: ArrayLike<ArrayLike<{transcript: string}>>}) => void) | null;
@@ -26,7 +26,7 @@ function ResultCard({product, match, shop, catalog, choose, close}: {product: Pr
       <label className="field">{bn ? "অপশন" : "Option"}<select aria-label={`${product.name} ${bn ? "অপশন" : "option"}`} value={variantId} onChange={e => setVariant(e.target.value)}>{variants.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label>
       <p><strong>{money(selected.price,product.currency)}</strong> · {bn ? "স্টক" : "Stock"}: {selected.stock}</p>
       {canCheckout(product, shop) ? <Link className="button primary" to={`/checkout/${product.id}?variant=${selected.id}&quantity=1`} onClick={close}>{product.custom_order ? (bn ? "কাস্টমাইজ করুন" : "Customize") : (bn ? "চেকআউট" : "Checkout")}</Link> : <p>{product.checkout_unavailable_reason || (bn ? "কেনার নিয়ম জানতে বিক্রেতার সাথে যোগাযোগ করুন।" : "Contact the seller to check how to order.")}</p>}
-      <button type="button" className="button secondary" onClick={choose}>{bn ? "এই পণ্য নিয়ে খুঁজুন" : "Search this product"}</button>
+      <button type="button" className="button secondary" onClick={choose}>{bn ? "এই পণ্য নিয়ে কথা বলুন" : "Ask about this product"}</button>
     </div>
   </article>;
 }
@@ -34,7 +34,7 @@ function ResultCard({product, match, shop, catalog, choose, close}: {product: Pr
 export function ShoppingAssistant({catalog, shop}: {catalog: Catalog; shop: Shop}) {
   const {lang} = useLang(), bn = lang === "bn";
   const dialog = useRef<HTMLDialogElement>(null), recognition = useRef<Recognition | null>(null);
-  const log = useRef<HTMLDivElement>(null);
+  const log = useRef<HTMLDivElement>(null), composer = useRef<HTMLTextAreaElement>(null);
   const [open, setOpen] = useState(false), [draft,setDraft] = useState(""), [turns,setTurns] = useState<Turn[]>([]);
   const [busy,setBusy] = useState(false), [listening,setListening] = useState(false), [voiceError,setVoiceError] = useState("");
   const [selected,setSelected] = useState<string | null>(null);
@@ -46,13 +46,14 @@ export function ShoppingAssistant({catalog, shop}: {catalog: Catalog; shop: Shop
   },[open]);
   useEffect(() => () => {recognition.current?.abort();request.current?.abort();},[]);
   useEffect(() => {if(log.current)log.current.scrollTop=log.current.scrollHeight;},[turns,busy]);
+  useEffect(() => {if(composer.current){composer.current.style.height="auto";composer.current.style.height=`${Math.min(composer.current.scrollHeight,104)}px`;}},[draft,open]);
   const close = () => setOpen(false);
-  async function send(event: React.FormEvent) {
+  async function send(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if(!draft.trim() || busy) return;
     recognition.current?.abort();
     const question = draft.trim(), previous = turns.map(t => t.question).slice(-4);
-    setDraft("");setBusy(true);
+    setDraft("");setBusy(true);composer.current?.focus();
     setTurns(current => [...current.slice(-9),{question}]);
     const controller = new AbortController(); request.current = controller;
     try {
@@ -69,42 +70,42 @@ export function ShoppingAssistant({catalog, shop}: {catalog: Catalog; shop: Shop
     const input = new voice();recognition.current=input;input.lang="bn-BD";input.continuous=false;input.interimResults=false;
     input.onresult=event=>{const text=Array.from(event.results).map(result=>result[0]?.transcript||"").join(" ");setDraft(text.slice(0,1000));};
     input.onend=()=>setListening(false);
-    input.onerror=()=>{setListening(false);setVoiceError(bn ? "ভয়েস ইনপুট পাওয়া যায়নি। লিখে খুঁজতে পারেন।" : "Voice input is unavailable. You can type your search.");};
-    try {setListening(true);input.start();} catch {setListening(false);setVoiceError(bn ? "মাইক্রোফোন চালু হয়নি। লিখে খুঁজুন।" : "Microphone could not start. Type your search.");}
+    input.onerror=()=>{setListening(false);setVoiceError(bn ? "ভয়েস ইনপুট পাওয়া যায়নি। লিখে জানাতে পারেন।" : "Voice input is unavailable. You can type your message.");};
+    try {setListening(true);input.start();} catch {setListening(false);setVoiceError(bn ? "মাইক্রোফোন চালু হয়নি। লিখে জানান।" : "Microphone could not start. Type your message.");}
   }
   function message(state: Reply["state"]) {
-    return ({results:bn?"আপনার খোঁজার সাথে মেলা পণ্যগুলো দেখুন। চেকআউটে বর্তমান দাম ও স্টক আবার যাচাই হবে।":"Here are matching products. Price and availability are checked again at checkout.",
-      no_matches:bn?"এই খোঁজে স্টকে থাকা পণ্য মেলেনি। পণ্যের নাম, বাজেট বা সাইজ বদলে দেখুন।":"No in-stock match for this search. Try a different product name, budget or size.",
-      unavailable:bn?"AI এখন পাওয়া যাচ্ছে না। সাধারণ product search ব্যবহার করুন বা পরে চেষ্টা করুন।":"AI search is unavailable. Use product search or try again later.",
-      quota_exhausted:bn?"এই shop-এর AI সহকারী আপাতত পাওয়া যাচ্ছে না। বিক্রেতার সাথে যোগাযোগ করুন।":"This shop's assistant is currently unavailable. Please contact the seller.",
-      clarify:bn?"কী ধরনের পণ্য চান? পণ্যের নাম এবং টাকায় বাজেট লিখুন; চাইলে সাইজ বা রংও জানান।":"What type of product would you like? Give its name and a BDT budget, plus size or color if needed.",
-      tracking:bn?"অর্ডার জানতে নিরাপদ tracking page খুলুন। এখানে শুধু order number দিয়ে ব্যক্তিগত তথ্য দেখানো হয় না।":"Open secure order tracking. An order number alone does not give access to private details here.",
-      policy:bn?"এই shop-এর সংরক্ষিত তথ্য নিচে দেখুন।":"Here is information saved by this shop."})[state];
+    return ({results:bn?"আপনার পছন্দ অনুযায়ী এগুলো দেখুন। কোনটি নিয়ে জানতে চান?":"Take a look at these options. Which would you like to know more about?",
+      no_matches:bn?"এই পছন্দ অনুযায়ী স্টকে পণ্য পাচ্ছি না। অন্য সাইজ, রং বা বাজেট দেখব?":"I couldn’t find an in-stock match. Shall we try another size, color or budget?",
+      unavailable:bn?"এখন উত্তর দিতে পারছি না। একটু পরে চেষ্টা করুন বা বিক্রেতার সঙ্গে কথা বলুন।":"I can’t reply right now. Please try again shortly or contact the seller.",
+      quota_exhausted:bn?"এই শপের সহকারী এখন পাওয়া যাচ্ছে না। বিক্রেতার সঙ্গে কথা বলতে পারেন।":"This shop’s assistant is unavailable right now. You can contact the seller for help.",
+      clarify:bn?"কোন পণ্যটি নিয়ে জানতে চান? নাম, সাইজ বা বাজেট বলুন।":"Which product do you have in mind? Tell me its name, size or your budget.",
+      tracking:bn?"My purchases খুলে আপনার অর্ডারের আপডেট দেখুন।":"Open My purchases to check your order’s updates.",
+      policy:bn?"এই বিষয়ে নিশ্চিত তথ্য পাচ্ছি না। বিক্রেতার সঙ্গে কথা বলবেন?":"I don’t have verified information about that. Would you like to contact the seller?",
+      greeting:bn?"হ্যালো! কী খুঁজছেন বলুন, সাহায্য করছি।":"Hi! Tell me what you’re looking for and I’ll help."})[state];
   }
   const contextProduct = catalog.products.find(p=>p.id===selected);
   const category = catalog.products.find(p=>p.shop_id===shop.id && p.category.trim())?.category;
-  const suggestions = [category ? (bn?`${category} দেখাও`:`Show ${category}`) : (bn?"এই shop সম্পর্কে বলুন":"Tell me about this shop"), bn?"রিটার্নের নিয়ম কী?":"What is the return policy?"];
+  const suggestions = [category ? (bn?`${category} দেখাও`:`Show ${category}`) : (bn?"এই শপ সম্পর্কে বলুন":"Tell me about this shop"), bn?"ক্যাশ অন ডেলিভারি হবে?":"Is cash on delivery available?", bn?"রিটার্নের নিয়ম কী?":"What is the return policy?"];
+  const prepare = (text: string) => {setDraft(text);composer.current?.focus();};
   return <>
     <button className="button primary assistant-launch" onClick={()=>setOpen(true)} aria-haspopup="dialog" aria-label={bn?"AI সহকারী":"AI assistant"}><Bot size={22}/><span>{bn?"Shop সহকারী":"Shop assistant"}<small>{shop.name}</small></span></button>
     <dialog className="assistant-drawer" ref={dialog} aria-labelledby="assistant-title" onCancel={close} onClose={close} onClick={e=>{if(e.target===e.currentTarget)close();}}>
-      <header className="assistant-heading"><span className="assistant-avatar" aria-hidden="true"><Bot size={22}/></span><div><h2 id="assistant-title">{bn?"Shop সহকারী":"Shop assistant"}</h2><p>{shop.name}</p></div><button className="icon-button" aria-label={bn?"বন্ধ করুন":"Close assistant"} onClick={close}><X size={20}/></button></header>
-      <div className="assistant-log" ref={log} role="log" aria-live="polite" aria-relevant="additions text">
-        {!turns.length && <div className="assistant-welcome"><h3>{bn?"কী খুঁজছেন?":"What are you looking for?"}</h3><p>{bn?"পণ্যের নাম, বাজেট বা প্রশ্ন লিখুন।":"Tell me a product, budget or question."}</p><div className="assistant-suggestions">{suggestions.map(text=><button key={text} type="button" onClick={()=>{setDraft(text);document.getElementById("assistant-message")?.focus();}}>{text}</button>)}</div></div>}
-        {turns.map((turn,index)=><section className="assistant-turn" key={index}><p className="assistant-question">{turn.question}</p>{turn.error&&<p role="alert">{turn.error}</p>}{turn.reply&&<><p>{message(turn.reply.state)}</p>
-          {turn.reply.information?.map(info=><blockquote className="assistant-information" key={info.id}><strong>{info.label}</strong><p className="preserve-lines">{info.content}</p></blockquote>)}
-          {turn.reply.state==="policy"&&!turn.reply.information?.length&&<p>{bn?"এই প্রশ্নের যাচাইকৃত তথ্য পাওয়া যায়নি। বিক্রেতার সাথে যোগাযোগ করুন।":"No verified information was found for this question. Please contact the seller."}</p>}
-          {turn.reply.matches.map(match=>{const visible=catalog.products.some(p=>p.id===match.product_id),product=match.product,owner=catalog.shops.find(s=>s.id===product?.shop_id);return visible&&product?.id===match.product_id&&owner&&(!shop||product.shop_id===shop.id)?<ResultCard key={`${product.id}:${match.variant_ids.join(",")}`} product={product} match={match} shop={owner} catalog={catalog} close={close} choose={()=>{setSelected(product.id);setDraft(bn?"এই পণ্যের কোন সাইজ স্টকে আছে?":"Which sizes of this product are in stock?");}}/>:null;})}
-          {turn.reply.state==="tracking"&&<Link className="button secondary" to="/track" onClick={close}>{bn?"অর্ডার ট্র্যাক করুন":"Track order"}</Link>}
-          {turn.reply.state==="policy"&&<Link className="button secondary" to={shop?`/shops/${shop.slug}/info/terms`:"/shops"} onClick={close}>{bn?"Shop-এর তথ্য":"Shop information"}</Link>}
-          {turn.reply.state==="unavailable"&&<Link className="button secondary" to={shop?`/shops/${shop.slug}`:"/products"} onClick={close}>{bn?"পণ্য খুঁজুন":"Search products"}</Link>}
-        </>}</section>)}
-        {busy&&<p role="status">{bn?"পণ্য খোঁজা হচ্ছে…":"Finding products…"}</p>}
+      <header className="assistant-heading"><span className="assistant-avatar" aria-hidden="true"><Bot size={23}/></span><div><h2 id="assistant-title">{shop.name}</h2><p>{bn?"আপনার AI শপিং সহকারী":"Your AI shopping assistant"}</p></div><button type="button" className="icon-button" aria-label={bn?"বন্ধ করুন":"Close assistant"} onClick={close}><X size={20}/></button></header>
+      <div className="assistant-log" ref={log} role="log" aria-live="polite" aria-relevant="additions text" aria-label={bn?"কথোপকথন":"Conversation"} aria-busy={busy}>
+        {!turns.length && <div className="assistant-welcome"><div className="assistant-welcome-mark" aria-hidden="true"><Bot size={28}/></div><h3>{bn?"কী খুঁজছেন?":"What can I help you find?"}</h3><p>{bn?`${shop.name}-এ স্বাগতম! পণ্য বেছে নিতে বা শপের নিয়ম জানতে আমাকে বলুন।`:`Welcome to ${shop.name}! Ask me about products or the shop’s policies.`}</p><span className="assistant-prompt-label">{bn?"এভাবে শুরু করতে পারেন":"Try asking"}</span><div className="assistant-suggestions">{suggestions.map(text=><button key={text} type="button" onClick={()=>prepare(text)}>{text}</button>)}</div></div>}
+        {turns.map((turn,index)=><section className="assistant-turn" key={index} aria-label={bn?"বার্তা":"Message"}><p className="assistant-question">{turn.question}</p>{turn.error&&<div className="assistant-response"><p role="alert">{turn.error}</p></div>}{turn.reply&&<div className="assistant-response"><span className="assistant-message-avatar" aria-hidden="true"><Bot size={16}/></span><div className="assistant-answer"><p className="preserve-lines">{turn.reply.reply || message(turn.reply.state)}</p>
+          {turn.reply.matches.map(match=>{const visible=catalog.products.some(p=>p.id===match.product_id),product=match.product,owner=catalog.shops.find(s=>s.id===product?.shop_id);return visible&&product?.id===match.product_id&&owner&&product.shop_id===shop.id?<ResultCard key={`${product.id}:${match.variant_ids.join(",")}`} product={product} match={match} shop={owner} catalog={catalog} close={close} choose={()=>{setSelected(product.id);prepare(bn?"এই পণ্যের কোন অপশন স্টকে আছে?":"Which options of this product are in stock?");}}/>:null;})}
+          {turn.reply.state==="tracking"&&<Link className="text-link" to="/purchases" onClick={close}>{bn?"আমার অর্ডারসমূহ":"My purchases"}</Link>}
+          {turn.reply.state==="policy"&&<Link className="text-link" to={`/shops/${shop.slug}/info/contact`} onClick={close}>{bn?"বিক্রেতার সঙ্গে কথা বলুন":"Contact seller"}</Link>}
+          {(turn.reply.state==="unavailable"||turn.reply.state==="quota_exhausted")&&<Link className="text-link" to={`/shops/${shop.slug}`} onClick={close}>{bn?"শপের পণ্য দেখুন":"Browse this shop"}</Link>}
+        </div></div>}</section>)}
+        {busy&&<div className="assistant-response assistant-typing" role="status"><span className="assistant-message-avatar" aria-hidden="true"><Bot size={16}/></span><span className="assistant-answer"><span className="assistant-input-label">{bn?"উত্তর তৈরি হচ্ছে…":"Replying…"}</span><span className="assistant-typing-dots" aria-hidden="true"><i/><i/><i/></span></span></div>}
       </div>
       <form className="assistant-compose" onSubmit={send}>
-        {contextProduct&&<p>{bn?"নির্বাচিত পণ্য":"Selected product"}: {contextProduct.name} <button type="button" className="button secondary" onClick={()=>setSelected(null)}>{bn?"সব পণ্যে খুঁজুন":"Search all products"}</button></p>}
-        <div className="assistant-input"><label className="field" htmlFor="assistant-message"><span className="assistant-input-label">{bn?"আপনার খোঁজ":"Your search"}</span><textarea id="assistant-message" placeholder={bn?"এখানে লিখুন…":"Type a message…"} value={draft} maxLength={1000} required rows={2} onChange={e=>setDraft(e.target.value)}/></label>
-        <div className="assistant-actions"><button type="button" className={`assistant-mic${listening?" is-listening":""}`} disabled={!voice||busy} aria-label={listening?(bn?"মাইক বন্ধ করুন":"Stop microphone"):(bn?"বাংলায় বলুন":"Speak Bangla")} title={bn?"বাংলায় বলুন":"Speak Bangla"} aria-pressed={listening} onClick={speak}><Mic size={19}/></button><button className="button primary" disabled={busy||!draft.trim()} aria-label={bn?"খুঁজুন":"Search"}><Search size={18}/><span>{bn?"খুঁজুন":"Search"}</span></button></div></div>
-        <details className="assistant-help"><summary>{bn?"শুধু এই shop-এর তথ্য · ভয়েস সম্পর্কে":"Only this shop's information · About voice"}</summary><p>{voice?(bn?"ভয়েসের জন্য browser-এর speech service ব্যবহৃত হয়। পাঠানোর আগে লেখা মিলিয়ে নিন।":"Voice uses your browser's speech service. Review the transcript before sending."):(bn?"এই browser-এ voice নেই। লিখে খুঁজুন।":"Voice is unavailable in this browser. Type to search.")}</p><p>{bn?"অর্ডার নিশ্চিত ও payment করতে checkout ব্যবহার করুন।":"Use checkout to confirm orders and make payments."}</p></details>
+        {contextProduct&&<div className="assistant-context"><span>{contextProduct.name}</span><button type="button" className="icon-button" aria-label={bn?"নির্বাচিত পণ্য সরান":"Clear selected product"} onClick={()=>setSelected(null)}><X size={16}/></button></div>}
+        <div className="assistant-input"><label className="field" htmlFor="assistant-message"><span className="assistant-input-label">{bn?"আপনার বার্তা":"Your message"}</span><textarea ref={composer} id="assistant-message" placeholder={bn?"আপনার প্রশ্ন লিখুন…":"Type your message…"} value={draft} maxLength={1000} required rows={1} onChange={e=>setDraft(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();if(!busy&&draft.trim())e.currentTarget.form?.requestSubmit();}}}/></label>
+        <div className="assistant-actions"><button type="button" className={`assistant-mic${listening?" is-listening":""}`} disabled={!voice||busy} aria-label={listening?(bn?"মাইক বন্ধ করুন":"Stop microphone"):(bn?"বাংলায় বলুন":"Speak Bangla")} title={bn?"বাংলায় বলুন":"Speak Bangla"} aria-pressed={listening} onClick={speak}><Mic size={19}/></button><button type="submit" className="assistant-send" disabled={busy||!draft.trim()} aria-label={bn?"বার্তা পাঠান":"Send message"} title={bn?"বার্তা পাঠান":"Send message"}><ArrowUp size={21}/></button></div></div>
+        <details className="assistant-help"><summary>{bn?"শুধু এই শপের তথ্য · AI ও ভয়েস সম্পর্কে":"Only this shop’s information · About AI & voice"}</summary><p>{bn?"আমি AI সহকারী। অর্ডার নিশ্চিত ও পেমেন্ট করতে চেকআউট ব্যবহার করুন।":"I’m an AI assistant. Use checkout to confirm an order and make payments."}</p><p>{voice?(bn?"ভয়েসের জন্য ব্রাউজারের speech service ব্যবহৃত হয়। পাঠানোর আগে লেখা মিলিয়ে নিন।":"Voice uses your browser’s speech service. Review the transcript before sending."):(bn?"এই ব্রাউজারে ভয়েস নেই। লিখে জানান।":"Voice is unavailable in this browser. You can type your message.")}</p></details>
         {voiceError&&<p role="status">{voiceError}</p>}
       </form>
     </dialog>

@@ -2,6 +2,7 @@
 // drastically reducing memory usage from ~1.5GB to <30MB during builds.
 import type { LucideIcon } from "lucide-react";
 
+import ArrowUpRaw from "lucide-react/dist/esm/icons/arrow-up.js";
 import ArrowUpRightRaw from "lucide-react/dist/esm/icons/arrow-up-right.js";
 import ArrowRightRaw from "lucide-react/dist/esm/icons/arrow-right.js";
 import ArrowLeftRaw from "lucide-react/dist/esm/icons/arrow-left.js";
@@ -53,6 +54,7 @@ import EyeRaw from "lucide-react/dist/esm/icons/eye.js";
 import TrendingUpRaw from "lucide-react/dist/esm/icons/trending-up.js";
 import HelpCircleRaw from "lucide-react/dist/esm/icons/help-circle.js";
 
+export const ArrowUp = ArrowUpRaw as LucideIcon;
 export const ArrowUpRight = ArrowUpRightRaw as LucideIcon;
 export const ShoppingCart = ShoppingCartRaw as LucideIcon;
 export const ArrowRight = ArrowRightRaw as LucideIcon;

@@ -16,3 +16,8 @@ During any coding task, command execution, or debugging workflow, provide real-t
 Phone/email OTP order recovery is unavailable. Keep Track order on existing
 browser/account-owned My purchases and courier tracking; never fabricate or display
 recovery codes or add a proxy to the retired Source recovery endpoints.
+
+Shop assistant layout follows `design-system/arise-digital-store/pages/assistant.md`.
+Render checked conversational replies, never raw knowledge fields or legacy
+`information` cards. Keep AI identity, Send/Enter/IME behavior, shop isolation and
+source-owned product facts; contact links must not imply a completed human handoff.
