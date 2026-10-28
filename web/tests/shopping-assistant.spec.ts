@@ -14,7 +14,7 @@ async function mock(page:any,requests:any[],state="results") {
     if(path==="/api/traffic")return route.fulfill({json:{ok:true}});
     if(path.endsWith("/questions"))return route.fulfill({json:{questions:[],has_more:false}});
     if(path.endsWith("/reviews"))return route.fulfill({json:{reviews:[],count:0,average:null}});
-    if(path==="/api/assistant"){requests.push(route.request().postDataJSON());return route.fulfill({json:{state,matches:state==="results"?[{product_id:product.id,variant_ids:["white42"],product}]:[]}});}
+    if(path==="/api/assistant"){requests.push(route.request().postDataJSON());return route.fulfill({json:{state,contract:"marketplace-chat-v3",matches:state==="results"?[{product_id:product.id,variant_ids:["white42"],product}]:[]}});}
     throw new Error(`Unexpected request ${path}`);
   });
 }
@@ -36,6 +36,7 @@ test("Bangla drawer keeps shop scope, shows source variant facts and checks out 
   await drawer.getByRole("button",{name:"বার্তা পাঠান",exact:true}).click();
   await expect.poll(()=>requests.length).toBe(2);expect(requests[1].selected_product_id).toBe(product.id);
   expect(requests[1].previous_queries).toEqual(["১৫০০ টাকার মধ্যে ৪২ সাইজের জুতা দেখাও"]);
+  expect(requests[1].context_product_ids).toEqual([product.id]);
   expect(await drawer.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBeTruthy();
   await page.screenshot({path:"../artifacts/shopping-assistant-mobile.png"});
   await drawer.getByRole("link",{name:"চেকআউট",exact:true}).last().click();
@@ -133,9 +134,57 @@ test("chat sends with Enter, keeps Shift+Enter, and never renders raw knowledge 
 
 test("old policy responses do not expose internal fields before the source deployment",async({page})=>{
   const requests:any[]=[];await mock(page,requests,"policy");
-  await page.route("**/api/assistant",route=>route.fulfill({json:{state:"policy",matches:[],information:[{id:"x",label:"cod_enabled",content:"True"}]}}));
+  await page.route("**/api/assistant",route=>{
+    requests.push(route.request().postDataJSON());
+    return route.fulfill({json:{state:"policy",contract:"marketplace-chat-v2",matches:[],information:[{id:"x",label:"cod_enabled",content:"True"}]}});
+  });
   await page.goto("/shops/shoe-shop");await page.getByRole("button",{name:"AI সহকারী",exact:true}).click();
   const drawer=page.getByRole("dialog");await drawer.getByLabel("আপনার বার্তা").fill("cod ache?");await drawer.getByRole("button",{name:"বার্তা পাঠান",exact:true}).click();
   await expect(drawer.locator(".assistant-answer")).toContainText("নিশ্চিত তথ্য পাচ্ছি না");
   await expect(drawer.getByText(/cod_enabled|^True$/)).toHaveCount(0);
+  await drawer.getByLabel("আপনার বার্তা").fill("আরও বলুন");await drawer.getByLabel("আপনার বার্তা").press("Enter");
+  await expect.poll(()=>requests.length).toBe(2);
+  for(const request of requests)expect(request).not.toHaveProperty("context_product_ids");
+});
+
+
+test("chat carries shown products into followups and replaces context on a product switch",async({page})=>{
+  const requests:any[]=[];await mock(page,requests);
+  const polo={...product,id:"44444444-4444-4444-8444-444444444444",name:"Classic Polo",variants:[{id:"polo-l",name:"Blue L",price:"790",stock:4}]};
+  await page.route("**/api/catalog",route=>route.fulfill({json:{shops:[shop],products:[product,polo],synced_at:new Date().toISOString()}}));
+  await page.route("**/api/assistant",route=>{
+    const body=route.request().postDataJSON();requests.push(body);
+    const chosen=body.message.includes("polo")||body.context_product_ids?.includes(polo.id)?polo:product;
+    return route.fulfill({json:{state:"results",contract:"marketplace-chat-v3",reply:"পণ্যের তথ্য নিচে দেখুন।",matches:[{product_id:chosen.id,variant_ids:[chosen.variants[0].id],product:chosen}]}});
+  });
+  await page.goto("/shops/shoe-shop");await page.getByRole("button",{name:"AI সহকারী",exact:true}).click();
+  const drawer=page.getByRole("dialog"),input=drawer.getByLabel("আপনার বার্তা");
+  await input.fill("no love aca?");await input.press("Enter");
+  await expect(drawer.getByRole("article")).toHaveCount(1);
+  expect(requests[0]).not.toHaveProperty("context_product_ids");
+  await drawer.getByRole("button",{name:"এই পণ্য নিয়ে কথা বলুন"}).click();
+  await input.fill("M size?");await input.press("Enter");
+  await expect(drawer.getByRole("article")).toHaveCount(2);
+  expect(requests[1].context_product_ids).toEqual([product.id]);
+  await input.fill("instead show polo");await input.press("Enter");
+  await expect(drawer.getByRole("article")).toHaveCount(3);
+  await expect(drawer.locator(".assistant-context")).toHaveCount(0);
+  await input.fill("L size?");await input.press("Enter");
+  await expect(drawer.getByRole("article")).toHaveCount(4);
+  expect(requests[3].context_product_ids).toEqual([polo.id]);
+  expect(requests[3]).not.toHaveProperty("selected_product_id");
+});
+
+
+test("known sold-out products show source details without a checkout action",async({page})=>{
+  const requests:any[]=[];await mock(page,requests);
+  await page.route("**/api/assistant",route=>route.fulfill({json:{state:"out_of_stock",contract:"marketplace-chat-v3",reply:"পণ্যটি আছে, তবে এখন স্টকে নেই।",matches:[{product_id:product.id,variant_ids:["white42"],product:{...product,size_chart:"Size M: chest 40 inches",variants:[{...product.variants[0],stock:0}]}}]}}));
+  await page.goto("/shops/shoe-shop");await page.getByRole("button",{name:"AI সহকারী",exact:true}).click();
+  const drawer=page.getByRole("dialog");await drawer.getByLabel("আপনার বার্তা").fill("এই পণ্য আছে?");await drawer.getByLabel("আপনার বার্তা").press("Enter");
+  await expect(drawer.getByRole("article")).toContainText(product.name);
+  await expect(drawer.getByRole("article")).toContainText(product.description);
+  await expect(drawer.getByRole("article")).toContainText("এই অপশন এখন স্টকে নেই");
+  await drawer.getByText("পণ্যের বিস্তারিত",{exact:true}).click();
+  await expect(drawer.getByText("Size M: chest 40 inches",{exact:true})).toBeVisible();
+  await expect(drawer.getByRole("link",{name:"চেকআউট",exact:true})).toHaveCount(0);
 });

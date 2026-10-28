@@ -4039,6 +4039,7 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
 .assistant-product .field { font-size: var(--text-label); }
 .assistant-product select { min-width: 0; width: 100%; font-size: 16px; }
 .assistant-product .button { margin: 4px 0; width: 100%; }
+.assistant-product-details summary { display: flex; align-items: center; min-height: 44px; color: var(--primary); cursor: pointer; }
 .assistant-compose { flex-shrink: 0; border-top: 1px solid var(--line); padding: 14px 16px max(8px, env(safe-area-inset-bottom)); background: var(--surface); max-height: 40dvh; overflow-y: auto; }
 .assistant-context { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding-left: 12px; border-radius: 12px; background: var(--primary-light); color: var(--primary); font-size: var(--text-label); }
 .assistant-context > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

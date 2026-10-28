@@ -7,7 +7,7 @@ import {Bot, X, ArrowUp, Mic} from "./icons";
 import type {Catalog, Product, Shop} from "./types";
 
 type Match = {product_id: string; variant_ids: string[]; product: Product};
-type Reply = {state: "results" | "no_matches" | "unavailable" | "quota_exhausted" | "clarify" | "tracking" | "policy" | "greeting"; matches: Match[]; reply?: string};
+type Reply = {state: "results" | "out_of_stock" | "no_matches" | "unavailable" | "quota_exhausted" | "clarify" | "tracking" | "policy" | "greeting"; matches: Match[]; reply?: string; contract?: string};
 type Turn = {question: string; reply?: Reply; error?: string};
 type Recognition = {lang: string; continuous: boolean; interimResults: boolean; start(): void; abort(): void;
   onresult: ((event: {results: ArrayLike<ArrayLike<{transcript: string}>>}) => void) | null;
@@ -16,16 +16,18 @@ type VoiceWindow = Window & {SpeechRecognition?: new () => Recognition; webkitSp
 
 function ResultCard({product, match, shop, catalog, choose, close}: {product: Product; match: Match; shop: Shop; catalog: Catalog; choose: () => void; close: () => void}) {
   const {lang} = useLang(), bn = lang === "bn";
-  const variants = product.variants.filter(v => match.variant_ids.includes(v.id) && v.stock > 0);
+  const variants = product.variants.filter(v => match.variant_ids.includes(v.id) && v.stock >= 0);
   const [variantId, setVariant] = useState(variants[0]?.id);
   const selected = variants.find(v => v.id === variantId);
   if (!selected) return null;
   return <article className="assistant-product">
     {product.image_url && <img src={product.image_url} alt="" loading="lazy"/>}
     <div><Link to={productPath(product,catalog)} onClick={close}>{product.name}</Link><small>{shop.name}</small>
+      {product.description&&<p>{product.description.length>180?product.description.slice(0,180)+"…":product.description}</p>}
+      {(product.size_chart||product.description?.length>180)&&<details className="assistant-product-details"><summary>{bn?"পণ্যের বিস্তারিত":"Product details"}</summary>{product.description.length>180&&<p className="preserve-lines">{product.description}</p>}{product.size_chart&&<p className="preserve-lines">{product.size_chart}</p>}</details>}
       <label className="field">{bn ? "অপশন" : "Option"}<select aria-label={`${product.name} ${bn ? "অপশন" : "option"}`} value={variantId} onChange={e => setVariant(e.target.value)}>{variants.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label>
       <p><strong>{money(selected.price,product.currency)}</strong> · {bn ? "স্টক" : "Stock"}: {selected.stock}</p>
-      {canCheckout(product, shop) ? <Link className="button primary" to={`/checkout/${product.id}?variant=${selected.id}&quantity=1`} onClick={close}>{product.custom_order ? (bn ? "কাস্টমাইজ করুন" : "Customize") : (bn ? "চেকআউট" : "Checkout")}</Link> : <p>{product.checkout_unavailable_reason || (bn ? "কেনার নিয়ম জানতে বিক্রেতার সাথে যোগাযোগ করুন।" : "Contact the seller to check how to order.")}</p>}
+      {selected.stock === 0 ? <p>{bn ? "এই অপশন এখন স্টকে নেই" : "This option is out of stock"}</p> : canCheckout(product, shop) ? <Link className="button primary" to={`/checkout/${product.id}?variant=${selected.id}&quantity=1`} onClick={close}>{product.custom_order ? (bn ? "কাস্টমাইজ করুন" : "Customize") : (bn ? "চেকআউট" : "Checkout")}</Link> : <p>{product.checkout_unavailable_reason || (bn ? "কেনার নিয়ম জানতে বিক্রেতার সাথে যোগাযোগ করুন।" : "Contact the seller to check how to order.")}</p>}
       <button type="button" className="button secondary" onClick={choose}>{bn ? "এই পণ্য নিয়ে কথা বলুন" : "Ask about this product"}</button>
     </div>
   </article>;
@@ -53,11 +55,14 @@ export function ShoppingAssistant({catalog, shop}: {catalog: Catalog; shop: Shop
     if(!draft.trim() || busy) return;
     recognition.current?.abort();
     const question = draft.trim(), previous = turns.map(t => t.question).slice(-4);
+    const context = [...turns].reverse().find(turn => turn.reply?.matches.length)?.reply?.matches.map(match => match.product_id).slice(0,4) || [];
+    const supportsContext = turns.some(turn => turn.reply?.contract === "marketplace-chat-v3");
     setDraft("");setBusy(true);composer.current?.focus();
     setTurns(current => [...current.slice(-9),{question}]);
     const controller = new AbortController(); request.current = controller;
     try {
-      const reply = await api<Reply>("/assistant",{method:"POST",signal:controller.signal,body:JSON.stringify({message:question,previous_queries:previous,shop_id:shop?.id,selected_product_id:selected || undefined})});
+      const reply = await api<Reply>("/assistant",{method:"POST",signal:controller.signal,body:JSON.stringify({message:question,previous_queries:previous,...(supportsContext?{context_product_ids:context}:{}),shop_id:shop?.id,selected_product_id:selected || undefined})});
+      if(selected && reply.matches.length && !reply.matches.some(match => match.product_id === selected))setSelected(null);
       setTurns(current => current.map((t,i) => i===current.length-1 ? {...t,reply} : t));
     } catch(error) {
       if(!controller.signal.aborted)setTurns(current => current.map((t,i) => i===current.length-1 ? {...t,error:(error as Error).message} : t));
@@ -75,7 +80,8 @@ export function ShoppingAssistant({catalog, shop}: {catalog: Catalog; shop: Shop
   }
   function message(state: Reply["state"]) {
     return ({results:bn?"আপনার পছন্দ অনুযায়ী এগুলো দেখুন। কোনটি নিয়ে জানতে চান?":"Take a look at these options. Which would you like to know more about?",
-      no_matches:bn?"এই পছন্দ অনুযায়ী স্টকে পণ্য পাচ্ছি না। অন্য সাইজ, রং বা বাজেট দেখব?":"I couldn’t find an in-stock match. Shall we try another size, color or budget?",
+      no_matches:bn?"এই নাম বা শর্তের সঙ্গে মেলাতে পারছি না। পণ্যের নাম বা অপশনটি আরেকটু জানাবেন?":"I couldn’t match that name or those requirements. Could you tell me the product name or option?",
+      out_of_stock:bn?"পণ্যটি আছে, তবে এই অপশনগুলো এখন স্টকে নেই। নিচে তথ্য দেখতে পারেন।":"This product is listed, but these options are out of stock. You can still see its details below.",
       unavailable:bn?"এখন উত্তর দিতে পারছি না। একটু পরে চেষ্টা করুন বা বিক্রেতার সঙ্গে কথা বলুন।":"I can’t reply right now. Please try again shortly or contact the seller.",
       quota_exhausted:bn?"এই শপের সহকারী এখন পাওয়া যাচ্ছে না। বিক্রেতার সঙ্গে কথা বলতে পারেন।":"This shop’s assistant is unavailable right now. You can contact the seller for help.",
       clarify:bn?"কোন পণ্যটি নিয়ে জানতে চান? নাম, সাইজ বা বাজেট বলুন।":"Which product do you have in mind? Tell me its name, size or your budget.",

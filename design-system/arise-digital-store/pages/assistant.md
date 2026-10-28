@@ -15,3 +15,9 @@ arrow. Enter sends; Shift+Enter inserts a line; IME composition never submits.
 Suggestions only fill the draft, voice remains editable, and neither spends a
 message until submission. Use a short reduced-motion-aware typing state and keep
 errors readable. Shop changes reset all conversation and product context.
+
+Carry previously shown product IDs only after the Source v3 contract is advertised;
+new named products replace old selection. Keep sold-out product information visible
+and omit checkout for a zero-stock option. Long descriptions and source size charts
+use a compact accessible disclosure. Never turn uncertain matching into a claim that
+the shop has no stock or products.
