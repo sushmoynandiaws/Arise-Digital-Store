@@ -299,18 +299,23 @@ test("mobile navigation exposes complete destinations without a clipped horizont
   }
 });
 
-test("tracking request failures keep the email form and never fabricate a verification code", async ({ page }) => {
+test("tracking uses existing order access and never requests an unsupported recovery code", async ({ page }) => {
   await preview(page);
-  await page.route("**/api/orders/track/request-otp", route => route.fulfill({ status: 503, json: { error: "Email lookup is temporarily unavailable. Open My purchases or try again." } }));
+  const recoveryRequests: string[] = [];
+  page.on("request", request => { if (request.url().includes("/orders/track/")) recoveryRequests.push(request.url()); });
   await page.goto("/track");
-  await page.getByLabel("Email address", { exact: true }).fill("buyer@example.test");
-  await page.getByRole("button", { name: "Send verification code", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("temporarily unavailable");
-  await expect(page.getByLabel("Email address", { exact: true })).toHaveValue("buyer@example.test");
+  await expect(page.getByText("Order recovery by phone or email code is unavailable.")).toBeVisible();
+  await expect(page.getByLabel("Email address", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("Verification code", { exact: true })).toHaveCount(0);
   await expect(page.getByText(/Demo code/)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Send verification code", exact: true })).toBeEnabled();
-  await expect(page.locator(".track-browser-orders").getByRole("link", { name: "My purchases", exact: true })).toHaveAttribute("href", "/purchases");
+  for (const width of [320, 768, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  }
+  await page.getByRole("region", { name: "Order access", exact: true }).getByRole("link", { name: "My purchases", exact: true }).click();
+  await expect(page).toHaveURL(/\/purchases$/);
+  await expect(page.getByText("SAMPLE-001", { exact: true })).toBeVisible();
+  expect(recoveryRequests).toEqual([]);
 });
 
 test("catalog search stays visible and preserves shop and category context when a legacy query is cleared", async ({ page }) => {
@@ -322,56 +327,6 @@ test("catalog search stays visible and preserves shop and category context when 
   await expect(page).toHaveURL(/\/shops\/studio-north\?category=Templates$/);
   await expect(page.locator(".product-card")).toHaveCount(1);
   await expect(page.locator(".product-card")).toContainText("Notion Life Planner");
-});
-
-test("tracking verifies the email before showing grouped orders and supports changing email", async ({ page }) => {
-  await preview(page);
-  let verificationAttempts = 0;
-  await page.route("**/api/orders/track/request-otp", route => {
-    expect(route.request().postDataJSON()).toEqual({ email: "buyer@example.test" });
-    return route.fulfill({ json: { ok: true, message: "Code sent" } });
-  });
-  await page.route("**/api/orders/track/verify-otp", route => {
-    verificationAttempts++;
-    const data = route.request().postDataJSON();
-    expect(data.email).toBe("buyer@example.test");
-    return route.fulfill({ json: data.otp === "123456" ? { ok: true, orders: [readyOrder] } : { ok: false, message: "Check the verification code and try again." } });
-  });
-  await page.goto("/track");
-  await page.getByLabel("Email address", { exact: true }).fill("Buyer@Example.test");
-  await page.getByRole("button", { name: "Send verification code", exact: true }).click();
-  const code = page.getByLabel("Verification code", { exact: true });
-  await expect(code).toBeFocused();
-  await code.fill("0000");
-  await page.getByRole("button", { name: "Verify & retrieve orders", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("Check the verification code");
-  await expect(page.locator(".track-order-row")).toHaveCount(0);
-  await code.fill("123456");
-  await page.getByRole("button", { name: "Verify & retrieve orders", exact: true }).click();
-  await expect(page.locator(".track-results-heading h2")).toBeFocused();
-  await expect(page.locator(".track-shop-card-section")).toContainText(shop.name);
-  await expect(page.locator(".track-order-row")).toHaveAttribute("href", "/purchases/sample-order");
-  for (const width of [320, 768, 1440]) {
-    await page.setViewportSize({ width, height: 1000 });
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
-    await page.screenshot({ path: `../artifacts/premium-ui/tracking-results-${width}.png`, fullPage: true });
-  }
-  await page.getByRole("button", { name: "Try another email", exact: true }).click();
-  await expect(page.getByLabel("Email address", { exact: true })).toBeFocused();
-  expect(verificationAttempts).toBe(2);
-});
-
-test("tracking a verified email with no orders offers a useful recovery action", async ({ page }) => {
-  await preview(page);
-  await page.route("**/api/orders/track/request-otp", route => route.fulfill({ json: { ok: true } }));
-  await page.route("**/api/orders/track/verify-otp", route => route.fulfill({ json: { ok: true, orders: [] } }));
-  await page.goto("/track");
-  await page.getByLabel("Email address", { exact: true }).fill("buyer@example.test");
-  await page.getByRole("button", { name: "Send verification code", exact: true }).click();
-  await page.getByLabel("Verification code", { exact: true }).fill("123456");
-  await page.getByRole("button", { name: "Verify & retrieve orders", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "No matching orders" })).toBeVisible();
-  await expect(page.locator(".track-results-container").getByRole("link", { name: "My purchases", exact: true })).toHaveAttribute("href", "/purchases");
 });
 
 test("English and Bangla typography load while external font services are blocked", async ({ page }) => {

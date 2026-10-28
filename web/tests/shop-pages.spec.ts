@@ -85,6 +85,41 @@ test("seller sets up all five pages, saves, reloads and customers read the same 
   await expect(page.getByRole("heading", { name: "About us", level: 1, exact: true })).toBeVisible();
 });
 
+test("signed-in settings opens the existing owned shop editor and persists changes", async ({page}) => {
+  await fixture(page);
+  await page.goto("/how-it-works");
+  await page.locator(".account-bar").getByRole("link",{name:"Settings",exact:true}).click();
+  await expect(page).toHaveURL(/\/settings$/);
+  await expect(page.getByRole("heading",{name:"Settings",exact:true})).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Shop settings"})).toBeVisible();
+  await page.getByRole("navigation",{name:"Shop settings"}).getByRole("link",{name:"Shop profile",exact:true}).click();
+  await page.getByLabel("Shop name",{exact:true}).fill("Updated from settings");
+  await page.getByRole("button",{name:"Publish shop",exact:true}).click();
+  await expect(page.getByRole("status").filter({hasText:"Your shop is published"})).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Shop name",{exact:true})).toHaveValue("Updated from settings");
+  await page.setViewportSize({width:375,height:812});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+});
+
+test("signed-out visitors cannot load seller data through settings",async({page})=>{
+  await page.addInitScript(()=>localStorage.setItem("arise_lang","en"));
+  let sellerRequests=0;
+  await page.route("**/api/**",route=>{
+    const path=new URL(route.request().url()).pathname;
+    if(path==="/api/session")return route.fulfill({json:{user:null,csrf:"csrf",demo:false,source_web:"https://example.test"}});
+    if(path==="/api/catalog")return route.fulfill({json:{shops:[],products:[],synced_at:new Date().toISOString()}});
+    if(path==="/api/promotions")return route.fulfill({json:{ads:[],settings:{}}});
+    if(path==="/api/traffic")return route.fulfill({json:{ok:true}});
+    if(path.startsWith("/api/seller"))sellerRequests++;
+    throw new Error(`Unexpected request ${path}`);
+  });
+  await page.goto("/settings");
+  await expect(page.getByRole("link",{name:"Continue with AriseSell"})).toBeVisible();
+  await expect(page.locator(".account-bar")).toHaveCount(0);
+  expect(sellerRequests).toBe(0);
+});
+
 test("customer pages support direct links, refresh, responsive layouts and bilingual content", async ({ page }) => {
   const { shop } = await fixture(page);
   shop.pages.privacy = "Customer information\n\n" + "আমাদের গোপনীয়তা নীতি। ".repeat(100);

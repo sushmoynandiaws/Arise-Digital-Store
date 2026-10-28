@@ -23,13 +23,6 @@ export const translations = {
     emailPlaceholder: "e.g. name@example.com",
     phoneLabel: "Phone number",
     phonePlaceholder: "e.g. 01712345678",
-    sendOtp: "Send verification code",
-    otpSentMsg: "A 4-digit code was sent to your email.",
-    otpLabel: "Enter 4-digit code",
-    verifyOtp: "Verify & retrieve orders",
-    trackSuccess: "Orders found and linked to this device!",
-    noOrdersFound: "No orders found for this email address.",
-    enterCodePrompt: "Enter the verification code to continue.",
 
     // Trust & Warranty Badges
     instantDeliveryBadge: "⚡ Instant Auto-Delivery (< 45s)",
@@ -99,19 +92,12 @@ export const translations = {
     browseProducts: "প্রোডাক্ট ব্রাউজ করুন",
 
     // Track order
-    trackTitle: "ইমেইল দিয়ে অর্ডার ট্র্যাক করুন",
-    trackSubtitle: "আপনার ইমেইল অ্যাড্রেস দিয়ে যেকোনো ব্রাউজার থেকে আগের সব পারচেজ হিস্ট্রি ও সিকিউর রিকভারি লিঙ্ক দেখুন।",
+    trackTitle: "আপনার অর্ডার ট্র্যাক করুন",
+    trackSubtitle: "আমার অর্ডারসমূহ থেকে পেমেন্ট ও ডেলিভারির অবস্থা দেখুন।",
     emailLabel: "ইমেইল অ্যাড্রেস",
     emailPlaceholder: "যেমন: name@example.com",
     phoneLabel: "ফোন নম্বর",
     phonePlaceholder: "যেমন: ০১৭১২৩৪৫৬৭৮",
-    sendOtp: "ভেরিফিকেশন কোড পাঠান",
-    otpSentMsg: "আপনার ইমেইলে ৪ সংখ্যার ওটিপি কোড পাঠানো হয়েছে।",
-    otpLabel: "৪ সংখ্যার কোডটি লিখুন",
-    verifyOtp: "যাচাই করুন ও অর্ডার দেখুন",
-    trackSuccess: "অর্ডার সফলভাবে ভেরিফাই ও এই ব্রাউজারে যুক্ত হয়েছে!",
-    noOrdersFound: "এই ইমেইলে কোনো অর্ডার পাওয়া যায়নি।",
-    enterCodePrompt: "ভেরিফিকেশন কোডটি প্রবেশ করিয়ে এগিয়ে যান।",
 
     // Trust & Warranty Badges
     instantDeliveryBadge: "⚡ ইনস্ট্যান্ট অটো-ডেলিভারি (< ৪৫ সেকেন্ড)",

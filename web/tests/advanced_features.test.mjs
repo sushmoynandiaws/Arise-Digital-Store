@@ -86,15 +86,13 @@ test("App.tsx integrates all advanced e-commerce components and routes", () => {
   assert.ok(appCode.includes("arise_wishlist"));
   assert.ok(appCode.includes("card-wishlist-btn"));
 
-  // Track Order / OTP by email (Global across shops)
+  // Tracking uses existing browser/account access, without unsupported OTP recovery.
   assert.ok(appCode.includes("function TrackOrderPage()"));
-  assert.ok(appCode.includes("track-email"));
-  assert.ok(!appCode.includes("track-phone"));
-  assert.ok(appCode.includes("/orders/track/request-otp"));
-  assert.ok(appCode.includes("/orders/track/verify-otp"));
-  assert.ok(appCode.includes("<Route path=\"/track\" element={<TrackOrderPage />} />"));
-  assert.ok(appCode.includes("ordersByShop"));
-  assert.ok(appCode.includes("track-shop-card-section"));
+  assert.ok(!appCode.includes("/orders/track/request-otp"));
+  assert.ok(!appCode.includes("/orders/track/verify-otp"));
+  assert.ok(!appCode.includes("demo_otp"));
+  assert.ok(appCode.includes('<Route path="/track" element={<TrackOrderPage />} />'));
+  assert.ok(appCode.includes("Order recovery by phone or email code is unavailable."));
 
   // Shop customer reviews with clear product attribution
   assert.ok(appCode.includes("<ShopReviews"));

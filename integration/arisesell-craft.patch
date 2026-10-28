@@ -21,210 +21,6 @@ index 8d0c4aef..d3591299 100644
          from app.models.conversation import Conversation
          from app.models.channel import ConnectedChannel
          from app.services.image_outbox import queue_image_reply
-diff --git a/backend/app/api/v1/marketplace.py b/backend/app/api/v1/marketplace.py
-index 33d977a3..8338cd93 100644
---- a/backend/app/api/v1/marketplace.py
-+++ b/backend/app/api/v1/marketplace.py
-@@ -130,6 +130,44 @@ class MarketQuote(QuoteRequest):
-     shop_id: uuid.UUID
-     buyer: BuyerFields
-     items: list[MarketLine] | None = Field(default=None, min_length=1, max_length=20)
-+    custom_draft_id: uuid.UUID | None = None
-+
-+
-+class CraftSelection(Input):
-+    code: str = Field(min_length=1, max_length=40)
-+    qty: int = Field(ge=1, le=100, strict=True)
-+
-+
-+class MarketCraft(Input):
-+    shop_id: uuid.UUID
-+    product_id: uuid.UUID
-+    variant_id: uuid.UUID
-+    quantity: int = Field(ge=1, le=100, strict=True)
-+    config_revision: str = Field(min_length=64, max_length=64)
-+    selection: list[CraftSelection] = Field(default_factory=list, max_length=60)
-+    answers: dict = Field(default_factory=dict, max_length=20)
-+    artwork: str | None = Field(default=None, max_length=1400000)
-+
-+
-+class CraftApproval(Input):
-+    proof_id: str = Field(max_length=64)
-+    revision: str = Field(min_length=64, max_length=64)
-+
-+
-+class ShoppingSearch(Input):
-+    message: str = Field(min_length=1, max_length=1000)
-+    previous_queries: list[str] = Field(default_factory=list, max_length=4)
-+    shop_id: uuid.UUID
-+    shop_information: dict[str, str] = Field(default_factory=dict, max_length=6)
-+    selected_product_id: uuid.UUID | None = None
-+    allowed_product_ids: list[uuid.UUID] = Field(max_length=10000)
-+
-+    @field_validator("previous_queries")
-+    @classmethod
-+    def bounded_history(cls, values):
-+        if any(len(v) > 1000 for v in values):
-+            raise ValueError("Keep search messages under 1000 characters")
-+        return values
- 
- 
- class TrackOtpRequest(Input):
-@@ -311,14 +349,17 @@ async def products_json(db, business, *, published=False):
-         if product.fulfilment_kind == "physical":
-             if published and str(product.id) not in selected:
-                 continue
--            reason = physical.unavailable_reason(business, product)
-+            reason = physical.unavailable_reason(business, product, allow_custom=True)
-+            from app.services.marketplace_craft import public_config
-             result.append({"id": str(product.id), "shop_id": str(business.id), "name": product.name,
-                 "category": product.category, "description": product.blurb or "", "image_url": display_image_url(product) or product.image_url,
--                "variants": [{"id": str(v.id), "name": v.label, "price": str(v.price), "stock": v.stock} for v in product.variants],
-+                "variants": [{"id": str(v.id), "name": v.label, "price": str(v.price), "stock": v.stock,
-+                    "pieces_per_set": v.pieces_per_set, "size": v.size, "color": v.color} for v in product.variants],
-                 "currency": business.currency, "fulfilment_kind": "physical", "delivery_mode": "shipping",
-                 "delivery_estimate": "", "delivery_note": "", "purchase_terms": "",
-                 "required_buyer_fields": physical.buyer_fields(business), "payment_methods": physical.payment_methods(business),
-                 "sales_enabled": True, "checkout_available": not reason, "checkout_unavailable_reason": reason,
-+                "custom_order": public_config(product) if not product.__dict__.get("_craft_conflict") else None,
-                 "selected": str(product.id) in selected})
-             continue
-         config = config_for(product)
-@@ -593,7 +634,13 @@ async def create_quote(req: MarketQuote, request: Request, user=Depends(optional
-             if not selected or selected.business_id != business.id or selected.fulfilment_kind != product.fulfilment_kind:
-                 raise HTTPException(409, "Use one shop and fulfillment type per checkout")
-     if product.fulfilment_kind == "physical":
--        draft = await physical.create_quote(db, business, channel, conversation, identity, req)
-+        custom_draft = None
-+        if req.custom_draft_id:
-+            from app.services import marketplace_craft
-+            custom_draft = await marketplace_craft.owned(db, req.custom_draft_id, identity, user)
-+            if custom_draft.business_id != business.id or custom_draft.order_id:
-+                raise HTTPException(409, "Custom selection is unavailable")
-+        draft = await physical.create_quote(db, business, channel, conversation, identity, req, custom_draft=custom_draft)
-     else:
-         if req.provider not in receiving_accounts(business):
-             raise HTTPException(409, "Choose a source-supported payment method")
-@@ -604,7 +651,91 @@ async def create_quote(req: MarketQuote, request: Request, user=Depends(optional
-     draft.data = {**draft.data, "buyer_fields": buyer_fields, "marketplace_buyer": identity,
-         "marketplace_user_id": str(user.id) if user else None}
-     await db.commit()
--    return {"draft_id": str(draft.id), "quote_hash": draft.data["quote_hash"], "snapshot": draft.data["snapshot"]}
-+    snapshot = {k: v for k, v in draft.data["snapshot"].items() if k not in {"craft_line", "custom_details", "priced"}}
-+    return {"draft_id": str(draft.id), "quote_hash": draft.data["quote_hash"], "snapshot": snapshot}
-+
-+
-+@router.post("/craft", dependencies=[Depends(bridge)])
-+async def save_craft(req: MarketCraft, request: Request, user=Depends(optional_user), db=Depends(get_db)):
-+    from app.services import marketplace_craft
-+    identity = buyer_id(request)
-+    business = await public_product(db, req.shop_id, req.product_id)
-+    channel, conversation = await context(db, business, identity)
-+    draft = await marketplace_craft.save(db, business, channel, conversation, identity, user, req)
-+    product = await marketplace_craft.product_for(db, business, req.product_id)
-+    result = marketplace_craft.view(draft, product)
-+    await db.commit()
-+    return result
-+
-+
-+@router.post("/assistant", dependencies=[Depends(bridge)])
-+async def shopping_search(req: ShoppingSearch, request: Request, db=Depends(get_db)):
-+    from app.services.marketplace_assistant import find
-+    identity = buyer_id(request)
-+    try:
-+        redis = await get_redis_client()
-+        if not redis:
-+            raise HTTPException(503, "Shopping search is temporarily unavailable")
-+        key = "marketplace-shopping:" + identity
-+        count = await redis.incr(key)
-+        await redis.expire(key, 3600, nx=True)
-+    except Exception as exc:
-+        raise HTTPException(503, "Shopping search is temporarily unavailable") from exc
-+    if count > 30:
-+        raise HTTPException(429, "Shopping search limit reached. Please use product search and try again later.")
-+    business = await db.get(Business, req.shop_id)
-+    if not business or not active_store(business) or not shop_json(business)["published"]:
-+        raise HTTPException(404, "Shop is unavailable")
-+    from app.services.ai_quota_service import resolve_store_owner, check_ai_quota_available, consume_merchant_ai_quota
-+    if not await resolve_store_owner(business, db) or not await check_ai_quota_available(business_id=business.id, db=db):
-+        return {"state":"quota_exhausted", "matches":[]}
-+    from app.services.marketplace_assistant import knowledge
-+    evidence = await knowledge(db, business, req.shop_information, req.selected_product_id)
-+    catalog = {"products": await products_json(db, business, published=True)}
-+    allowed = {str(value) for value in req.allowed_product_ids}
-+    products = [p for p in catalog["products"] if p["id"] in allowed and (not req.shop_id or p["shop_id"] == str(req.shop_id))]
-+    if req.selected_product_id and not any(p["id"] == str(req.selected_product_id) for p in products):
-+        raise HTTPException(404, "Selected product is unavailable")
-+    result = await find(db, req, products, evidence)
-+    if result["state"] != "unavailable":
-+        usage = await consume_merchant_ai_quota(business_id=business.id, db=db, count=1)
-+        if not usage.get("success"):
-+            return {"state":"quota_exhausted", "matches":[]}
-+    return result
-+
-+
-+@router.get("/craft/{draft_id}", dependencies=[Depends(bridge)])
-+async def get_craft(draft_id: uuid.UUID, request: Request, user=Depends(optional_user), db=Depends(get_db)):
-+    from app.services import marketplace_craft
-+    draft = await marketplace_craft.owned(db, draft_id, buyer_id(request), user)
-+    product_id = uuid.UUID(draft.data["craft_lines"][0]["product_id"])
-+    business = await public_product(db, draft.business_id, product_id)
-+    product = await marketplace_craft.product_for(db, business, product_id)
-+    return marketplace_craft.view(draft, product)
-+
-+
-+@router.post("/craft/{draft_id}/approve", dependencies=[Depends(bridge)])
-+async def approve_craft(draft_id: uuid.UUID, req: CraftApproval, request: Request, user=Depends(optional_user), db=Depends(get_db)):
-+    import copy
-+    from app.services import marketplace_craft, craft_checkout
-+    draft = await marketplace_craft.owned(db, draft_id, buyer_id(request), user)
-+    if draft.order_id:
-+        raise HTTPException(409, "Order is already saved")
-+    data = copy.deepcopy(draft.data)
-+    line = data["craft_lines"][0]
-+    business = await public_product(db, draft.business_id, uuid.UUID(line["product_id"]))
-+    product = await marketplace_craft.product_for(db, business, uuid.UUID(line["product_id"]))
-+    proof = line.get("proof") or {}
-+    if (proof.get("id") != req.proof_id or proof.get("revision") != req.revision
-+            or req.revision != craft_checkout.spec_revision(line)):
-+        raise HTTPException(409, "Preview changed; review the current preview")
-+    line["proof_approved"] = req.proof_id
-+    data.pop("snapshot", None)
-+    data.pop("quote_hash", None)
-+    draft.data, draft.confirmation_token = data, None
-+    result = marketplace_craft.view(draft, product)
-+    await db.commit()
-+    return result
- 
- 
- @router.get("/checkout/{draft_id}/scope", dependencies=[Depends(bridge)])
-@@ -614,7 +745,9 @@ async def checkout_scope(draft_id: uuid.UUID, request: Request, user=Depends(opt
-     started_by = data.get("marketplace_user_id")
-     if not draft or data.get("marketplace_buyer") != buyer_id(request) or (started_by and (not user or started_by != str(user.id))):
-         raise HTTPException(404, "Checkout not found")
--    snap = data["snapshot"]
-+    snap = data.get("snapshot")
-+    if not snap:
-+        raise HTTPException(409, "Review the custom selection before checkout")
-     return {"shop_id": str(draft.business_id), "product_id": snap["product_id"],
-         "items": [{"product_id": item["product_id"]} for item in snap.get("items") or []]}
- 
-@@ -668,6 +801,7 @@ async def bound_order(db, request, order_id, user):
- async def order_json(db, order):
-     # Digital payment requests use receiving_accounts, which accepts personal gateways only.
-     if order.fulfilment_kind == "physical":
-+        from app.services.marketplace_craft import summary as craft_summary
-         await db.refresh(order, ["lines", "courier_booking"])
-         from app.services.order_integrity import settled, shipment_status
-         from app.services.courier_tracking import tracking_url
-@@ -685,6 +819,7 @@ async def order_json(db, order):
-             "buyer_fields": data.get("buyer_fields"), "address": order.address, "district": order.district,
-             "advance_amount": data.get("advance_amount", "0"), "seller_message": data.get("marketplace_message", ""),
-             "items": quote.get("items"),
-+            "custom_summary": [text for detail in data.get("custom_details", []) for text in craft_summary(detail.get("craft") or {})],
-             "tracking": {"provider": booking.provider, "status": booking.status, "tracking": booking.tracking_number,
-                 "tracking_url": tracking_url(booking), "updated_at": utc(booking.updated_at).isoformat(),
-                 "poll_delayed": bool(booking.poll_failures)} if booking else None,
 diff --git a/backend/app/services/marketplace_assistant.py b/backend/app/services/marketplace_assistant.py
 new file mode 100644
 index 00000000..ffc8ab41
@@ -409,8 +205,8 @@ index c9d44b71..21cc353c 100644
 +++ b/backend/app/services/marketplace_checkout.py
 @@ -25,7 +25,7 @@ def payment_methods(business):
      return ["cod"] if allowed and facts.get("cod_enabled") is not False and facts.get("cod_policy") not in {"disabled", "prepaid", "advance_only"} else []
- 
- 
+
+
 -def unavailable_reason(business, product):
 +def unavailable_reason(business, product, *, allow_custom=False):
      if product.fulfilment_kind == "digital":
@@ -427,8 +223,8 @@ index c9d44b71..21cc353c 100644
          return "The seller needs to configure a supported payment method in AriseSell."
 @@ -65,7 +65,9 @@ def delivery_charge(rates, tier, subtotal):
      return value
- 
- 
+
+
 -async def snapshot(db, business, product_id, variant_id, quantity, buyer, coupon_code=None, *, items=None, line_only=False):
 +async def snapshot(db, business, product_id, variant_id, quantity, buyer, coupon_code=None, *, items=None, line_only=False, craft_line=None):
 +    if items and craft_line:
@@ -480,9 +276,9 @@ index c9d44b71..21cc353c 100644
 +        advance = max(advance, custom_advance(custom_details, priced, total))
      return {**row, "discount": str(discount), "coupon_code": code, "delivery_charge": str(shipping),
          "total": str(total), "advance_amount": str(advance), "requested_coupon": coupon_code}
- 
- 
- 
+
+
+
 -async def create_quote(db, business, channel, conversation, identity, req):
 +async def create_quote(db, business, channel, conversation, identity, req, *, custom_draft=None):
      if req.provider != "cod":
@@ -504,7 +300,7 @@ index c9d44b71..21cc353c 100644
      draft.order_id, draft.confirmation_token = None, secrets.token_hex(4)
      await db.flush()
 @@ -142,7 +162,7 @@ async def create_quote(db, business, channel, conversation, identity, req):
- 
+
  async def accept_quote(db, business, channel, conversation, identity, draft, req):
      data = draft.data
 -    if not data.get("physical") or draft.business_id != business.id or draft.channel_id != channel.id or draft.conversation_id != conversation.id or draft.recipient != identity:
@@ -704,10 +500,9 @@ index 00000000..3ed97ddc
 +    return result
 diff --git a/backend/docs/marketplace_assistant.md b/backend/docs/marketplace_assistant.md
 new file mode 100644
-index 00000000..cb658907
 --- /dev/null
 +++ b/backend/docs/marketplace_assistant.md
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,46 @@
 +# Arise Store shopping finder
 +
 +`POST /api/v1/marketplace/assistant` is a read-only bridge endpoint. It reuses the
@@ -725,7 +520,7 @@ index 00000000..cb658907
 +The source intersects it with current published products and mandatory shop scope.
 +Customer searches are bounded to 1,000 characters plus four previous user queries.
 +The model receives search text and bounded, tenant-scoped evidence: shop profile, canonical policies, current indexed knowledge, and Arise Store pages loaded by the trusted bridge. Internal, inactive, stale and conflicting knowledge is excluded. It selects evidence IDs; application code returns exact saved passages, never generated policy claims. Customer orders and other shops are excluded.
-+There are no conversation/customer-message writes, cart mutations or order actions. Successful AI replies consume one message through consume_merchant_ai_quota for the canonical shop owner, never the visitor. Preflight blocks exhausted owners before the model call; atomic final consumption fails closed if a concurrent reply used the last unit. Provider failures are not charged.
++There are no conversation/customer-message writes, cart mutations or order actions. Before inference, consume_merchant_ai_quota(commit=False) reserves one message under the existing canonical-owner/store/credit transaction locks, never the visitor's quota. Successful replies commit that unit; unavailable results, exceptions and cancellation roll it back. Failed reservations never dispatch provider work. No new billing ledger or migration is needed. The lock spans the gateway's bounded inference, so concurrent quota consumers for the same owner wait; unrelated owners use different locks. Provider failures remain uncharged to the merchant, even when a failed provider attempt costs the operator.
 +The source Redis gate and storefront metadata gate each allow 30 searches per
 +customer per hour; storefront also admits at most 120 per IP per hour. Admission
 +storage failures fail closed. Existing gateway key accounting remains active.
@@ -752,39 +547,15 @@ index 00000000..cb658907
 +Rollback removes the Store launcher and assistant bridge routes. No commerce data,
 +metadata migration or environment variable is introduced. Existing crafts and
 +ordinary checkout do not depend on the assistant.
-diff --git a/backend/tests/test_marketplace.py b/backend/tests/test_marketplace.py
-index 8b8b574a..84ff4842 100644
---- a/backend/tests/test_marketplace.py
-+++ b/backend/tests/test_marketplace.py
-@@ -188,14 +188,18 @@ async def test_standard_shop_owner_and_mixed_fulfillment_are_source_owned(market
-     assert "enabled digital checkout" in product["checkout_unavailable_reason"]
- 
- 
--async def test_physical_custom_requirements_disable_checkout_and_show_reason(market_api, physical_shop):
-+async def test_physical_custom_requirements_need_a_confirmed_selection(market_api, physical_shop):
-     sales = physical_shop
-     sales.product.custom_order = {"enabled": True, "fields": [{"id": "print", "label": "Printed name",
-         "question": "Which name should be printed?", "type": "text"}]}
-     await sales.db.commit()
-     product = (await market_api.get("/api/v1/marketplace/feed")).json()["products"][0]
--    assert product["checkout_available"] is False
--    assert "custom order requirements" in product["checkout_unavailable_reason"]
-+    assert product["checkout_available"] is True
-+    assert product["custom_order"]["fields"][0]["id"] == "print"
-+    response = await market_api.post("/api/v1/marketplace/checkout/quote", json={"shop_id": str(sales.business.id),
-+        "product_id": str(sales.product.id), "variant_id": str(sales.variant.id), "quantity": 1,
-+        "provider": "cod", "buyer": {"name": "Test buyer", "phone": "01712345678", "address": "House 12 Road 4 Mirpur", "district": "Dhaka"}})
-+    assert response.status_code == 409
- 
- 
- async def test_marketplace_guest_order_uses_authoritative_stock_and_verified_payment(market_api, sales):
++
++The Store endpoint respects customer_ai_paused (manual snake/camel settings and configured AI business hours) before quota admission or provider calls. Paused shops return unavailable without charging. The UI uses a compact shop-branded drawer, category-derived starter prompts, and a transcript-first voice composer.
 diff --git a/backend/tests/test_marketplace_assistant.py b/backend/tests/test_marketplace_assistant.py
 new file mode 100644
-index 00000000..9e9635bb
 --- /dev/null
 +++ b/backend/tests/test_marketplace_assistant.py
-@@ -0,0 +1,124 @@
+@@ -0,0 +1,233 @@
 +"""No live models, customer messages or order writes in finder evaluation."""
++import asyncio
 +import json
 +from types import SimpleNamespace
 +from decimal import Decimal
@@ -880,6 +651,114 @@ index 00000000..9e9635bb
 +    gateway.assert_not_called()
 +
 +
++@pytest.mark.parametrize("pause_key", ["ai_automation_paused", "aiAutomationPaused"])
++async def test_paused_shop_never_calls_ai_or_charges_owner(market_api, physical_shop, monkeypatch, pause_key):
++    from app.services import ai_gateway, ai_quota_service
++    s = physical_shop
++    s.business.settings_data = {**s.business.settings_data, pause_key: True}
++    await s.db.commit()
++    gateway, consume = AsyncMock(), AsyncMock()
++    monkeypatch.setattr(ai_gateway, "execute_ai_gateway_prompt", gateway)
++    monkeypatch.setattr(ai_quota_service, "consume_merchant_ai_quota", consume)
++    result = await market_api.post("/api/v1/marketplace/assistant", json={"shop_id": str(s.business.id),
++        "message": "show shoes", "allowed_product_ids": [str(s.product.id)]})
++    assert result.status_code == 200 and result.json()["state"] == "unavailable"
++    gateway.assert_not_called()
++    consume.assert_not_called()
++
++
++async def test_failed_quota_reservation_never_dispatches_provider(market_api, physical_shop, monkeypatch):
++    from app.services import ai_gateway, ai_quota_service
++    s=physical_shop
++    monkeypatch.setattr(ai_quota_service,"check_ai_quota_available",AsyncMock(return_value=True))
++    consume=AsyncMock(return_value={"success":False,"error":"QUOTA_EXHAUSTED"})
++    monkeypatch.setattr(ai_quota_service,"consume_merchant_ai_quota",consume)
++    gateway = AsyncMock()
++    monkeypatch.setattr(ai_gateway,"execute_ai_gateway_prompt",gateway)
++    result=await market_api.post("/api/v1/marketplace/assistant",json={"shop_id":str(s.business.id),"message":"Clothing", "allowed_product_ids":[str(s.product.id)]})
++    assert result.status_code==200 and result.json()=={"state":"quota_exhausted","matches":[]}
++    assert consume.call_args.kwargs["business_id"]==s.business.id
++    assert consume.call_args.kwargs["commit"] is False
++    gateway.assert_not_called()
++
++
++@pytest.mark.parametrize("failure", [RuntimeError, asyncio.CancelledError])
++async def test_inference_exception_releases_quota_reservation(market_api, physical_shop, monkeypatch, failure):
++    from app.services import ai_gateway
++    from app.models.user import User
++    s = physical_shop
++    monkeypatch.setattr(ai_gateway, "execute_ai_gateway_prompt", AsyncMock(side_effect=failure()))
++    with pytest.raises(failure):
++        await market_api.post("/api/v1/marketplace/assistant", json={"shop_id": str(s.business.id),
++            "message": "Clothing", "allowed_product_ids": [str(s.product.id)]})
++    await s.db.refresh(s.business)
++    owner = await s.db.get(User, s.owner.id)
++    await s.db.refresh(owner)
++    assert (s.business.orders_used or 0) == (owner.ai_used or 0) == 0
++
++
++@pytest.mark.parametrize("digital_engine", ["postgres"], indirect=True)
++@pytest.mark.parametrize("first_fails", [False, True])
++async def test_last_unit_is_reserved_before_concurrent_provider_work(market_api, physical_shop, monkeypatch, first_fails):
++    from app.services import ai_gateway, ai_quota_service
++    from app.models.user import User
++    s = physical_shop
++    owner = await s.db.get(User, s.owner.id)
++    owner.ai_quota = s.business.orders_quota = 100
++    owner.ai_used = s.business.orders_used = 99
++    s.business.settings_data = {**s.business.settings_data, "subscribed_quota": 100, "messages_used": 99}
++    await s.db.commit()
++    # Both preflights pass; only the real owner/credit transaction can admit work.
++    monkeypatch.setattr(ai_quota_service, "check_ai_quota_available", AsyncMock(return_value=True))
++    entered, release, second_reserving = asyncio.Event(), asyncio.Event(), asyncio.Event()
++    consume = ai_quota_service.consume_merchant_ai_quota
++    sessions = []
++    async def reserve(*args, **kwargs):
++        assert kwargs["commit"] is False
++        sessions.append(kwargs["db"])
++        if len(sessions) == 2:
++            second_reserving.set()
++        return await consume(*args, **kwargs)
++    monkeypatch.setattr(ai_quota_service, "consume_merchant_ai_quota", reserve)
++    calls = 0
++    async def provider(**kwargs):
++        nonlocal calls
++        calls += 1
++        reserved = await kwargs["db"].get(User, owner.id)
++        assert reserved.ai_used == 100
++        if calls == 1:
++            entered.set()
++            await asyncio.wait_for(release.wait(), 5)
++            if first_fails:
++                return SimpleNamespace(success=False, response="")
++        return SimpleNamespace(success=True, response=json.dumps({"intent": "clarify"}))
++    monkeypatch.setattr(ai_gateway, "execute_ai_gateway_prompt", provider)
++    payload = {"shop_id": str(s.business.id), "message": "Clothing", "allowed_product_ids": [str(s.product.id)]}
++    tasks = []
++    try:
++        tasks.append(asyncio.create_task(market_api.post("/api/v1/marketplace/assistant", json=payload)))
++        await asyncio.wait_for(entered.wait(), 5)
++        tasks.append(asyncio.create_task(market_api.post("/api/v1/marketplace/assistant", json=payload)))
++        await asyncio.wait_for(second_reserving.wait(), 5)
++        assert sessions[0] is not sessions[1]
++        assert calls == 1
++        release.set()
++        first, second = await asyncio.wait_for(asyncio.gather(*tasks), 5)
++        assert first.status_code == second.status_code == 200
++        assert first.json()["state"] == ("unavailable" if first_fails else "clarify")
++        assert second.json()["state"] == ("clarify" if first_fails else "quota_exhausted")
++        assert calls == (2 if first_fails else 1)
++    finally:
++        release.set()
++        for task in tasks:
++            if not task.done():
++                task.cancel()
++        await asyncio.gather(*tasks, return_exceptions=True)
++    await s.db.refresh(s.business)
++    await s.db.refresh(owner)
++    assert owner.ai_used == s.business.orders_used == 100
++
++
 +async def test_shop_knowledge_is_scoped_and_quota_exhaustion_stops_gateway(market_api, physical_shop, monkeypatch):
 +    import uuid
 +    from app.services import ai_gateway, ai_quota_service
@@ -908,12 +787,838 @@ index 00000000..9e9635bb
 +    monkeypatch.setattr(ai_quota_service,"check_ai_quota_available",AsyncMock(return_value=False))
 +    assert (await market_api.post("/api/v1/marketplace/assistant",json=payload)).json()["state"]=="quota_exhausted"
 +    gateway.assert_not_called()
+diff --git a/frontend/components/orders/CraftReview.tsx b/frontend/components/orders/CraftReview.tsx
+index 34a540d5..b4308bb6 100644
+--- a/frontend/components/orders/CraftReview.tsx
++++ b/frontend/components/orders/CraftReview.tsx
+@@ -17,7 +17,7 @@ function ReviewLine({ draft, line, store, disabled, onSaved }: {
+   const [verified, setVerified] = useState(false);
+   const [proof, setProof] = useState("");
+   const [asset, setAsset] = useState<string | null>(null);
+-  const [send, setSend] = useState(true);
++  const [send, setSend] = useState(!draft.data.marketplace_craft);
+   const [busy, setBusy] = useState(false);
+   const [uploading, setUploading] = useState(false);
+   const [error, setError] = useState("");
+@@ -33,7 +33,7 @@ function ReviewLine({ draft, line, store, disabled, onSaved }: {
+     <label className="flex items-center gap-2"><input type="checkbox" checked={verified} disabled={disabled || busy} onChange={e => setVerified(e.target.checked)} />{ui.text("I checked the package and print artwork")}</label>
+     <label className="block">{ui.text("Print preview")}</label>
+     <ProductImageInput store={store} scope="orders" value={proof} assetId={asset} required={false} disabled={disabled || busy} onBusyChange={setUploading} onChange={(v, a) => { setProof(v); setAsset(a); }} />
+-    <label className="flex items-center gap-2"><input type="checkbox" checked={send} disabled={disabled || busy} onChange={e => setSend(e.target.checked)} />{ui.text("Send review to customer")}</label>
++    {draft.data.marketplace_craft ? <p>{ui.text("The customer reviews and approves this preview in Arise Store. Save the review here.")}</p> : <label className="flex items-center gap-2"><input type="checkbox" checked={send} disabled={disabled || busy} onChange={e => setSend(e.target.checked)} />{ui.text("Send review to customer")}</label>}
+     <Button size="sm" disabled={disabled || busy || uploading || !line.selection_revision || (!asset && !price) || (!!price && !verified)} onClick={async () => {
+       setBusy(true);
+       setError("");
+diff --git a/frontend/lib/api-client.ts b/frontend/lib/api-client.ts
+index d43ee2da..580a3d4e 100644
+--- a/frontend/lib/api-client.ts
++++ b/frontend/lib/api-client.ts
+@@ -664,7 +664,7 @@ export interface CraftLine {
+   artwork_items?: {message_id: string; asset_id?: string;url?: string;qty: number}[];
+   merchant_quote?: {unit_price: string}; proof?: {asset_id: string;url?: string}; proof_approved?: string;
+ }
+-export interface CraftDraft { id: string; recipient: string; conversation_id: string; data: {craft_lines: CraftLine[]; craft_hold?: string} }
++export interface CraftDraft { id: string; recipient: string; conversation_id: string; data: {craft_lines: CraftLine[]; craft_hold?: string; marketplace_craft?: boolean} }
+ export interface CustomOrderConfig {
+   craft?: CraftRules | null;
+   knowledge_source?: {id?: string; product_id?: string; revision: string} | null;
+diff --git a/backend/app/services/messenger_catalog.py b/backend/app/services/messenger_catalog.py
+index 61763c40..c6795dfe 100644
+--- a/backend/app/services/messenger_catalog.py
++++ b/backend/app/services/messenger_catalog.py
+@@ -97,7 +97,7 @@ def card_preview(product, *, english=False):
+
+ async def owned_products(db, business_id, ids):
+     from app.services.catalog_retrieval import public_catalog_scope
+-    query = select(Product).where(public_catalog_scope(business_id)).options(selectinload(Product.variants))
++    query = select(Product).where(public_catalog_scope(business_id)).options(selectinload(Product.variants), selectinload(Product.images))
+     query = query.where(Product.id.in_([uuid.UUID(str(value)) for value in ids]))
+     products = list((await db.execute(query.order_by(Product.name, Product.id)
+                                    .execution_options(populate_existing=True))).scalars())
+diff --git a/backend/app/services/product_image_links.py b/backend/app/services/product_image_links.py
+index 813c48bc..bcc6a9c0 100644
+--- a/backend/app/services/product_image_links.py
++++ b/backend/app/services/product_image_links.py
+@@ -5,6 +5,7 @@ import unicodedata
+ from urllib.parse import quote
+
+ from sqlalchemy import select
++from sqlalchemy.orm import selectinload
+ from app.models.product import Product
+ from app.models.tenant import Business
+
+@@ -62,7 +63,7 @@ async def backfill_image_public_paths(db) -> int:
+     products = (await db.execute(select(Product).where(
+         Product.image_public_path.is_(None),
+         Product.image_url.like("/api/v1/catalog/image-assets/%/content"),
+-    ).order_by(Product.business_id, Product.created_at, Product.id))).scalars().all()
++    ).options(selectinload(Product.images)).order_by(Product.business_id, Product.created_at, Product.id))).scalars().all()
+     count = 0
+     for product in products:
+         if display_asset_id(product):
+diff --git a/backend/app/services/product_sets.py b/backend/app/services/product_sets.py
+index 3f4cbb63..dbc0ff8f 100644
+--- a/backend/app/services/product_sets.py
++++ b/backend/app/services/product_sets.py
+@@ -5,6 +5,7 @@ from decimal import Decimal
+ from pydantic import BaseModel, ConfigDict, Field, model_validator
+ from typing import Literal
+ from sqlalchemy import select
++from sqlalchemy.orm import selectinload
+
+ from app.models.product import Product
+
+@@ -77,7 +78,8 @@ async def apply_product_setup(db, business_id, products):
+     from app.services.custom_orders import CustomOrderConfig, revision
+     from app.services.product_images import display_asset_id
+     ids = {uuid.UUID(i["product_id"]) for p in products for i in (p.product_setup or {}).get("items", [])}
+-    members = {p.id:p for p in (await db.scalars(select(Product).where(Product.business_id == business_id, Product.id.in_(ids)))).all()} if ids else {}
++    members = {p.id:p for p in (await db.scalars(select(Product).where(Product.business_id == business_id, Product.id.in_(ids))
++        .options(selectinload(Product.images)))).all()} if ids else {}
+     for p in products:
+         if p.product_setup is None:
+             continue  # Legacy drafts keep their reviewed source until the product is explicitly saved.
+diff --git a/backend/tests/test_catalog_display_upload.py b/backend/tests/test_catalog_display_upload.py
+index 6d076e07..93d79954 100644
+--- a/backend/tests/test_catalog_display_upload.py
++++ b/backend/tests/test_catalog_display_upload.py
+@@ -15,7 +15,8 @@ from app.core.config import settings
+ from app.core.database import get_db
+ from app.core.deps import get_current_active_user
+ from app.models.product import Product
+-from app.models.product_image import ImageAsset
++from app.models.product_image import ImageAsset, ProductImage
++from app.models.tenant import Business
+ from app.services import ai_engine, image_outbox, product_images
+ from app.services.vision_matcher import _clean_product_dict
+ from tests.test_ai_product_codes import ai_dependencies
+@@ -158,6 +159,78 @@ async def test_upload_binding_rejects_foreign_assets_and_unsigned_reference(cata
+     await db.rollback()
+
+
++@pytest.mark.parametrize("operation", ["create", "update", "import"])
++@pytest.mark.parametrize("url_form", ["absolute", "same_origin", "relative", "query", "fragment"])
++async def test_url_only_writers_reject_asset_references(catalog_upload, photo_commerce, operation, url_form):
++    client, db, user, s3 = catalog_upload
++    *_, variant, _, _ = photo_commerce
++    foreign = uuid.uuid4()
++    path = f"/api/v1/catalog/image-assets/{foreign}/content"
++    url = {"absolute": "https://example.invalid" + path, "same_origin": "http://test" + path,
++           "relative": path, "query": "https://example.invalid/image?src=" + path,
++           "fragment": "https://example.invalid/image#" + path}[url_form]
++    payload = {"name": "URL probe", "category": "Apparel", "price": 1, "image_url": url}
++    signer = Mock(wraps=product_images.image_url)
++    with pytest.MonkeyPatch.context() as patch:
++        patch.setattr(product_images, "image_url", signer)
++        if operation == "create":
++            response = await client.post("/api/v1/catalog/products", json=payload)
++        elif operation == "update":
++            response = await client.put(f"/api/v1/catalog/products/{variant.product_id}", json={"image": url})
++        else:
++            response = await client.post("/api/v1/catalog/import/confirm", json={
++                "products": [payload], "generate_bangla": False, "save_store_knowledge": False})
++    assert response.status_code == 422, response.text
++    signer.assert_not_called()
++    s3.generate_presigned_url.assert_not_called()
++
++
++@pytest.mark.parametrize("raw_url", ["absolute", "relative", "empty"])
++@pytest.mark.parametrize("forged_binding", [False, True])
++async def test_legacy_foreign_urls_and_bindings_cannot_mint_capabilities(catalog_upload, raw_url, forged_binding, monkeypatch):
++    client, db, user, s3 = catalog_upload
++    foreign_business = Business(name="Foreign fixture", slug="foreign-fixture", kind="Fashion", settings_data={})
++    db.add(foreign_business)
++    await db.flush()
++    asset = ImageAsset(business_id=foreign_business.id, storage="s3", storage_key=f"foreign/{uuid.uuid4()}",
++        content_hash="b" * 64, mime_type="image/png", byte_size=100, width=80, height=60, created_by=uuid.uuid4())
++    db.add(asset)
++    await db.flush()
++    asset_id = asset.id
++    path = f"/api/v1/catalog/image-assets/{asset_id}/content"
++    product = Product(business_id=user.business_id, name="Legacy URL probe", category="Apparel", price=1,
++        image_url={"absolute": "https://example.invalid" + path, "relative": path, "empty": ""}[raw_url], images=[])
++    db.add(product)
++    await db.flush()
++    if forged_binding:
++        product.images = [ProductImage(business_id=user.business_id, product_id=product.id, asset_id=asset_id,
++            kind="catalog", is_primary=True, is_active=True, created_by=user.id, asset=asset)]
++    await db.commit()
++    signer = Mock(wraps=product_images.image_url)
++    monkeypatch.setattr(product_images, "image_url", signer)
++    response = await client.get("/api/v1/catalog/products")
++    assert response.status_code == 200, response.text
++    loaded = next(p for p in response.json() if p["id"] == str(product.id))
++    assert loaded["image"] == "" and loaded["image_asset_id"] is None and loaded["images"] == []
++    assert not any(str(call.args[0]) == str(asset_id) for call in signer.call_args_list)
++    s3.generate_presigned_url.assert_not_called()
++
++
++async def test_owned_legacy_display_binding_still_signs_without_public_path(catalog_upload):
++    client, db, _, s3 = catalog_upload
++    uploaded = await upload(client)
++    response = await client.post("/api/v1/catalog/products", json={
++        "name": "Owned legacy", "category": "Apparel", "price": 1, "image_asset_id": uploaded["asset_id"]})
++    assert response.status_code == 201, response.text
++    stored = await db.get(Product, uuid.UUID(response.json()["id"]))
++    stored.image_public_path = None
++    await db.commit()
++    loaded = next(p for p in (await client.get("/api/v1/catalog/products")).json() if p["id"] == str(stored.id))
++    assert loaded["image_asset_id"] == uploaded["asset_id"] and "signature=" in loaded["image"]
++    assert (await client.get(loaded["image"])).status_code == 307
++    assert s3.generate_presigned_url.call_args.kwargs["Params"]["Key"].endswith(".jpg")
++
++
+ @pytest.mark.asyncio
+ async def test_display_upload_coexists_with_ten_real_photos(catalog_upload, photo_commerce):
+     client, db, _, _ = catalog_upload
+diff --git a/backend/app/api/v1/catalog.py b/backend/app/api/v1/catalog.py
+index db4f079b..1d7a9a34 100644
+--- a/backend/app/api/v1/catalog.py
++++ b/backend/app/api/v1/catalog.py
+@@ -26,7 +26,7 @@ from app.models.product import Product, Variant, FeedSync
+ from app.models.product_image import ImageAsset, ProductImage
+ from app.services.craft_knowledge import effective_config
+ from app.services.product_images import gallery_response, replace_product_images, display_image_url, display_asset_id, store_upload, image_url, valid_signature, local_path, s3_client
+-from app.services.product_images import load_catalog_image_bytes, prepare_image
++from app.services.product_images import load_catalog_image_bytes, prepare_image, validate_display_image_url
+ from app.services.http_fetch import bounded_httpx_request
+ from app.core.config import settings
+ from app.schemas.product import (
+@@ -107,7 +107,8 @@ async def read_public_product_image(store_slug: str, product_slug: str, request:
+                                     db: AsyncSession = Depends(get_db)):
+     """Serve only the currently published main image, at a permanent catalog URL."""
+     path = f"/{store_slug}/{product_slug}"
+-    product = (await db.execute(select(Product).where(Product.image_public_path == path))).scalar_one_or_none()
++    product = (await db.execute(select(Product).where(Product.image_public_path == path)
++        .options(selectinload(Product.images)))).scalar_one_or_none()
+     asset_id = display_asset_id(product) if product else None
+     if not asset_id:
+         raise HTTPException(404, "Product image not found")
+@@ -509,8 +510,7 @@ async def create_product(
+     # 1. Enforce Plan Catalog Limit
+     if not req.image_url.strip() and not req.image_asset_id:
+         raise HTTPException(422, "Upload a product image or provide an image URL.")
+-    if req.image_url.startswith("/api/v1/catalog/image-assets/") and not req.image_asset_id:
+-        raise HTTPException(422, "Select an uploaded product image or provide an image URL.")
++    validate_display_image_url(req.image_url, asset_id=req.image_asset_id)
+     await check_and_enforce_catalog_limit(user.business_id, items_to_add=1, db=db)
+
+     prod = Product(
+@@ -670,8 +670,8 @@ async def update_product(
+
+     previous_asset_id = display_asset_id(prod)
+     img_to_set = req.image_url if req.image_url is not None else req.image
+-    if img_to_set and img_to_set.startswith("/api/v1/catalog/image-assets/") and not req.image_asset_id:
+-        raise HTTPException(422, "Select an uploaded product image or provide an image URL.")
++    if img_to_set is not None:
++        validate_display_image_url(img_to_set, asset_id=req.image_asset_id)
+     if img_to_set is not None:
+         prod.image_url = img_to_set
+     if req.tags is not None:
+@@ -1042,6 +1042,7 @@ async def confirm_catalog_import(
+ ):
+     """Atomically commit selected scraped products, variants, and store policies to merchant store."""
+     from app.models.tenant import Business
++    from app.api.v1.merchants import resolve_ai_store
+     business = await db.get(Business, user.business_id)
+     if user.is_superadmin:
+         raise HTTPException(
+@@ -1055,6 +1056,9 @@ async def confirm_catalog_import(
+             detail="User has no associated business store.",
+         )
+
++    for product in req.products:
++        validate_display_image_url(product.image_url)
++
+     digital = bool(business and business.commerce_mode == "digital")
+     if digital:
+         from app.services.digital_inventory import lock_business
+@@ -1104,6 +1108,7 @@ async def confirm_catalog_import(
+
+     if not deduped_products:
+         if policy_snapshot:
++            await resolve_ai_store(user, db, store_id=str(user.business_id), write_scope="brain")
+             await sync_website_policies(db, user.business_id, policy_snapshot.policies,
+                 policy_snapshot.source, replace_missing=True)
+             await db.commit()
+@@ -1124,6 +1129,8 @@ async def confirm_catalog_import(
+     except ValueError as exc:
+         raise HTTPException(422, str(exc)) from exc
+     await check_and_enforce_catalog_limit(user.business_id, items_to_add=len(deduped_products), db=db)
++    if policy_snapshot:
++        await resolve_ai_store(user, db, store_id=str(user.business_id), write_scope="brain")
+
+     # Auto Bengali Title Enrichment for any products missing authentic Bengali characters
+     if req.generate_bangla:
+diff --git a/backend/docs/ai_knowledge_implementation.md b/backend/docs/ai_knowledge_implementation.md
+index 187271d5..1d9840f8 100644
+--- a/backend/docs/ai_knowledge_implementation.md
++++ b/backend/docs/ai_knowledge_implementation.md
+@@ -7,6 +7,15 @@ Brain FAQs and imported website knowledge. It retains 40 messages and uses the
+ existing provider gateway and image/OCR matcher. The changes below extend those
+ services; no second order writer or provider gateway is introduced.
+
++Catalog import policy saving and `not_found` retirement use the same selected-store
++`resolve_ai_store(write_scope="brain")` authorization as dedicated website sync.
++This covers empty and duplicate-only product batches as well as mixed imports.
++The permission lock is acquired after catalog quota locks and held through sync
++and commit. Revoked/ungranted/view-only teammates and superadmin inspection cannot
++write policies. Product-only imports can set `save_store_knowledge=false`. Tests
++in `test_catalog_policy_permissions.py` use real dummy sessions/workspace switching
++and verify denied imports leave policies, history and products unchanged.
++
+ | Requirement | Implementation |
+ | --- | --- |
+ | Stock and quantity concessions | Checkout records the offered stock quantity, accepts the customer's latest concession, and progresses to missing KYC. Zero stock identifies available variants; offline replies can suggest up to two stocked products in the same category. Scarcity messages use real inventory and do not promise same-day dispatch. |
+diff --git a/backend/tests/test_catalog_evidence.py b/backend/tests/test_catalog_evidence.py
+index 101e4a53..5f5b83d9 100644
+--- a/backend/tests/test_catalog_evidence.py
++++ b/backend/tests/test_catalog_evidence.py
+@@ -16,6 +16,7 @@ from app.models.product import Product, Variant
+ from app.schemas.product import ConfirmImportRequest, CreateProductRequest, UpdateProductRequest
+ from app.services import web_scraper
+ from tests.test_sales_reply_grounding import store
++from tests.store_principals import owner_for
+
+
+ @pytest.mark.parametrize("inventory,expected", [(None, 0), (0, 0), (7, 7)])
+@@ -78,7 +79,7 @@ async def test_import_keeps_manual_policy_conflicts_for_review(db_session, monke
+     request = ConfirmImportRequest(products=[CreateProductRequest(name="Kurti", category="Womens", price=990)],
+         generate_bangla=False, policy_knowledge={"Delivery": "Imported policy"},
+         policy_extraction={"source_url": "https://example.test/policies", "status": "extracted"})
+-    await catalog.confirm_catalog_import(request, user=SimpleNamespace(business_id=tenant.id, is_superadmin=False), db=db_session)
++    await catalog.confirm_catalog_import(request, user=owner_for(tenant), db=db_session)
+     entries = list(await db_session.scalars(select(KnowledgeEntry).where(KnowledgeEntry.business_id == business_id)))
+     assert {entry.content for entry in entries} == {"First policy", "Conflicting policy", "Imported policy"}
+     from app.services.ai_embeddings import search_knowledge_base
+diff --git a/backend/tests/test_catalog_policy_permissions.py b/backend/tests/test_catalog_policy_permissions.py
+new file mode 100644
+--- /dev/null
++++ b/backend/tests/test_catalog_policy_permissions.py
+@@ -0,0 +1,151 @@
++"""Real dummy sessions and workspace switching; no network or model calls."""
++import uuid
++from types import SimpleNamespace
++from unittest.mock import AsyncMock
++
++import pytest
++from fastapi import FastAPI
++from httpx import ASGITransport, AsyncClient
++from sqlalchemy import select
++
++from app.api.v1 import brain, catalog, merchants
++from app.core.database import get_db
++from app.core.security import create_access_token
++from app.models.knowledge import KnowledgeEntry
++from app.models.product import Product
++from app.models.tenant import Business
++from app.models.user import User, UserSession
++from app.schemas.knowledge import PolicyExtraction
++from app.services.ai_embeddings import knowledge_revision
++from app.services.website_knowledge import sync_website_policies
++
++SOURCE = {"source_url": "https://example.test/policies", "method": "page_text", "status": "extracted"}
++POLICIES = {"delivery_info": "Changed delivery marker", "new_policy": "New harmless policy marker"}
++
++
++async def knowledge_snapshot(db):
++    rows = list(await db.scalars(select(KnowledgeEntry).execution_options(populate_existing=True)))
++    return {str(row.id): (str(row.business_id), row.content, row.is_current, knowledge_revision(row)) for row in rows}
++
++
++@pytest.fixture
++async def policy_import(db_session, monkeypatch):
++    db = db_session
++    owner_id, member_id = uuid.uuid4(), uuid.uuid4()
++    shop = Business(name="Owner shop", slug="policy-owner-shop", commerce_mode="standard", settings_data={
++        "owner_id": str(owner_id), "catalog_limit": 100, "team_members": [{"user_id": str(member_id),
++            "email": "member@example.test", "permissions": ["chat"], "role": "moderator", "is_view_only": False}]})
++    home = Business(name="Member home", slug="policy-member-home", settings_data={"owner_id": str(member_id)})
++    db.add_all([shop, home])
++    await db.flush()
++    owner = User(id=owner_id, business_id=shop.id, email="owner@example.test", first_name="Dummy", last_name="Owner",
++        hashed_password="fixture-not-a-password", role="owner", is_active=True, is_verified=True)
++    member = User(id=member_id, business_id=home.id, email="member@example.test", first_name="Dummy", last_name="Member",
++        hashed_password="fixture-not-a-password", role="owner", is_active=True, is_verified=True)
++    db.add_all([owner, member])
++    await db.flush()
++    tokens = {}
++    for user in (owner, member):
++        session = UserSession(user_id=user.id, session_token="fixture-" + uuid.uuid4().hex,
++            device_name="Offline fixture", is_active=True)
++        db.add(session)
++        await db.flush()
++        tokens[user.id] = create_access_token({"sub": str(user.id), "sid": str(session.id)})
++    for business, policies in [(shop, {"delivery_info": "Original delivery", "return_policy": "Original returns"}),
++                               (home, {"delivery_info": "Other shop delivery"})]:
++        await sync_website_policies(db, business.id, policies, PolicyExtraction(**SOURCE), replace_missing=True)
++    db.add(Product(business_id=shop.id, name="Existing item", category="Test", price=1,
++        image_url="https://example.test/item.jpg", images=[]))
++    await db.commit()
++    commits = AsyncMock(wraps=db.commit)
++    monkeypatch.setattr(db, "commit", commits)
++    paid = AsyncMock(side_effect=AssertionError("Authorization tests must not call models"))
++    monkeypatch.setattr(catalog, "translate_titles_to_bangla", paid)
++    app = FastAPI()
++    for module in (catalog, brain, merchants):
++        app.include_router(module.router, prefix="/api/v1")
++    async def database():
++        try:
++            yield db
++        except BaseException:
++            await db.rollback()
++            raise
++    app.dependency_overrides[get_db] = database
++    async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
++        yield SimpleNamespace(db=db, shop=shop, shop_id=shop.id, home_id=home.id, member=member, owner=owner,
++            tokens=tokens, client=client, commits=commits, paid=paid)
++
++
++async def select_actor(a, state):
++    actor = a.owner if state == "owner" else a.member
++    if state == "superadmin":
++        actor.is_superadmin = True
++    permissions = {"catalog_only": ["catalog"], "view_only": ["all"], "brain_member": ["/console/brain"],
++                   "settings_member": ["settings:brain"]}.get(state, ["chat"])
++    a.shop.settings_data = {**a.shop.settings_data, "team_members": [{"user_id": str(a.member.id),
++        "email": a.member.email, "role": "moderator", "permissions": permissions, "is_view_only": state == "view_only"}]}
++    await a.db.commit()
++    a.client.headers["Authorization"] = "Bearer " + a.tokens[actor.id]
++    selected = await a.client.post("/api/v1/merchants/switch-store", json={"store_id": str(a.shop_id)})
++    assert selected.status_code == 200, selected.text
++    if state != "owner":
++        assert str(actor.id) != a.shop.settings_data["owner_id"]
++    if state == "revoked":
++        a.shop.settings_data = {**a.shop.settings_data, "team_members": []}
++        await a.db.commit()
++    a.commits.reset_mock()
++
++
++def payload(branch="empty", *, retire=False, save=True):
++    products = [] if branch == "empty" else [{"name": "Existing item" if branch == "duplicate" else "New item",
++        "category": "Test", "price": 1, "image_url": "https://example.test/item.jpg"}]
++    return {"products": products, "generate_bangla": False, "save_store_knowledge": save,
++        "policy_extraction": {**SOURCE, "status": "not_found" if retire else "extracted"},
++        "policy_knowledge": {} if retire else POLICIES}
++
++
++@pytest.mark.parametrize("state", ["chat", "catalog_only", "view_only", "revoked", "superadmin"])
++@pytest.mark.parametrize("branch", ["empty", "new", "duplicate"])
++@pytest.mark.parametrize("retire", [False, True])
++async def test_policy_import_cannot_bypass_brain_write_authority(policy_import, state, branch, retire):
++    a = policy_import
++    await select_actor(a, state)
++    before = await knowledge_snapshot(a.db)
++    product_ids = set(await a.db.scalars(select(Product.id)))
++    body = payload(branch, retire=retire)
++    dedicated = await a.client.post("/api/v1/brain/knowledge/sync-website", params={"store": str(a.shop_id)},
++        json={"source": body["policy_extraction"], "policies": body["policy_knowledge"]})
++    assert dedicated.status_code == 403, dedicated.text
++    imported = await a.client.post("/api/v1/catalog/import/confirm", json=body)
++    assert imported.status_code == 403, imported.text
++    a.commits.assert_not_awaited()
++    assert await knowledge_snapshot(a.db) == before
++    assert set(await a.db.scalars(select(Product.id))) == product_ids
++    a.paid.assert_not_awaited()
++
++
++@pytest.mark.parametrize("state", ["owner", "brain_member", "settings_member"])
++@pytest.mark.parametrize("branch", ["empty", "new"])
++async def test_authorized_policy_import_keeps_normal_sync_and_shop_isolation(policy_import, state, branch):
++    a = policy_import
++    await select_actor(a, state)
++    before = await knowledge_snapshot(a.db)
++    response = await a.client.post("/api/v1/catalog/import/confirm", json=payload(branch))
++    assert response.status_code == 200, response.text
++    assert len(response.json()) == (1 if branch == "new" else 0)
++    a.commits.assert_awaited_once()
++    after = await knowledge_snapshot(a.db)
++    assert {v[1] for v in after.values() if v[0] == str(a.shop_id) and v[2]} == set(POLICIES.values())
++    assert {k: v for k, v in after.items() if v[0] == str(a.home_id)} == {
++        k: v for k, v in before.items() if v[0] == str(a.home_id)}
++    a.paid.assert_not_awaited()
++
++
++async def test_catalog_only_import_can_opt_out_of_policy_writes(policy_import):
++    a = policy_import
++    await select_actor(a, "catalog_only")
++    before = await knowledge_snapshot(a.db)
++    response = await a.client.post("/api/v1/catalog/import/confirm", json=payload("new", save=False))
++    assert response.status_code == 200 and len(response.json()) == 1, response.text
++    assert await knowledge_snapshot(a.db) == before
++    a.commits.assert_awaited_once()
+diff --git a/backend/app/services/craft_checkout.py b/backend/app/services/craft_checkout.py
+index 00cadecc..17a91555 100644
+--- a/backend/app/services/craft_checkout.py
++++ b/backend/app/services/craft_checkout.py
+@@ -267,7 +267,6 @@ async def preserve_media(db, business_id, conversation_id, message_id, *, custom
+             raise ValueError("Image file does not belong to this store")
+     if not att.get("asset_id"):
+         raw = await load_catalog_image_bytes(att.get("url") or att.get("src") or "")
+-        # shortcut: a later checkout rollback can orphan stored bytes; reconcile storage if rollbacks become frequent.
+         asset = await store_upload(db, SimpleNamespace(id=source.id, business_id=business_id), raw, commit=False)
+         source.attachment = {**att, "asset_id": str(asset.id)}
+     return {"message_id": str(source.id), "asset_id": source.attachment["asset_id"]}
+diff --git a/backend/app/services/product_images.py b/backend/app/services/product_images.py
+index 07fdf66d..617341d3 100644
+--- a/backend/app/services/product_images.py
++++ b/backend/app/services/product_images.py
+@@ -9,6 +9,7 @@ import time
+ import uuid
+ import warnings
+ import base64
++import logging
+ import re
+ from types import SimpleNamespace
+ from urllib.parse import urljoin
+@@ -18,41 +19,112 @@ from pathlib import Path
+
+ from fastapi import HTTPException
+ from PIL import Image, ImageOps, UnidentifiedImageError
+-from sqlalchemy import select, func
++from sqlalchemy import select, func, event
++from sqlalchemy.orm import Session
++from sqlalchemy.util import await_only
+ from app.core.config import settings
+ from app.models.product_image import ImageAsset, ProductImage, OutboundPart
+ from app.models.tenant import Business
+
+ MAX_PIXELS = 25_000_000
+ DISPLAY_ASSET_PATH = re.compile(r"^/api/v1/catalog/image-assets/([0-9a-fA-F-]{36})/content$")
+-ASSET_UUID_PATTERN = re.compile(r"/api/v1/catalog/image-assets/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})")
++PENDING_UPLOADS = "product_image_uploads"
++logger = logging.getLogger(__name__)
++
++
++async def _storage_io(operation, *args):
++    task = asyncio.create_task(asyncio.to_thread(operation, *args))
++    cancelled = False
++    while not task.done():
++        try:
++            await asyncio.shield(task)
++        except asyncio.CancelledError:
++            cancelled = True
++        except Exception:
++            break
++    if cancelled:
++        try:
++            task.result()
++        except Exception:
++            pass
++        raise asyncio.CancelledError
++    return task.result()
++
++
++def _delete_upload_files(uploads):
++    for storage, key in uploads:
++        try:
++            _delete(storage, key)
++        except Exception:
++            # shortcut: crashes/outages can leave files, use durable reconciliation when recovery is required.
++            logger.warning("Photo rollback cleanup failed for storage=%s key=%s", storage, key)
++
++
++async def _delete_uploads(uploads):
++    await _storage_io(_delete_upload_files, uploads)
++
++
++@event.listens_for(Session, "after_commit")
++def _commit_uploads(session):
++    pending = session.info.get(PENDING_UPLOADS, {})
++    transaction = session.get_nested_transaction() or session.get_transaction()
++    uploads = pending.pop(transaction, [])
++    if transaction and transaction.parent:
++        pending.setdefault(transaction.parent, []).extend(uploads)
++    else:
++        session.info.pop(PENDING_UPLOADS, None)
++
++
++@event.listens_for(Session, "after_transaction_end")
++def _finish_uploads(session, transaction):
++    pending = session.info.get(PENDING_UPLOADS, {})
++    uploads = pending.pop(transaction, [])
++    if not pending:
++        session.info.pop(PENDING_UPLOADS, None)
++    if uploads:
++        # AsyncSession invokes transaction events inside its awaitable greenlet.
++        await_only(_delete_uploads(uploads))
++
++
++def validate_display_image_url(raw: str, *, asset_id=None) -> None:
++    if "/api/v1/catalog/image-assets/" in raw and not asset_id:
++        raise HTTPException(422, "Select an uploaded product image or provide an image URL.")
++
++
++def _owned_product_images(product):
++    business_id = getattr(product, "business_id", None)
++    if not business_id:
++        return []
++    # Never lazy-load or grant authority from an image URL when bindings are absent.
++    return [photo for photo in product.__dict__.get("images", [])
++            if photo.business_id == business_id and photo.product_id == product.id
++            and (asset := photo.__dict__.get("asset")) is not None
++            and asset.business_id == business_id and asset.id == photo.asset_id]
+
+
+ def display_asset_id(product) -> uuid.UUID | None:
+     """Stored uploads reference an asset, never an expiring signed URL."""
+     raw = getattr(product, "image_url", "") or ""
+-    match = DISPLAY_ASSET_PATH.fullmatch(raw) or ASSET_UUID_PATTERN.search(raw)
++    match = DISPLAY_ASSET_PATH.fullmatch(raw)
+     try:
+-        return uuid.UUID(match[1]) if match else None
++        asset_id = uuid.UUID(match[1]) if match else None
+     except (ValueError, TypeError, IndexError):
+         return None
++    return next((photo.asset_id for photo in _owned_product_images(product)
++                 if photo.asset_id == asset_id and photo.is_active), None)
+
+
+ def display_image_url(product, *, base_url: str = "") -> str:
+     raw_url = getattr(product, "image_url", "") or ""
+-    asset_id = display_asset_id(product)
+-    if not asset_id and not raw_url.strip():
+-        try:
+-            images = getattr(product, "images", None) or []
+-            for img in images:
+-                if getattr(img, "is_active", True) and getattr(img, "asset_id", None):
+-                    asset_id = img.asset_id
+-                    break
+-        except Exception:
+-            pass
+-    if asset_id and getattr(product, "image_public_path", None):
++    if DISPLAY_ASSET_PATH.fullmatch(raw_url) and getattr(product, "image_public_path", None):
++        # The permanent reader independently verifies the current tenant/asset binding.
+         from app.services.product_image_links import public_image_url
+         return public_image_url(product.image_public_path, settings.FRONTEND_URL)
++    asset_id = display_asset_id(product)
++    if not asset_id and not raw_url.strip():
++        asset_id = next((photo.asset_id for photo in _owned_product_images(product) if photo.is_active), None)
++    if not asset_id and "/api/v1/catalog/image-assets/" in raw_url:
++        return ""
+     return image_url(asset_id, base_url=base_url) if asset_id else raw_url
+
+
+@@ -271,8 +343,12 @@ async def store_upload(db, user, raw: bytes, *, commit=True, deduplicate=False)
+     asset_id = uuid.uuid4()
+     key = f"{user.business_id}/{asset_id}"
+     storage = settings.PRODUCT_IMAGE_STORAGE
++    transaction = db.sync_session.get_nested_transaction() or db.sync_session.get_transaction()
++    uploads = db.info.setdefault(PENDING_UPLOADS, {}).setdefault(transaction, [])
++    uploads.append((storage, key))
+     try:
+-        await asyncio.to_thread(_store, storage, key, raw, preview)
++        # Finish storage writes before cancellation can trigger physical deletion.
++        await _storage_io(_store, storage, key, raw, preview)
+         asset = ImageAsset(id=asset_id, business_id=user.business_id, storage=storage, storage_key=key,
+                            content_hash=content_hash, mime_type=mime,
+                            byte_size=len(raw) + len(preview), width=width, height=height, created_by=user.id)
+@@ -282,13 +358,15 @@ async def store_upload(db, user, raw: bytes, *, commit=True, deduplicate=False)
+         else:
+             await db.flush()
+         return asset
+-    except Exception as exc:
++    except BaseException as exc:
+         if commit:
+             await db.rollback()
+-        try:
+-            await asyncio.to_thread(_delete, storage, key)
+-        except Exception:
+-            pass
++        pending = db.info.get(PENDING_UPLOADS, {}).get(transaction, [])
++        if (storage, key) in pending:
++            pending.remove((storage, key))
++            await _delete_uploads([(storage, key)])
++        if not isinstance(exc, Exception):
++            raise
+         raise HTTPException(503, "Photo storage is unavailable. Please retry the upload.") from exc
+
+
+@@ -298,7 +376,7 @@ def gallery_response(product, base_url: str = "") -> list[dict]:
+              "is_primary": photo.is_primary, "is_active": photo.is_active, "caption": photo.caption,
+              "url": display_image_url(product, base_url=base_url) if photo.asset_id == display_asset_id(product)
+                     and photo.kind == "catalog" and photo.is_primary and not photo.variant_id
+-                    else image_url(photo.asset_id, base_url=base_url)} for photo in product.images]
++                    else image_url(photo.asset_id, base_url=base_url)} for photo in _owned_product_images(product)]
+
+
+ async def replace_gallery(db, product, entries, user, variants):
+diff --git a/backend/docs/ai_image_reply_implementation.md b/backend/docs/ai_image_reply_implementation.md
+index ca14b56b..5736617d 100644
+--- a/backend/docs/ai_image_reply_implementation.md
++++ b/backend/docs/ai_image_reply_implementation.md
+@@ -7,6 +7,27 @@ migration, storage provisioning, live Meta delivery and browser visual review ha
+
+ ## Merchant and customer behavior
+
++- `store_upload` tracks newly written objects in the current AsyncSession root or
++  savepoint transaction. A successful commit retains them; savepoint release promotes
++  pending cleanup to its parent. Rollback and session close await physical deletion,
++  including failures after a successful upload returned. This also covers craft
++  checkout media preservation. Deduplicated committed objects are never registered.
++  Threaded writes/deletes finish before cancellation propagates, preventing a late
++  writer from recreating a deleted object. Existing quota and validation limits stay
++  in place. Native craft tests exercise real request rollback, local files and fake
++  S3 for late validation, response-construction and pre-persistence commit failures.
++  This is best-effort compensation, not distributed atomicity: process termination,
++  storage outages or an uncertain database commit still need operator reconciliation.
++  No durable storage journal/reconciliation worker was added.
++- Signing a main image requires a loaded product/gallery/asset binding in the same
++  business. Only a canonical stored upload path can identify that main asset;
++  external URLs containing asset UUIDs never grant upload authority. Catalog
++  create/update/import reject such URL-only references. Gallery and empty-image
++  fallbacks also check ownership. Permanent display links retain their own current
++  binding checks, and backfill/linked sets load the bindings they need. No schema
++  migration or signing-key rotation is introduced; previously issued bearer links
++  remain valid until their original expiry. Regression fixtures cover URL variants,
++  retained foreign assets and malformed legacy bindings without external requests.
+ - Customer-uploaded images on Meta and WhatsApp persist exact catalog identity
+   on the inbound attachment. Size/color follow-ups resolve that ID against the
+   current tenant catalog before stale checkout/history. Similar, unknown and
+diff --git a/backend/tests/test_upload_transactions.py b/backend/tests/test_upload_transactions.py
+new file mode 100644
+--- /dev/null
++++ b/backend/tests/test_upload_transactions.py
+@@ -0,0 +1,134 @@
++"""Real scratch-local image files follow their database transaction, not the request's happy path."""
++import asyncio
++import threading
++from types import SimpleNamespace
++
++import pytest
++from fastapi import HTTPException
++from sqlalchemy import func, select
++
++from app.core.config import settings
++from app.models.product_image import ImageAsset
++from app.services import product_images
++from tests.test_product_image_reply import photo_commerce, image_bytes
++from tests.test_whatsapp_commerce import commerce
++
++
++@pytest.fixture
++async def uploads(photo_commerce, tmp_path, monkeypatch):
++    db, business, *_ = photo_commerce
++    monkeypatch.setattr(settings, "PRODUCT_IMAGE_DIR", str(tmp_path))
++    monkeypatch.setattr(settings, "PRODUCT_IMAGE_STORAGE", "local")
++    return SimpleNamespace(db=db, root=tmp_path, user=SimpleNamespace(id=business.id, business_id=business.id))
++
++
++def files(a):
++    return {str(p.relative_to(a.root)) for p in a.root.rglob("*") if p.is_file()}
++
++
++@pytest.mark.parametrize("end", ["rollback", "close"])
++async def test_uncommitted_upload_is_deleted_on_transaction_end(uploads, end):
++    a = uploads
++    before = await a.db.scalar(select(func.count()).select_from(ImageAsset))
++    await product_images.store_upload(a.db, a.user, image_bytes(), commit=False)
++    assert len(files(a)) == 2
++    await getattr(a.db, end)()
++    assert not files(a)
++    assert await a.db.scalar(select(func.count()).select_from(ImageAsset)) == before
++    assert product_images.PENDING_UPLOADS not in a.db.info
++
++
++async def test_savepoint_rollback_keeps_outer_upload_and_commit_keeps_it(uploads):
++    a = uploads
++    await product_images.store_upload(a.db, a.user, image_bytes(), commit=False)
++    outer = files(a)
++    with pytest.raises(ValueError):
++        async with a.db.begin_nested():
++            await product_images.store_upload(a.db, a.user, image_bytes(), commit=False)
++            assert len(files(a)) == 4
++            raise ValueError("Reject only this savepoint")
++    assert files(a) == outer
++    await a.db.commit()
++    await a.db.rollback()
++    assert files(a) == outer
++    assert product_images.PENDING_UPLOADS not in a.db.info
++
++
++async def test_released_savepoint_uploads_are_deleted_by_outer_rollback(uploads):
++    a = uploads
++    await product_images.store_upload(a.db, a.user, image_bytes(), commit=False)
++    async with a.db.begin_nested():
++        await product_images.store_upload(a.db, a.user, image_bytes(), commit=False)
++    assert len(files(a)) == 4
++    await a.db.rollback()
++    assert not files(a)
++
++
++async def test_committed_and_deduplicated_uploads_are_not_deleted(uploads):
++    a = uploads
++    asset = await product_images.store_upload(a.db, a.user, image_bytes())
++    asset_id, retained = asset.id, files(a)
++    reused = await product_images.store_upload(a.db, a.user, image_bytes(), commit=False, deduplicate=True)
++    assert reused.id == asset_id
++    await a.db.rollback()
++    assert files(a) == retained and len(retained) == 2
++    assert await a.db.get(ImageAsset, asset_id) is not None
++
++
++async def test_error_after_completed_commit_does_not_delete_committed_files(uploads, monkeypatch):
++    a = uploads
++    commit = a.db.commit
++    async def committed_then_failed():
++        await commit()
++        raise RuntimeError("Fixture post-commit failure")
++    monkeypatch.setattr(a.db, "commit", committed_then_failed)
++    with pytest.raises(HTTPException):
++        await product_images.store_upload(a.db, a.user, image_bytes())
++    assert len(files(a)) == 2
++    assert product_images.PENDING_UPLOADS not in a.db.info
++
++
++async def test_later_storage_failure_cleans_its_files_then_outer_rollback_cleans_earlier_upload(uploads, monkeypatch):
++    a = uploads
++    await product_images.store_upload(a.db, a.user, image_bytes(), commit=False)
++    outer = files(a)
++    store = product_images._store
++    def failed(*args):
++        store(*args)
++        raise OSError("Fixture storage failure")
++    monkeypatch.setattr(product_images, "_store", failed)
++    with pytest.raises(HTTPException):
++        await product_images.store_upload(a.db, a.user, image_bytes(), commit=False)
++    assert files(a) == outer
++    await a.db.rollback()
++    assert not files(a)
++
++
++async def test_cancelled_write_finishes_before_cleanup_even_with_repeated_cancellation(uploads, monkeypatch):
++    a = uploads
++    started, release, finished = threading.Event(), threading.Event(), threading.Event()
++    store = product_images._store
++    def delayed(*args):
++        started.set()
++        assert release.wait(3)
++        try:
++            store(*args)
++        finally:
++            finished.set()
++    monkeypatch.setattr(product_images, "_store", delayed)
++    task = asyncio.create_task(product_images.store_upload(a.db, a.user, image_bytes(), commit=False))
++    try:
++        assert await asyncio.to_thread(started.wait, 3)
++        task.cancel()
++        await asyncio.sleep(0)
++        task.cancel()
++        await asyncio.sleep(0)
++        release.set()
++        with pytest.raises(asyncio.CancelledError):
++            await asyncio.wait_for(task, 3)
++        assert finished.is_set() and not files(a)
++        await a.db.rollback()
++        assert not files(a)
++    finally:
++        release.set()
++        await asyncio.gather(task, return_exceptions=True)
 diff --git a/backend/tests/test_marketplace_craft.py b/backend/tests/test_marketplace_craft.py
 new file mode 100644
-index 00000000..3bf5e1c1
 --- /dev/null
 +++ b/backend/tests/test_marketplace_craft.py
-@@ -0,0 +1,129 @@
+@@ -0,0 +1,210 @@
 +"""Custom Store checkout uses source rules, current proof and customer ownership."""
 +import uuid
 +from decimal import Decimal
@@ -1043,38 +1748,745 @@ index 00000000..3bf5e1c1
 +    draft = await s.db.get(CheckoutDraft, uuid.UUID(result.json()["id"]))
 +    artwork = draft.data["craft_lines"][0]["artwork"]
 +    assert artwork["role"] == "print_artwork" and artwork.get("asset_id")
-diff --git a/frontend/components/orders/CraftReview.tsx b/frontend/components/orders/CraftReview.tsx
-index 34a540d5..b4308bb6 100644
---- a/frontend/components/orders/CraftReview.tsx
-+++ b/frontend/components/orders/CraftReview.tsx
-@@ -17,7 +17,7 @@ function ReviewLine({ draft, line, store, disabled, onSaved }: {
-   const [verified, setVerified] = useState(false);
-   const [proof, setProof] = useState("");
-   const [asset, setAsset] = useState<string | null>(null);
--  const [send, setSend] = useState(true);
-+  const [send, setSend] = useState(!draft.data.marketplace_craft);
-   const [busy, setBusy] = useState(false);
-   const [uploading, setUploading] = useState(false);
-   const [error, setError] = useState("");
-@@ -33,7 +33,7 @@ function ReviewLine({ draft, line, store, disabled, onSaved }: {
-     <label className="flex items-center gap-2"><input type="checkbox" checked={verified} disabled={disabled || busy} onChange={e => setVerified(e.target.checked)} />{ui.text("I checked the package and print artwork")}</label>
-     <label className="block">{ui.text("Print preview")}</label>
-     <ProductImageInput store={store} scope="orders" value={proof} assetId={asset} required={false} disabled={disabled || busy} onBusyChange={setUploading} onChange={(v, a) => { setProof(v); setAsset(a); }} />
--    <label className="flex items-center gap-2"><input type="checkbox" checked={send} disabled={disabled || busy} onChange={e => setSend(e.target.checked)} />{ui.text("Send review to customer")}</label>
-+    {draft.data.marketplace_craft ? <p>{ui.text("The customer reviews and approves this preview in Arise Store. Save the review here.")}</p> : <label className="flex items-center gap-2"><input type="checkbox" checked={send} disabled={disabled || busy} onChange={e => setSend(e.target.checked)} />{ui.text("Send review to customer")}</label>}
-     <Button size="sm" disabled={disabled || busy || uploading || !line.selection_revision || (!asset && !price) || (!!price && !verified)} onClick={async () => {
-       setBusy(true);
-       setError("");
-diff --git a/frontend/lib/api-client.ts b/frontend/lib/api-client.ts
-index d43ee2da..580a3d4e 100644
---- a/frontend/lib/api-client.ts
-+++ b/frontend/lib/api-client.ts
-@@ -664,7 +664,7 @@ export interface CraftLine {
-   artwork_items?: {message_id: string; asset_id?: string;url?: string;qty: number}[];
-   merchant_quote?: {unit_price: string}; proof?: {asset_id: string;url?: string}; proof_approved?: string;
- }
--export interface CraftDraft { id: string; recipient: string; conversation_id: string; data: {craft_lines: CraftLine[]; craft_hold?: string} }
-+export interface CraftDraft { id: string; recipient: string; conversation_id: string; data: {craft_lines: CraftLine[]; craft_hold?: string; marketplace_craft?: boolean} }
- export interface CustomOrderConfig {
-   craft?: CraftRules | null;
-   knowledge_source?: {id?: string; product_id?: string; revision: string} | null;
++
++
++@pytest.mark.parametrize("storage", ["local", "s3"])
++@pytest.mark.parametrize("failure", ["invalid_artwork", "view_failure", "commit_failure", None])
++async def test_craft_uploads_follow_real_request_transaction(market_api, physical_shop, monkeypatch, tmp_path, storage, failure):
++    import base64
++    import json
++    from datetime import datetime, timedelta, timezone
++    from fastapi import FastAPI
++    from httpx import ASGITransport, AsyncClient
++    from sqlalchemy import func
++    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
++    from app.api.v1 import marketplace
++    from app.core import database
++    from app.core.config import settings
++    from app.models.conversation import Message
++    from app.services import marketplace_craft, product_images
++    from tests.test_marketplace import KEY
++    from tests.test_product_image_reply import image_bytes
++    s = physical_shop
++    await setup(s)
++    s.product.custom_order = {**s.product.custom_order, "fields": [{"id": "reference", "label": "Reference image",
++        "question": "Which reference?", "type": "image"}], "craft": {"enabled": True, "allow_artwork": True}}
++    await s.db.commit()
++    cfg = (await market_api.get("/api/v1/marketplace/feed")).json()["products"][0]["custom_order"]
++    monkeypatch.setattr(settings, "PRODUCT_IMAGE_DIR", str(tmp_path))
++    monkeypatch.setattr(settings, "PRODUCT_IMAGE_STORAGE", storage)
++    monkeypatch.setattr(settings, "AWS_S3_BUCKET", "offline-craft-fixture")
++    objects = {}
++    class FakeS3:
++        def put_object(self, *, Bucket, Key, Body, ContentType):
++            objects[Key] = Body
++        def delete_object(self, *, Bucket, Key):
++            objects.pop(Key, None)
++    monkeypatch.setattr(product_images, "s3_client", FakeS3)
++    if failure == "view_failure":
++        def fail_view(*args):
++            raise RuntimeError("Fixture result construction failed")
++        monkeypatch.setattr(marketplace_craft, "view", fail_view)
++    factory = s.factory
++    if failure == "commit_failure":
++        class FailedCommit(AsyncSession):
++            async def commit(self):
++                raise RuntimeError("Fixture commit failed before persistence")
++        factory = async_sessionmaker(s.db.bind, class_=FailedCommit, expire_on_commit=False, autoflush=False)
++    # Exercise the production dependency, including its rollback and session-close paths.
++    monkeypatch.setattr(database, "async_session_factory", factory)
++    app = FastAPI()
++    app.include_router(marketplace.router, prefix="/api/v1")
++    body = {**request(s, cfg["revision"]), "answers": {"reference": base64.b64encode(image_bytes()).decode()},
++        "artwork": base64.b64encode(b"not an image" if failure == "invalid_artwork" else image_bytes()).decode()}
++    assert len(json.dumps(body).encode()) < 8192
++    async def counts():
++        return (await s.db.scalar(select(func.count()).select_from(ImageAsset)),
++                await s.db.scalar(select(func.count()).select_from(Message)),
++                await s.db.scalar(select(func.count()).select_from(CheckoutDraft)),
++                await s.db.scalar(select(func.coalesce(func.sum(ImageAsset.byte_size), 0))))
++    before = await counts()
++    async with AsyncClient(transport=ASGITransport(app, raise_app_exceptions=False), base_url="http://fixture.test",
++        headers={"X-Marketplace-Key": KEY, "X-Marketplace-Buyer": BUYER}) as client:
++        for _ in range(2 if failure else 1):
++            response = await client.post("/api/v1/marketplace/craft", json=body)
++            assert response.status_code == (422 if failure == "invalid_artwork" else 500 if failure else 200), response.text
++            if failure:
++                assert await counts() == before
++                assert not any(p.is_file() for p in tmp_path.rglob("*")) and not objects
++    if failure:
++        class Clock(datetime):
++            @classmethod
++            def now(cls, tz=None):
++                now = datetime.now(timezone.utc) + timedelta(days=8)
++                return now.astimezone(tz) if tz else now.replace(tzinfo=None)
++        monkeypatch.setattr(product_images, "datetime", Clock)
++        assert await product_images.cleanup_unused_assets(s.db) == 0
++        assert await counts() == before
++        assert not any(p.is_file() for p in tmp_path.rglob("*")) and not objects
++    else:
++        after = await counts()
++        assert after[:3] == (before[0] + 2, before[1] + 2, before[2] + 1) and after[3] > before[3]
++        assert len(objects) == (4 if storage == "s3" else 0)
++        assert sum(p.is_file() for p in tmp_path.rglob("*")) == (4 if storage == "local" else 0)
+diff --git a/backend/app/api/v1/marketplace.py b/backend/app/api/v1/marketplace.py
+--- a/backend/app/api/v1/marketplace.py
++++ b/backend/app/api/v1/marketplace.py
+@@ -130,6 +130,44 @@
+     shop_id: uuid.UUID
+     buyer: BuyerFields
+     items: list[MarketLine] | None = Field(default=None, min_length=1, max_length=20)
++    custom_draft_id: uuid.UUID | None = None
++
++
++class CraftSelection(Input):
++    code: str = Field(min_length=1, max_length=40)
++    qty: int = Field(ge=1, le=100, strict=True)
++
++
++class MarketCraft(Input):
++    shop_id: uuid.UUID
++    product_id: uuid.UUID
++    variant_id: uuid.UUID
++    quantity: int = Field(ge=1, le=100, strict=True)
++    config_revision: str = Field(min_length=64, max_length=64)
++    selection: list[CraftSelection] = Field(default_factory=list, max_length=60)
++    answers: dict = Field(default_factory=dict, max_length=20)
++    artwork: str | None = Field(default=None, max_length=1400000)
++
++
++class CraftApproval(Input):
++    proof_id: str = Field(max_length=64)
++    revision: str = Field(min_length=64, max_length=64)
++
++
++class ShoppingSearch(Input):
++    message: str = Field(min_length=1, max_length=1000)
++    previous_queries: list[str] = Field(default_factory=list, max_length=4)
++    shop_id: uuid.UUID
++    shop_information: dict[str, str] = Field(default_factory=dict, max_length=6)
++    selected_product_id: uuid.UUID | None = None
++    allowed_product_ids: list[uuid.UUID] = Field(max_length=10000)
++
++    @field_validator("previous_queries")
++    @classmethod
++    def bounded_history(cls, values):
++        if any(len(v) > 1000 for v in values):
++            raise ValueError("Keep search messages under 1000 characters")
++        return values
+
+
+ class TrackOtpRequest(Input):
+@@ -311,14 +349,17 @@
+         if product.fulfilment_kind == "physical":
+             if published and str(product.id) not in selected:
+                 continue
+-            reason = physical.unavailable_reason(business, product)
++            reason = physical.unavailable_reason(business, product, allow_custom=True)
++            from app.services.marketplace_craft import public_config
+             result.append({"id": str(product.id), "shop_id": str(business.id), "name": product.name,
+-                "category": product.category, "description": product.blurb or "", "image_url": display_image_url(product) or product.image_url,
+-                "variants": [{"id": str(v.id), "name": v.label, "price": str(v.price), "stock": v.stock} for v in product.variants],
++                "category": product.category, "description": product.blurb or "", "image_url": display_image_url(product),
++                "variants": [{"id": str(v.id), "name": v.label, "price": str(v.price), "stock": v.stock,
++                    "pieces_per_set": v.pieces_per_set, "size": v.size, "color": v.color} for v in product.variants],
+                 "currency": business.currency, "fulfilment_kind": "physical", "delivery_mode": "shipping",
+                 "delivery_estimate": "", "delivery_note": "", "purchase_terms": "",
+                 "required_buyer_fields": physical.buyer_fields(business), "payment_methods": physical.payment_methods(business),
+                 "sales_enabled": True, "checkout_available": not reason, "checkout_unavailable_reason": reason,
++                "custom_order": public_config(product) if not product.__dict__.get("_craft_conflict") else None,
+                 "selected": str(product.id) in selected})
+             continue
+         config = config_for(product)
+@@ -326,7 +367,7 @@
+             continue
+         variants = [{"id": str(v.id), "name": v.label, "price": str(v.price),
+             "stock": available.get(v.id, 0) if config.delivery_mode == "automatic" else v.stock} for v in product.variants]
+-        img = display_image_url(product) or getattr(product, "image_url", "")
++        img = display_image_url(product)
+         result.append({"id": str(product.id), "shop_id": str(business.id), "name": product.name,
+             "category": product.category, "description": product.blurb or "", "image_url": img,
+             "variants": variants, "currency": "BDT", "fulfilment_kind": "digital", "delivery_mode": config.delivery_mode,
+@@ -593,7 +634,13 @@
+             if not selected or selected.business_id != business.id or selected.fulfilment_kind != product.fulfilment_kind:
+                 raise HTTPException(409, "Use one shop and fulfillment type per checkout")
+     if product.fulfilment_kind == "physical":
+-        draft = await physical.create_quote(db, business, channel, conversation, identity, req)
++        custom_draft = None
++        if req.custom_draft_id:
++            from app.services import marketplace_craft
++            custom_draft = await marketplace_craft.owned(db, req.custom_draft_id, identity, user)
++            if custom_draft.business_id != business.id or custom_draft.order_id:
++                raise HTTPException(409, "Custom selection is unavailable")
++        draft = await physical.create_quote(db, business, channel, conversation, identity, req, custom_draft=custom_draft)
+     else:
+         if req.provider not in receiving_accounts(business):
+             raise HTTPException(409, "Choose a source-supported payment method")
+@@ -604,7 +651,105 @@
+     draft.data = {**draft.data, "buyer_fields": buyer_fields, "marketplace_buyer": identity,
+         "marketplace_user_id": str(user.id) if user else None}
+     await db.commit()
+-    return {"draft_id": str(draft.id), "quote_hash": draft.data["quote_hash"], "snapshot": draft.data["snapshot"]}
++    snapshot = {k: v for k, v in draft.data["snapshot"].items() if k not in {"craft_line", "custom_details", "priced"}}
++    return {"draft_id": str(draft.id), "quote_hash": draft.data["quote_hash"], "snapshot": snapshot}
++
++
++@router.post("/craft", dependencies=[Depends(bridge)])
++async def save_craft(req: MarketCraft, request: Request, user=Depends(optional_user), db=Depends(get_db)):
++    from app.services import marketplace_craft
++    identity = buyer_id(request)
++    business = await public_product(db, req.shop_id, req.product_id)
++    channel, conversation = await context(db, business, identity)
++    draft = await marketplace_craft.save(db, business, channel, conversation, identity, user, req)
++    product = await marketplace_craft.product_for(db, business, req.product_id)
++    result = marketplace_craft.view(draft, product)
++    await db.commit()
++    return result
++
++
++@router.post("/assistant", dependencies=[Depends(bridge)])
++async def shopping_search(req: ShoppingSearch, request: Request, db=Depends(get_db)):
++    from app.services.marketplace_assistant import find
++    identity = buyer_id(request)
++    try:
++        redis = await get_redis_client()
++        if not redis:
++            raise HTTPException(503, "Shopping search is temporarily unavailable")
++        key = "marketplace-shopping:" + identity
++        count = await redis.incr(key)
++        await redis.expire(key, 3600, nx=True)
++    except Exception as exc:
++        raise HTTPException(503, "Shopping search is temporarily unavailable") from exc
++    if count > 30:
++        raise HTTPException(429, "Shopping search limit reached. Please use product search and try again later.")
++    business = await db.get(Business, req.shop_id)
++    if not business or not active_store(business) or not shop_json(business)["published"]:
++        raise HTTPException(404, "Shop is unavailable")
++    from app.services.ai_engine import customer_ai_paused
++    if customer_ai_paused(business.settings_data, business.timezone):
++        return {"state":"unavailable", "matches":[]}
++    from app.services.ai_quota_service import resolve_store_owner, check_ai_quota_available, consume_merchant_ai_quota
++    if not await resolve_store_owner(business, db) or not await check_ai_quota_available(business_id=business.id, db=db):
++        return {"state":"quota_exhausted", "matches":[]}
++    from app.services.marketplace_assistant import knowledge
++    evidence = await knowledge(db, business, req.shop_information, req.selected_product_id)
++    catalog = {"products": await products_json(db, business, published=True)}
++    allowed = {str(value) for value in req.allowed_product_ids}
++    products = [p for p in catalog["products"] if p["id"] in allowed and (not req.shop_id or p["shop_id"] == str(req.shop_id))]
++    if req.selected_product_id and not any(p["id"] == str(req.selected_product_id) for p in products):
++        raise HTTPException(404, "Selected product is unavailable")
++    # Hold the existing owner/credit locks until inference succeeds or rolls back.
++    usage = await consume_merchant_ai_quota(business_id=business.id, db=db, count=1, commit=False)
++    if not usage.get("success"):
++        return {"state":"quota_exhausted", "matches":[]}
++    try:
++        if not active_store(business) or not shop_json(business)["published"] or customer_ai_paused(business.settings_data, business.timezone):
++            await db.rollback()
++            return {"state":"unavailable", "matches":[]}
++        result = await find(db, req, products, evidence)
++        if result["state"] == "unavailable":
++            await db.rollback()
++        else:
++            await db.commit()
++        return result
++    except BaseException:
++        await db.rollback()
++        raise
++
++
++@router.get("/craft/{draft_id}", dependencies=[Depends(bridge)])
++async def get_craft(draft_id: uuid.UUID, request: Request, user=Depends(optional_user), db=Depends(get_db)):
++    from app.services import marketplace_craft
++    draft = await marketplace_craft.owned(db, draft_id, buyer_id(request), user)
++    product_id = uuid.UUID(draft.data["craft_lines"][0]["product_id"])
++    business = await public_product(db, draft.business_id, product_id)
++    product = await marketplace_craft.product_for(db, business, product_id)
++    return marketplace_craft.view(draft, product)
++
++
++@router.post("/craft/{draft_id}/approve", dependencies=[Depends(bridge)])
++async def approve_craft(draft_id: uuid.UUID, req: CraftApproval, request: Request, user=Depends(optional_user), db=Depends(get_db)):
++    import copy
++    from app.services import marketplace_craft, craft_checkout
++    draft = await marketplace_craft.owned(db, draft_id, buyer_id(request), user)
++    if draft.order_id:
++        raise HTTPException(409, "Order is already saved")
++    data = copy.deepcopy(draft.data)
++    line = data["craft_lines"][0]
++    business = await public_product(db, draft.business_id, uuid.UUID(line["product_id"]))
++    product = await marketplace_craft.product_for(db, business, uuid.UUID(line["product_id"]))
++    proof = line.get("proof") or {}
++    if (proof.get("id") != req.proof_id or proof.get("revision") != req.revision
++            or req.revision != craft_checkout.spec_revision(line)):
++        raise HTTPException(409, "Preview changed; review the current preview")
++    line["proof_approved"] = req.proof_id
++    data.pop("snapshot", None)
++    data.pop("quote_hash", None)
++    draft.data, draft.confirmation_token = data, None
++    result = marketplace_craft.view(draft, product)
++    await db.commit()
++    return result
+
+
+ @router.get("/checkout/{draft_id}/scope", dependencies=[Depends(bridge)])
+@@ -614,7 +759,9 @@
+     started_by = data.get("marketplace_user_id")
+     if not draft or data.get("marketplace_buyer") != buyer_id(request) or (started_by and (not user or started_by != str(user.id))):
+         raise HTTPException(404, "Checkout not found")
+-    snap = data["snapshot"]
++    snap = data.get("snapshot")
++    if not snap:
++        raise HTTPException(409, "Review the custom selection before checkout")
+     return {"shop_id": str(draft.business_id), "product_id": snap["product_id"],
+         "items": [{"product_id": item["product_id"]} for item in snap.get("items") or []]}
+
+@@ -668,6 +815,7 @@
+ async def order_json(db, order):
+     # Digital payment requests use receiving_accounts, which accepts personal gateways only.
+     if order.fulfilment_kind == "physical":
++        from app.services.marketplace_craft import summary as craft_summary
+         await db.refresh(order, ["lines", "courier_booking"])
+         from app.services.order_integrity import settled, shipment_status
+         from app.services.courier_tracking import tracking_url
+@@ -685,6 +833,7 @@
+             "buyer_fields": data.get("buyer_fields"), "address": order.address, "district": order.district,
+             "advance_amount": data.get("advance_amount", "0"), "seller_message": data.get("marketplace_message", ""),
+             "items": quote.get("items"),
++            "custom_summary": [text for detail in data.get("custom_details", []) for text in craft_summary(detail.get("craft") or {})],
+             "tracking": {"provider": booking.provider, "status": booking.status, "tracking": booking.tracking_number,
+                 "tracking_url": tracking_url(booking), "updated_at": utc(booking.updated_at).isoformat(),
+                 "poll_delayed": bool(booking.poll_failures)} if booking else None,
+@@ -733,107 +882,17 @@
+     return await order_json(db, order)
+
+
+-_MEMORY_OTP: dict[str, tuple[str, float]] = {}
+-
+-
+-def _clean_phone_variants(raw: str) -> list[str]:
+-    raw_str = str(raw).strip()
+-    digits = "".join(c for c in raw_str if c.isdigit())
+-    if digits.startswith("88001"):
+-        digits = "8801" + digits[5:]
+-    elif digits.startswith("01") and len(digits) == 11:
+-        digits = f"88{digits}"
+-    local = digits[2:] if digits.startswith("88") else digits
+-    plus = f"+{digits}" if digits else ""
+-    variants = {raw_str, digits, local, plus, f"+880 {local}", f"0{local}" if not local.startswith("0") else local}
+-    return [v for v in variants if v]
+-
+-
++# shortcut: phone recovery is unavailable until a verified delivery/proof service exists.
+ @router.post("/orders/track/request-otp", dependencies=[Depends(bridge)])
+-async def request_track_otp(req: TrackOtpRequest, request: Request, db=Depends(get_db)):
+-    variants = _clean_phone_variants(req.phone)
+-    from sqlalchemy import or_
+-    conds = [Order.phone.in_(variants)]
+-    for v in variants:
+-        conds.append(Order.checkout_data["buyer_fields"]["phone"].as_string() == v)
+-
+-    matching_orders = list(await db.scalars(
+-        select(Order)
+-        .where(Order.fulfilment_kind == "digital", or_(*conds))
+-        .order_by(Order.placed_at.desc())
+-        .limit(50)
+-    ))
+-    if not matching_orders:
+-        raise HTTPException(404, "No orders found for this phone number")
+-
+-    norm_phone = variants[1] if len(variants) > 1 else req.phone.strip()
+-    import random
+-    import time
+-    otp = str(random.randint(1000, 9999))
+-    _MEMORY_OTP[norm_phone] = (otp, time.time() + 300)
+-
+-    try:
+-        redis = await get_redis_client()
+-        await redis.set(f"marketplace:otp:{norm_phone}", otp, ex=300)
+-    except Exception:
+-        pass
+-
+-    return {
+-        "ok": True,
+-        "message": f"OTP verification code sent to {req.phone} via SMS/WhatsApp",
+-        "phone": req.phone,
+-        "order_count": len(matching_orders),
+-        "demo_otp": otp,
+-    }
++async def request_track_otp(req: TrackOtpRequest):
++    raise HTTPException(503, "Phone recovery is unavailable. Open My purchases in the original browser or sign in to the account used at checkout.",
++                        headers={"Cache-Control": "no-store"})
+
+
+ @router.post("/orders/track/verify-otp", dependencies=[Depends(bridge)])
+-async def verify_track_otp(req: TrackOtpVerify, request: Request, db=Depends(get_db)):
+-    identity = buyer_id(request)
+-    variants = _clean_phone_variants(req.phone)
+-    norm_phone = variants[1] if len(variants) > 1 else req.phone.strip()
+-
+-    stored_otp = None
+-    try:
+-        redis = await get_redis_client()
+-        stored_otp = await redis.get(f"marketplace:otp:{norm_phone}")
+-    except Exception:
+-        pass
+-
+-    if not stored_otp and norm_phone in _MEMORY_OTP:
+-        code, exp = _MEMORY_OTP[norm_phone]
+-        import time
+-        if time.time() <= exp:
+-            stored_otp = code
+-
+-    input_otp = req.otp.strip()
+-    if not stored_otp or (stored_otp != input_otp and input_otp != "1234"):
+-        raise HTTPException(400, "Invalid or expired OTP code")
+-
+-    from sqlalchemy import or_
+-    conds = [Order.phone.in_(variants)]
+-    for v in variants:
+-        conds.append(Order.checkout_data["buyer_fields"]["phone"].as_string() == v)
+-
+-    matching_orders = list(await db.scalars(
+-        select(Order)
+-        .where(Order.fulfilment_kind == "digital", or_(*conds))
+-        .order_by(Order.placed_at.desc())
+-        .limit(50)
+-    ))
+-
+-    for order in matching_orders:
+-        cd = dict(order.checkout_data or {})
+-        cd["marketplace_buyer"] = identity
+-        order.checkout_data = cd
+-
+-    await db.commit()
+-
+-    return {
+-        "ok": True,
+-        "message": "Orders successfully verified and linked to this browser",
+-        "orders": [await order_json(db, o) for o in matching_orders],
+-    }
++async def verify_track_otp(req: TrackOtpVerify):
++    raise HTTPException(503, "Phone recovery is unavailable. Open My purchases in the original browser or sign in to the account used at checkout.",
++                        headers={"Cache-Control": "no-store"})
+
+
+ @router.post("/orders/{order_id}/proof", dependencies=[Depends(bridge)])
+diff --git a/backend/tests/test_marketplace.py b/backend/tests/test_marketplace.py
+--- a/backend/tests/test_marketplace.py
++++ b/backend/tests/test_marketplace.py
+@@ -188,14 +188,18 @@
+     assert "enabled digital checkout" in product["checkout_unavailable_reason"]
+
+
+-async def test_physical_custom_requirements_disable_checkout_and_show_reason(market_api, physical_shop):
++async def test_physical_custom_requirements_need_a_confirmed_selection(market_api, physical_shop):
+     sales = physical_shop
+     sales.product.custom_order = {"enabled": True, "fields": [{"id": "print", "label": "Printed name",
+         "question": "Which name should be printed?", "type": "text"}]}
+     await sales.db.commit()
+     product = (await market_api.get("/api/v1/marketplace/feed")).json()["products"][0]
+-    assert product["checkout_available"] is False
+-    assert "custom order requirements" in product["checkout_unavailable_reason"]
++    assert product["checkout_available"] is True
++    assert product["custom_order"]["fields"][0]["id"] == "print"
++    response = await market_api.post("/api/v1/marketplace/checkout/quote", json={"shop_id": str(sales.business.id),
++        "product_id": str(sales.product.id), "variant_id": str(sales.variant.id), "quantity": 1,
++        "provider": "cod", "buyer": {"name": "Test buyer", "phone": "01712345678", "address": "House 12 Road 4 Mirpur", "district": "Dhaka"}})
++    assert response.status_code == 409
+
+
+ async def test_marketplace_guest_order_uses_authoritative_stock_and_verified_payment(market_api, sales):
+@@ -306,8 +310,13 @@
+     await stock(sales, 1)
+     first, _ = await quote_and_accept(market_api, sales)
+     assert first.status_code == 200
+-    second, _ = await quote_and_accept(market_api, sales, identity="b" * 64)
++    second = await market_api.post("/api/v1/marketplace/checkout/quote",
++        headers={"X-Marketplace-Buyer": "b" * 64}, json={
++            "shop_id": str(sales.business.id), "product_id": str(sales.product.id),
++            "variant_id": str(sales.variant.id), "quantity": 1, "provider": "bkash",
++            "buyer": {"name": "Second buyer"}})
+     assert second.status_code == 409
++    assert "Not enough stock" in second.json()["detail"]
+     assert await sales.db.scalar(select(func.count()).select_from(Order)) == 1
+     assert await sales.db.scalar(select(func.count()).select_from(DigitalPaymentRequest)) == 1
+
+@@ -519,7 +528,7 @@
+     assert (await market_api.post("/api/v1/marketplace/checkout/quote", json={**req,"coupon_code":"RENEW10"})).status_code == 409
+
+
+-async def test_marketplace_track_orders_by_phone_and_otp(market_api, sales):
++async def test_marketplace_phone_recovery_requires_a_verified_delivery_service(market_api, sales):
+     await stock(sales, 5)
+     phone = "01799998888"
+     # Place an order as a guest on Browser A
+@@ -551,28 +560,10 @@
+     b_orders = await market_api.get("/api/v1/marketplace/orders", headers={"X-Marketplace-Buyer": browser_b})
+     assert len(b_orders.json()["orders"]) == 0
+
+-    # 1. Request OTP for phone on Browser B
+-    otp_req = await market_api.post("/api/v1/marketplace/orders/track/request-otp", headers={"X-Marketplace-Buyer": browser_b}, json={
+-        "phone": phone,
+-    })
+-    assert otp_req.status_code == 200
+-    data = otp_req.json()
+-    assert data["ok"] is True
+-    assert data["order_count"] >= 1
+-    demo_otp = data["demo_otp"]
+-    assert len(demo_otp) == 4
+-
+-    # 2. Verify OTP on Browser B
+-    verify_req = await market_api.post("/api/v1/marketplace/orders/track/verify-otp", headers={"X-Marketplace-Buyer": browser_b}, json={
+-        "phone": phone,
+-        "otp": demo_otp,
+-    })
+-    assert verify_req.status_code == 200
+-    v_data = verify_req.json()
+-    assert v_data["ok"] is True
+-    assert any(o["id"] == order_id for o in v_data["orders"])
+-
+-    # 3. Verify that Browser B now directly sees the order in standard GET /orders
+-    b_orders_after = await market_api.get("/api/v1/marketplace/orders", headers={"X-Marketplace-Buyer": browser_b})
+-    assert len(b_orders_after.json()["orders"]) >= 1
+-    assert any(o["id"] == order_id for o in b_orders_after.json()["orders"])
++    for path, payload in (("request-otp", {"phone": phone}), ("verify-otp", {"phone": phone, "otp": "1234"})):
++        response = await market_api.post("/api/v1/marketplace/orders/track/" + path,
++                                        headers={"X-Marketplace-Buyer": browser_b}, json=payload)
++        assert response.status_code == 503, response.text
++        assert "demo_otp" not in response.json()
++    assert (await market_api.get(f"/api/v1/marketplace/orders/{order_id}", headers={"X-Marketplace-Buyer": browser_b})).status_code == 404
++    assert (await market_api.get(f"/api/v1/marketplace/orders/{order_id}", headers={"X-Marketplace-Buyer": browser_a})).status_code == 200
+diff --git a/AGENT.md b/AGENT.md
+index 00d2d19b..f7876d37 100644
+--- a/AGENT.md
++++ b/AGENT.md
+@@ -1,5 +1,40 @@
+ # AGENT.md — Agent Guidelines & Repository Context
+
++Marketplace phone OTP recovery is unavailable: both legacy endpoints return 503
++with no challenge, order lookup or identity mutation. No verified phone delivery
++service exists here. Never restore demo codes, fixed substitutes or memory fallback.
++Any future recovery must provide delivered, caller/account-bound, rate-limited,
++atomic one-use proof and retain normal account/provenance checks. Run
++`test_marketplace_recovery_scope.py`; do not add a public Store recovery proxy.
++
++New product-image objects are tracked by their AsyncSession transaction. Preserve
++commit/savepoint promotion and rollback/close cleanup in `product_images`; never
++delete committed or deduplicated assets. Storage threads finish before cancellation
++can clean their files. Normal API and worker sessions share these hooks. Cleanup is
++best effort during storage outages; process-crash/uncertain-commit reconciliation
++is not provided by the in-memory registry. Run upload-transaction, marketplace-craft,
++storage/delivery, display/link and craft-checkout regressions without live storage.
++
++Catalog policy import shares Brain's `resolve_ai_store(write_scope="brain")` gate
++for both policy-only/duplicate-only and product-plus-policy imports. Authorize
++after catalog quota locking and before generation or writes; retain the store lock
++through sync/commit. `not_found` retirement needs the same permission. Product-only
++imports with `save_store_knowledge=false` keep their existing flow. Run catalog
++policy-permission, website-policy, AI-store-access and import regressions.
++
++Product-image signing requires a loaded same-business product/gallery/asset binding;
++never infer upload authority from an external URL containing an asset UUID. All
++catalog URL writers reject asset-reference URLs without the owned upload path.
++Permanent image readers and backfill must load bindings before resolving the asset.
++Run catalog-display, public-image-link, product-set and photo-reply regressions.
++
++Marketplace finder quota is reserved with `consume_merchant_ai_quota(commit=False)`
++before provider work. Keep canonical owner/store/credit locks through inference;
++commit a successful reply and roll back unavailable results, errors or cancellation.
++The gateway must not commit the caller's transaction. Same-owner consumers wait
++during the bounded gateway call. Run `test_marketplace_assistant.py`, including its
++disposable PostgreSQL final-unit race cases; never use a production database/model.
++
+ Catalog browsing shares a 10-product page across WhatsApp, Messenger, Instagram
+ and Playground. Preserve the server-owned filter/cursor on More; navigation cards
+ are controls, never product identity evidence. Bound category cards separately and
+diff --git a/SITE.md b/SITE.md
+index f5fc28cc..fd6ae02e 100644
+--- a/SITE.md
++++ b/SITE.md
+@@ -1636,3 +1636,49 @@ cards can join the same row without changing the layout. Legal links leave room
+ for the fixed assistant on laptop widths.
+ The assistant hides its passive suggestion while the footer is visible, keeping
+ links clear without adding empty padding; its launcher remains available.
++# Marketplace recovery unavailable
++
++The Source phone recovery endpoints fail closed with 503 because the repository has
++no verified phone OTP delivery service. Challenge disclosure, the fixed substitute,
++in-memory fallback and the recovery rebinding path have been removed. Existing
++Redis challenges cannot authorize requests; no new challenge or phone-based order
++count is returned. Normal browser/account-owned purchases and tracking remain.
++The Store removes its unsupported email-code form and links to My purchases; no
++public recovery proxy or new delivery dependency was added. Future recovery needs
++real delivery, caller/account-bound one-use proof, bounded attempts and the normal
++marketplace/account eligibility checks before any order projection or mutation.
++
++# Transactional image cleanup
++
++Uncommitted image files follow their owning database transaction across API and
++worker sessions. Rollback or close awaits cleanup of new files; a released savepoint
++keeps its files pending until the outer transaction commits. Committed and reused
++assets are retained. No new table or cleanup service was added. Crashes, uncertain
++commit outcomes and storage deletion failures still require operator reconciliation;
++delete failures log the storage/key without exposing provider exception content.
++
++# Catalog policy import permissions
++
++Saving or retiring website policies during catalog import requires the selected
++shop's Brain-write authority, including imports with no new products. The shared
++resolver enforces canonical ownership, current member permissions and view-only
++restrictions under the store lock. Imports that opt out of policy saving keep
++their existing catalog flow; no schema or additional permission model was added.
++
++# Product image ownership
++
++Product image capability issuance now checks product/gallery/asset tenant binding.
++Catalog create/update/import reject asset-reference URLs supplied as external images;
++legacy URL-only records cannot renew a signed asset capability. Normal external
++images and validated own-shop uploads keep their existing flows. Existing bearer
++links are not revoked by this code change and retain their original expiry.
++
++# Marketplace finder quota admission
++
++The Store shopping finder reserves one canonical-owner message in the existing
++quota transaction before provider inference. Successful replies commit; unavailable
++results, exceptions and cancellation roll back the reservation. The owner/store
++locks serialize same-owner quota consumers during the bounded gateway call. No
++schema or billing ledger was added. PostgreSQL race regressions live in
++`backend/tests/test_marketplace_assistant.py`; local/production validation status
++must be reported separately from the implementation.
+diff --git a/backend/scripts/run_reply_regressions.py b/backend/scripts/run_reply_regressions.py
+index 9ad636bd..afd5712f 100644
+--- a/backend/scripts/run_reply_regressions.py
++++ b/backend/scripts/run_reply_regressions.py
+@@ -13,6 +13,7 @@ TESTS = (
+     "tests/test_sales_reply_grounding.py",
+     "tests/test_new_store_reply_defaults.py",
+     "tests/test_catalog_scope_evidence.py",
++    "tests/test_catalog_policy_permissions.py",
+     "tests/test_available_catalog.py",
+     "tests/test_large_catalog_context.py",
+     "tests/test_messaging_parity.py",
+@@ -54,6 +55,8 @@ TESTS = (
+     "tests/test_messenger_catalog.py",
+     "tests/test_multichannel_catalog.py",
+     "tests/test_product_image_storage_delivery.py",
++    "tests/test_upload_transactions.py",
++    "tests/test_marketplace_recovery_scope.py",
+     "tests/test_photo_request_followups.py",
+     "tests/test_omnichannel_media_delivery.py",
+     "tests/test_spoken_delivery_corrections.py",
+diff --git a/backend/tests/test_marketplace_recovery_scope.py b/backend/tests/test_marketplace_recovery_scope.py
+new file mode 100644
+--- /dev/null
++++ b/backend/tests/test_marketplace_recovery_scope.py
+@@ -0,0 +1,109 @@
++"""Unsupported recovery cannot disclose proof or change any order binding."""
++import copy
++import uuid
++from unittest.mock import AsyncMock
++
++import pytest
++
++from app.api.v1 import marketplace as market
++from app.models.order import Order
++from tests.test_marketplace import digital_engine, market_api, sales, sign_in, stock  # noqa: F401
++
++PHONE = "01799998888"
++PREFIX = "/api/v1/marketplace"
++NEW_BROWSER = "b" * 64
++
++
++async def place(client, sales, browser, token=None):
++    headers = {"X-Marketplace-Buyer": browser}
++    if token:
++        headers["Authorization"] = "Bearer " + token
++    quoted = await client.post(PREFIX + "/checkout/quote", headers=headers, json={
++        "shop_id": str(sales.business.id), "product_id": str(sales.product.id),
++        "variant_id": str(sales.variant.id), "quantity": 1, "provider": "bkash",
++        "buyer": {"name": "Recovery fixture", "phone": PHONE}})
++    assert quoted.status_code == 200, quoted.text
++    quote = quoted.json()
++    accepted = await client.post(PREFIX + "/checkout/accept", headers=headers, json={
++        "shop_id": str(sales.business.id), "product_id": str(sales.product.id),
++        "draft_id": quote["draft_id"], "quote_hash": quote["quote_hash"],
++        "idempotency_key": "recovery-fixture-" + browser[:8], "provider": "bkash", "accepted": True})
++    assert accepted.status_code == 200, accepted.text
++    return uuid.UUID(accepted.json()["id"])
++
++
++@pytest.fixture
++async def recovery_orders(market_api, sales):
++    await stock(sales, 3)
++    auth = await market_api.post(PREFIX + "/token", json=await sign_in(market_api))
++    assert auth.status_code == 200
++    token = auth.json()["access_token"]
++    ids = [await place(market_api, sales, "a" * 64),
++           await place(market_api, sales, "c" * 64, token),
++           await place(market_api, sales, "d" * 64)]
++    async with sales.factory() as db:
++        guest, account, offline = [await db.get(Order, id) for id in ids]
++        # Exercise checkout buyer_fields fallback, without changing account/provenance rules.
++        guest.phone = None
++        offline.checkout_data = {key: value for key, value in offline.checkout_data.items()
++                                 if key != "marketplace_buyer"}
++        offline.checkout_data = {**offline.checkout_data, "marketplace_user_id": str(sales.market_user.id)}
++        await db.commit()
++        before = [copy.deepcopy(order.checkout_data) for order in (guest, account, offline)]
++    return ids, before, token
++
++
++@pytest.mark.parametrize("phone", [PHONE, "01700000000"])
++async def test_phone_recovery_request_is_unavailable_without_enumerating_orders(market_api, sales, recovery_orders, monkeypatch, phone):
++    ids, before, _ = recovery_orders
++    monkeypatch.setattr(market, "get_redis_client", AsyncMock(side_effect=AssertionError("No recovery storage or delivery")))
++    response = await market_api.post(PREFIX + "/orders/track/request-otp", json={"phone": phone})
++    assert response.status_code == 503
++    assert response.headers["cache-control"] == "no-store"
++    assert set(response.json()) == {"detail"}
++    assert "unavailable" in response.json()["detail"]
++    market.get_redis_client.assert_not_awaited()
++    async with sales.factory() as db:
++        assert [(await db.get(Order, id)).checkout_data for id in ids] == before
++
++
++@pytest.mark.parametrize("otp", ["8369", "1234"])
++@pytest.mark.parametrize("signed_in", [False, True])
++async def test_legacy_proof_and_fixed_code_cannot_rebind_or_replay(market_api, sales, recovery_orders, monkeypatch, otp, signed_in):
++    ids, before, token = recovery_orders
++    redis = await market.get_redis_client()
++    for phone in (PHONE, "8801799998888", "+8801799998888"):
++        await redis.set("marketplace:otp:" + phone, "8369", ex=300)
++    monkeypatch.setattr(market, "get_redis_client", AsyncMock(side_effect=AssertionError("Do not accept legacy proofs")))
++    for browser in (NEW_BROWSER, "e" * 64):
++        headers = {"X-Marketplace-Buyer": browser}
++        if signed_in:
++            headers["Authorization"] = "Bearer " + token
++        response = await market_api.post(PREFIX + "/orders/track/verify-otp", headers=headers,
++                                         json={"phone": PHONE, "otp": otp})
++        assert response.status_code == 503
++        assert response.headers["cache-control"] == "no-store"
++        assert set(response.json()) == {"detail"}
++        assert (await market_api.get(PREFIX + f"/orders/{ids[0]}", headers=headers)).status_code == 404
++    market.get_redis_client.assert_not_awaited()
++    async with sales.factory() as db:
++        assert [(await db.get(Order, id)).checkout_data for id in ids] == before
++    assert (await market_api.get(PREFIX + f"/orders/{ids[0]}")).status_code == 200
++    assert (await market_api.get(PREFIX + f"/orders/{ids[1]}")).status_code == 404
++    assert (await market_api.get(PREFIX + f"/orders/{ids[1]}", headers={"Authorization": "Bearer " + token})).status_code == 200
++
++
++@pytest.mark.parametrize("path", ["request-otp", "verify-otp"])
++@pytest.mark.parametrize("key", ["", "wrong-service-key"])
++async def test_recovery_still_requires_bridge_authentication(market_api, path, key):
++    body = {"phone": PHONE, **({"otp": "8369"} if path == "verify-otp" else {})}
++    response = await market_api.post(PREFIX + "/orders/track/" + path,
++                                     headers={"X-Marketplace-Key": key}, json=body)
++    assert response.status_code == 401
++
++
++@pytest.mark.parametrize("path", ["request-otp", "verify-otp"])
++async def test_email_only_recovery_is_not_a_supported_phone_proof(market_api, path):
++    body = {"email": "fixture@example.test", **({"otp": "8369"} if path == "verify-otp" else {})}
++    response = await market_api.post(PREFIX + "/orders/track/" + path, json=body)
++    assert response.status_code == 422

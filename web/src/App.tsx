@@ -416,111 +416,27 @@ export function DynamicPaymentQR({
 export function TrackOrderPage() {
   const { t, lang } = useLang();
   const { session } = useMarket();
-  const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
-  const [step, setStep] = useState<"email" | "otp" | "done">("email");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [demoOtp, setDemoOtp] = useState("");
-  const [foundOrders, setFoundOrders] = useState<Purchase[]>([]);
-  const emailField = useRef<HTMLInputElement>(null);
-  const otpField = useRef<HTMLInputElement>(null);
-  const resultsTitle = useRef<HTMLHeadingElement>(null);
-  useEffect(() => {
-    if (step === "otp") otpField.current?.focus();
-    if (step === "done") resultsTitle.current?.focus();
-    if (step === "email" && email) emailField.current?.focus();
-  }, [step]);
-  const ordersByShop = useMemo(() => {
-    const map = new Map<string, { shop: Purchase["shop"]; orders: Purchase[] }>();
-    for (const order of foundOrders) {
-      const key = order.shop.id || order.shop.slug;
-      if (!map.has(key)) map.set(key, { shop: order.shop, orders: [] });
-      map.get(key)!.orders.push(order);
-    }
-    return Array.from(map.values());
-  }, [foundOrders]);
-  const handleRequestOtp = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      const result = await api<{ ok: boolean; message: string; demo_otp?: string }>("/orders/track/request-otp", {
-        method: "POST", body: JSON.stringify({ email: email.trim().toLowerCase() }),
-      });
-      if (!result.ok) throw new Error(result.message || (lang === "bn" ? "কোড পাঠানো যায়নি। আবার চেষ্টা করুন।" : "We couldn’t send a code. Please try again."));
-      setDemoOtp(session?.demo ? result.demo_otp || "" : "");
-      setOtp("");
-      setStep("otp");
-    } catch (failure) { setError((failure as Error).message); }
-    finally { setBusy(false); }
-  };
-  const handleVerifyOtp = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      const result = await api<{ ok: boolean; message: string; orders: Purchase[] }>("/orders/track/verify-otp", {
-        method: "POST", body: JSON.stringify({ email: email.trim().toLowerCase(), otp: otp.trim() }),
-      });
-      if (!result.ok) throw new Error(result.message || (lang === "bn" ? "কোড যাচাই করা যায়নি। আবার চেষ্টা করুন।" : "We couldn’t verify that code. Please try again."));
-      setFoundOrders(result.orders || []);
-      setStep("done");
-    } catch (failure) { setError((failure as Error).message); }
-    finally { setBusy(false); }
-  };
-  const startAgain = () => { setStep("email"); setOtp(""); setDemoOtp(""); setError(""); };
   return (
     <main id="main" className="container track-order-page">
-      <LiveTracking ready={!!session}/>
       <header className="page-intro track-intro">
         <p className="eyebrow">{lang === "bn" ? "অর্ডার ও ডেলিভারি" : "Orders & delivery"}</p>
         <h1>{t("trackTitle")}</h1>
-        <p>{lang === "bn" ? "কেনাকাটার সময় দেওয়া ইমেইল দিয়ে আপনার অর্ডার খুঁজুন। পেমেন্ট ও ডেলিভারির আপডেট এক জায়গায় দেখুন।" : "Find your orders with the email you used at checkout. Check payment and delivery updates in one place."}</p>
+        <p>{lang === "bn" ? "আমার অর্ডারসমূহ থেকে পেমেন্ট ও ডেলিভারির আপডেট দেখুন।" : "Check payment and delivery updates in My purchases."}</p>
       </header>
       <div className="track-workspace">
-        <section className="panel track-primary" aria-label={lang === "bn" ? "অর্ডার অনুসন্ধান" : "Order lookup"}>
-          <ol className="track-progress" aria-label={lang === "bn" ? "অর্ডার খোঁজার ধাপ" : "Order lookup progress"}>
-            {[lang === "bn" ? "ইমেইল" : "Your email", lang === "bn" ? "যাচাই" : "Verify email", lang === "bn" ? "অর্ডার" : "Your orders"].map((label, index) => {
-              const active = ["email", "otp", "done"].indexOf(step);
-              return <li key={label} aria-current={index === active ? "step" : undefined} className={index < active ? "complete" : ""}><span>{index < active ? <Check size={14} /> : index + 1}</span>{label}</li>;
-            })}
-          </ol>
-          {error && <ErrorBox message={error} />}
-          {step === "email" && <form className="track-form" onSubmit={handleRequestOtp} aria-busy={busy}>
-            <div className="track-form-heading"><Mail size={24} /><h2>{lang === "bn" ? "আপনার অর্ডার খুঁজুন" : "Find your orders"}</h2></div>
-            <div className="field"><label htmlFor="track-email">{t("emailLabel")}</label>
-              <input ref={emailField} id="track-email" type="email" required disabled={busy} autoComplete="email" spellCheck={false} aria-describedby="track-email-hint" value={email} onChange={event => setEmail(event.target.value)} placeholder={t("emailPlaceholder")} />
-              <small id="track-email-hint">{lang === "bn" ? "অর্ডারের তথ্য দেখতে ইমেইল যাচাই করতে হবে।" : "Verify your email before viewing matching orders."}</small>
-            </div>
-            <button className="button primary full-width" type="submit" disabled={busy || !email.trim()}>{busy ? (lang === "bn" ? "পাঠানো হচ্ছে…" : "Sending…") : t("sendOtp")}<ArrowRight size={17} /></button>
-            <p className="track-privacy-note"><LockKeyhole size={15} />{lang === "bn" ? "আপনার অর্ডারের তথ্য ব্যক্তিগত।" : "Your orders stay private."}</p>
-          </form>}
-          {step === "otp" && <form className="track-form" onSubmit={handleVerifyOtp} aria-busy={busy}>
-            <div className="track-form-heading"><Mail size={24} /><h2>{lang === "bn" ? "ইমেইল দেখুন" : "Check your email"}</h2></div>
-            <p className="track-code-destination" role="status">{lang === "bn" ? "যাচাইকরণ কোড পাঠানো হয়েছে:" : "A verification code was sent to:"}<strong>{email.trim()}</strong></p>
-            {demoOtp && <p className="notice">{lang === "bn" ? "শুধু ডেমো কোড:" : "Demo code only:"} <strong>{demoOtp}</strong></p>}
-            <label className="field" htmlFor="track-otp">{lang === "bn" ? "যাচাইকরণ কোড" : "Verification code"}
-              <input ref={otpField} id="track-otp" type="text" inputMode="numeric" autoComplete="one-time-code" required disabled={busy} maxLength={6} value={otp} onChange={event => setOtp(event.target.value)} placeholder="1234" className="otp-input" />
-            </label>
-            <button className="button primary full-width" type="submit" disabled={busy || !otp.trim()}>{busy ? (lang === "bn" ? "যাচাই করা হচ্ছে…" : "Verifying…") : t("verifyOtp")}<ArrowRight size={17} /></button>
-            <button className="text-link track-change-email" type="button" disabled={busy} onClick={startAgain}><ArrowLeft size={15} />{lang === "bn" ? "ইমেইল পরিবর্তন করুন" : "Change email"}</button>
-          </form>}
-          {step === "done" && <div className="track-results-container">
-            <div className="track-results-heading"><CheckCircle2 size={24} /><div><h2 ref={resultsTitle} tabIndex={-1}>{lang === "bn" ? "আপনার অর্ডারসমূহ" : "Your orders"}</h2><p>{lang === "bn" ? `${foundOrders.length}টি অর্ডার পাওয়া গেছে` : `${foundOrders.length} ${foundOrders.length === 1 ? "order" : "orders"} found`}</p></div></div>
-            {!foundOrders.length && <div className="empty"><h3>{lang === "bn" ? "কোনো অর্ডার পাওয়া যায়নি" : "No matching orders"}</h3><p>{lang === "bn" ? "অন্য ইমেইল দিয়ে চেষ্টা করুন বা এই ব্রাউজারের অর্ডার দেখুন।" : "Try another email or open purchases saved in this browser."}</p><Link className="button secondary" to="/purchases">{t("myPurchases")}</Link></div>}
-            <div className="track-global-shops-container">{ordersByShop.map(group => <section key={group.shop.id || group.shop.slug} className="track-shop-card-section">
-              <div className="track-shop-card-header"><div className="track-shop-identity-info"><span className="tiny-avatar">{group.shop.name.slice(0, 1)}</span><h3 className="track-shop-name">{group.shop.name}</h3></div><Link to={`/shops/${group.shop.slug}`} className="text-link">{lang === "bn" ? "শপ দেখুন" : "Visit shop"}<ArrowRight size={14} /></Link></div>
-              <div className="purchase-list">{group.orders.map(order => <Link key={order.id} to={`/purchases/${order.id}`} className="track-order-row"><div><span className="order-ref">{order.ref}</span><h3>{order.name}</h3><p>{new Date(order.created_at).toLocaleDateString(lang === "bn" ? "bn-BD" : "en-GB", { day: "numeric", month: "short", year: "numeric" })}</p></div><div><strong className="price">{money(order.total, order.currency)}</strong><span className="pill">{order.payment_status === "paid" ? deliveryLabel(order.delivery_status, lang) : paymentLabel(order.payment_status, lang)}</span><span className="text-link">{lang === "bn" ? "অর্ডার দেখুন" : "View order"}<ArrowRight size={14} /></span></div></Link>)}</div>
-            </section>)}</div>
-            <button className="text-link" type="button" onClick={startAgain}><ArrowLeft size={15} />{lang === "bn" ? "অন্য ইমেইল দিয়ে খুঁজুন" : "Try another email"}</button>
-          </div>}
+        <section className="panel track-primary" aria-label={lang === "bn" ? "অর্ডার দেখুন" : "Order access"}>
+          <div className="track-form">
+            <div className="track-form-heading"><ShoppingBag size={24} /><h2>{lang === "bn" ? "আপনার অর্ডার দেখুন" : "Open your purchases"}</h2></div>
+            <p>{lang === "bn" ? "অর্ডার করার ব্রাউজারে আমার অর্ডারসমূহ খুলুন। অ্যাকাউন্টে সাইন ইন করে অর্ডার করলে একই অ্যাকাউন্ট ব্যবহার করুন।" : "Open My purchases in the browser used at checkout. If you ordered while signed in, use the same account."}</p>
+            <Link className="button primary full-width" to="/purchases">{t("myPurchases")}<ArrowRight size={17} /></Link>
+            <p className="notice">{lang === "bn" ? "ফোন বা ইমেইলের কোড দিয়ে অর্ডার পুনরুদ্ধার এখন উপলভ্য নয়।" : "Order recovery by phone or email code is unavailable."}</p>
+          </div>
         </section>
         <aside className="track-guidance" aria-label={lang === "bn" ? "অর্ডারের সহায়তা" : "Order help"}>
-          <div className="track-browser-orders"><ShoppingBag size={24} /><h2>{lang === "bn" ? "এই ব্রাউজারে অর্ডার করেছেন?" : "Ordered in this browser?"}</h2><p>{lang === "bn" ? "সরাসরি আমার অর্ডারসমূহে গিয়ে পেমেন্ট ও ডেলিভারি দেখুন।" : "Open My purchases to check payment and delivery for orders already available to you."}</p><Link to="/purchases" className="button secondary">{t("myPurchases")}<ArrowRight size={16} /></Link></div>
-          <div className="track-help-copy"><h3>{lang === "bn" ? "সহায়তা প্রয়োজন?" : "Need a hand?"}</h3><p>{lang === "bn" ? "অর্ডারের ইমেইল খুঁজে না পেলে এই ব্রাউজারে আমার অর্ডারসমূহ দেখুন। পেমেন্ট বা রিফান্ড নিয়ে বিক্রেতার সাথে যোগাযোগ করুন।" : "Can’t find the checkout email? Check My purchases in this browser. Contact the seller for payment or refund questions."}</p><Link className="text-link" to="/how-it-works">{t("howItWorks")}<ArrowRight size={15} /></Link></div>
+          <div className="track-help-copy"><h3>{lang === "bn" ? "সহায়তা প্রয়োজন?" : "Need a hand?"}</h3><p>{lang === "bn" ? "অর্ডারের লিংক সংরক্ষণ করা থাকলে সেটি খুলুন। অর্ডার খুঁজে না পেলে বিক্রেতার সাথে যোগাযোগ করুন।" : "If you saved your order link, open it. Contact the seller if you cannot find your order."}</p><Link className="text-link" to="/how-it-works">{t("howItWorks")}<ArrowRight size={15} /></Link></div>
         </aside>
       </div>
+      <LiveTracking ready={!!session}/>
     </main>
   );
 }
@@ -994,8 +910,9 @@ function Header() {
       )}
       {session?.user && (
         <div className="account-bar">
-          <span>Signed in as {session.user.name}</span>
+          <span>{lang === "bn" ? "সাইন ইন করেছেন:" : "Signed in as"} {session.user.name}</span>
           <div>
+            <Link to="/settings" aria-current={location.pathname === "/settings" ? "page" : undefined}><SlidersHorizontal size={16} />{lang === "bn" ? "সেটিংস" : "Settings"}</Link>
             {session.user.admin && <Link to="/admin">Marketplace admin</Link>}
             <button
               onClick={async () => {
@@ -3989,7 +3906,7 @@ function PurchasePage() {
     </main>
   );
 }
-function Seller() {
+function Seller({ settings = false }: { settings?: boolean }) {
   const [connection] = useSearchParams();
   const { session, sessionError, refreshSession, reloadCatalog } = useMarket();
   const { t, lang } = useLang();
@@ -4129,10 +4046,20 @@ function Seller() {
   return (
     <main id="main" className="container seller-page">
       <div className="page-intro">
-        <p className="eyebrow">Seller workspace</p>
-        <h1>{session?.user ? "Manage your shop" : <>Sell your products</>}</h1>
-        <p>{session?.user ? "Update your profile, choose products, and share your shop link." : "Connect your AriseSell account to publish your products here."}</p>
+        <p className="eyebrow">{settings ? (lang === "bn" ? "আপনার অ্যাকাউন্ট" : "Your account") : "Seller workspace"}</p>
+        <h1>{settings ? (lang === "bn" ? "সেটিংস" : "Settings") : session?.user ? "Manage your shop" : <>Sell your products</>}</h1>
+        <p>{settings ? (lang === "bn" ? "আপনার shop setup, প্রোফাইল, তথ্য ও প্রকাশিত পণ্য ম্যানেজ করুন।" : "Manage your shop setup, profile, information and published products.") : session?.user ? "Update your profile, choose products, and share your shop link." : "Connect your AriseSell account to publish your products here."}</p>
       </div>
+      {settings && session?.user && <section className="panel account-settings-summary" aria-label={lang === "bn" ? "সংযুক্ত অ্যাকাউন্ট" : "Connected account"}>
+        <div><strong>{session.user.name}</strong><p>{session.user.email}</p></div>
+        <Link className="button secondary" to="/purchases"><ShoppingBag size={16}/>{t("myPurchases")}</Link>
+      </section>}
+      {settings && data && <nav className="settings-shortcuts" aria-label={lang === "bn" ? "Shop সেটিংস" : "Shop settings"}>
+        <a href="#settings-profile">{lang === "bn" ? "Shop প্রোফাইল" : "Shop profile"}</a>
+        <a href="#settings-information">{lang === "bn" ? "তথ্য ও নীতিমালা" : "Information & policies"}</a>
+        <a href="#settings-payments">{lang === "bn" ? "পেমেন্ট" : "Payments"}</a>
+        <a href="#settings-products">{lang === "bn" ? "পণ্য" : "Products"}</a>
+      </nav>}
       <ol className="onboarding-steps">
         <li className={session?.user ? "complete" : "active"}>
           <span>{session?.user ? <Check size={16} /> : "1"}</span>Connect
@@ -4318,7 +4245,7 @@ function Seller() {
                       void save(true);
                     }}
                   >
-                    <section className="panel seller-panel">
+                    <section id="settings-profile" className="panel seller-panel">
                       <div className="seller-panel-heading">
                         <div>
                           <span className="eyebrow">Shop settings</span>
@@ -4403,7 +4330,7 @@ function Seller() {
                         </label>
                       </details>
                     </section>
-                    <section className="panel seller-panel" aria-labelledby="shop-information-title">
+                    <section id="settings-information" className="panel seller-panel" aria-labelledby="shop-information-title">
                       <div className="seller-panel-heading">
                         <div><span className="eyebrow">Useful links</span><h2 id="shop-information-title">Shop information & policies</h2></div>
                         <BookOpen size={24} aria-hidden="true" />
@@ -4427,7 +4354,7 @@ function Seller() {
                       <p className="muted">Use {data.shop.published ? "Save shop changes" : "Publish shop"} below to save this information with your shop.</p>
                     </section>
 
-                    <section className="panel seller-panel" aria-labelledby="shop-payment-settings-title">
+                    <section id="settings-payments" className="panel seller-panel" aria-labelledby="shop-payment-settings-title">
                       <p className="muted">Your AriseSell shop controls payment accounts, shipping charges and fulfillment.</p>
                       <div className="seller-panel-heading">
                         <div>
@@ -4503,7 +4430,7 @@ function Seller() {
                         </a>
                       </div>
                     </section>
-                    <section className="panel seller-panel">
+                    <section id="settings-products" className="panel seller-panel">
                       <div className="seller-panel-heading">
                         <div>
                           <span className="eyebrow">
@@ -4916,6 +4843,7 @@ export default function App() {
           <Route path="/purchases" element={<Purchases />} />
           <Route path="/purchases/:id" element={<PurchasePage />} />
           <Route path="/seller" element={<Seller />} />
+          <Route path="/settings" element={<Seller settings />} />
           <Route path="/admin/*" element={<AdminEntry />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="*" element={<NotFound />} />

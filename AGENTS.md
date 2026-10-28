@@ -12,3 +12,7 @@ Reviews are stored in marketplace metadata and are allowed only for an owned Ari
 
 During any coding task, command execution, or debugging workflow, provide real-time, concise step-by-step progress notes, architectural decisions, and findings in Bengali before and between tool executions (Codex-style execution updates). Explain what you are checking, what you discovered, the reasoning behind changes, and file edits/commands executed, keeping the user continuously informed of every step in clear, short notes.
 
+
+Phone/email OTP order recovery is unavailable. Keep Track order on existing
+browser/account-owned My purchases and courier tracking; never fabricate or display
+recovery codes or add a proxy to the retired Source recovery endpoints.

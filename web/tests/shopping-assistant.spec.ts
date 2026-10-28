@@ -70,6 +70,23 @@ test("assistant is absent outside shops",async({page})=>{
   await expect(page.getByRole("button",{name:"AI সহকারী",exact:true})).toHaveCount(0);
 });
 
+test("minimal empty state fits mobile and desktop and suggestions do not spend a message",async({page})=>{
+  const requests:any[]=[];await mock(page,requests);await page.goto("/shops/shoe-shop");
+  await page.getByRole("button",{name:"AI সহকারী",exact:true}).click();
+  const drawer=page.getByRole("dialog");
+  for(const width of [375,1280]) {
+    await page.setViewportSize({width,height:900});
+    await expect(drawer.getByRole("heading",{name:"কী খুঁজছেন?"})).toBeVisible();
+    await expect(drawer.getByLabel("আপনার খোঁজ")).toBeVisible();
+    expect(await drawer.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBeTruthy();
+    await page.screenshot({path:`../artifacts/assistant-clean-${width}.png`});
+  }
+  await drawer.getByRole("button",{name:"Shoes দেখাও",exact:true}).click();
+  await expect(drawer.getByLabel("আপনার খোঁজ")).toHaveValue("Shoes দেখাও");
+  await expect(drawer.getByLabel("আপনার খোঁজ")).toBeFocused();
+  expect(requests).toHaveLength(0);
+});
+
 
 test("changing shops clears conversation and product context",async({page})=>{
   const requests:any[]=[];await mock(page,requests);

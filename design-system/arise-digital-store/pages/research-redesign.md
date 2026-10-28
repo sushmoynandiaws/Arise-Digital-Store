@@ -27,7 +27,7 @@ This is a design review and implementation based on the existing code, localhost
 
 ## Tracking limitation found during review
 
-The frontend references `/api/orders/track/request-otp` and `/api/orders/track/verify-otp`, but those routes are absent from this checkout's Rust router. This redesign does not add a backend email recovery system. It removes the old failure path that fabricated a demo code and the fallback that presented browser orders as if email verification had succeeded. Requests now show their real failure without claiming verification. My purchases remains the existing browser/account-owned recovery path. Browser fixtures separately exercise successful, invalid-code and empty-results states; they do not prove production email delivery.
+Phone/email code recovery is unavailable. The Source endpoints return 503 without generating or accepting proof because no verified phone delivery service exists. The Store has no recovery proxy and no longer presents the unsupported email-code form. Track order points to existing browser/account-owned My purchases and keeps courier tracking. Browser regressions check that no recovery code is requested or displayed; they do not prove production delivery or public exploitability.
 
 ## Navigation reconstruction
 
