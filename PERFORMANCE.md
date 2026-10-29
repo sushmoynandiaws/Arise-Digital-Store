@@ -12,7 +12,7 @@ Before changes, from this workstation:
 | Main JavaScript | 565,778 bytes uncompressed |
 | Two sampled product images | 126–133 KB each, 0.42–1.04 s |
 
-The deployed function runs in `iad1`. Database/Source locality has not been independently established, so its region was not changed. Production logs showed failed TLS handshakes, not simply a slow frontend. Nested error classification now preserves the underlying reason without logging URLs or credentials; TLS verification remains enabled.
+At the initial review the function ran in `iad1`; the measured regional comparison and subsequent setting change are recorded below. Production logs showed failed TLS handshakes, not simply a slow frontend. Nested error classification now preserves the underlying reason without logging URLs or credentials; TLS verification remains enabled.
 
 Changes:
 
@@ -26,3 +26,20 @@ Checks: 49 frontend unit tests and TypeScript checks pass locally; 37 Rust tests
 Remaining limits: no field p75 LCP/INP/CLS, low-end device or throttled-mobile measurement; no high-concurrency or paid-provider traffic. Third-party product image availability remains source-owned. Connection failures may still dominate slow or failed requests until their underlying TLS cause is resolved.
 
 Production spot check after the first change: catalog TTFB 2.28 s / total 2.48 s; shared shop HTML TTFB 2.36 s / total 2.54 s with a valid bootstrap containing 3 shops and 14 products. These are individual samples, not a percentile or controlled causal comparison. The underlying Source TLS failure still appeared in logs.
+
+
+## Follow-up: domain and region comparison
+
+Both verified hostnames serve the same release with no redirect loop. A bounded
+comparison observed homepage total 0.32 s on the custom domain and 0.26 s on the
+old Vercel hostname. The custom product page was 2.77 s versus 4.06 s on the old
+hostname; a catalog read on the old hostname also returned 503. These samples do
+not establish a domain-change regression. Current DNS is the assigned Vercel CNAME
+and the live auth-start URL requests the correct new callback.
+
+An unaliased Mumbai deployment of the same code was compared with US East.
+Mumbai catalog samples were 2.12 s and 1.88 s, versus 2.18 s and 2.56 s in US East.
+Promotions were 0.93 s in Mumbai versus a 5.76 s US East outlier (earlier US East
+sample 1.78 s). This supports pinning the service to `bom1`, while retaining the
+same global static CDN, Source/database credentials, TLS and authentication.
+No stable speed percentage or TLS-resolution claim is made from these samples.

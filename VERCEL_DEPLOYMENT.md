@@ -102,3 +102,22 @@ Public catalog reads succeeding there does not prove the new domain's login/CSRF
 flow is configured. Keep exact origin/callback checks; do not add a wildcard bypass.
 GitHub-hosted Source deployment requires its account billing/spending admission to
 be available, in addition to existing repository secrets and the trusted host variable.
+
+
+## Function region after domain migration
+
+The Rust service runs in Mumbai (`bom1`), pinned by `regions` in `vercel.json`.
+The static frontend remains on Vercel's global CDN. Changing the public hostname
+alone does not move the function from its previous US East (`iad1`) location.
+
+A same-revision, unaliased production candidate was compared with the live release:
+public catalog reads took about 1.88–2.12 s in Mumbai versus 2.18–2.56 s in US East
+in bounded samples. These are spot checks, not percentile or load-test results.
+Keep the region close to the existing Source/database path; remeasure if those
+services move. Do not disable TLS verification or change database credentials to
+address latency. Intermittent Source TLS failures remain a separate concern.
+
+`store.arisesell.com` uses its existing Vercel CNAME with DNS-only routing. Keep
+`PUBLIC_ORIGIN=https://store.arisesell.com` and Source's exact registered callback
+`https://store.arisesell.com/api/auth/callback`. The Source API remains
+`https://arisesell.com/api/v1`; no wildcard callback or CORS bypass is needed.
