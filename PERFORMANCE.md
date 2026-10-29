@@ -19,7 +19,10 @@ Changes:
 - Start public Source feed, moderation and shop-page reads together, retaining fail-closed errors and the same moderation filters.
 - Embed the already moderated public catalog as escaped inert JSON in shared shop/product HTML. The client reuses it instead of doing a duplicate initial catalog fetch. No account or purchase state is embedded. Existing refresh and checkout validation remain live.
 - Load assistant and craft checkout JavaScript only on routes that use those features.
+- Use long browser caching only for content-hashed `/assets/` output; API and HTML responses are excluded. Previously these assets required revalidation on every reload.
 
-Checks so far: 48 frontend unit tests and TypeScript checks; 37 Rust tests pass with the disposable PostgreSQL test left for CI. Coverage includes public-bootstrap parsing/fallback, JSON escaping and round-trip, share metadata, moderation and auth/order handling. The new browser case checks initial catalog reuse and client navigation; CI also exercises craft checkout and assistant routes after code splitting.
+Checks: 49 frontend unit tests and TypeScript checks pass locally; 37 Rust tests pass locally. CI also passed the disposable PostgreSQL case and 57 existing browser cases. The added bootstrap browser case passed initial catalog reuse but had an incorrect expectation for shop-scoped navigation; it now uses the breadcrumb to leave the shop before opening global Products. The complete corrected browser run is required.
 
 Remaining limits: no field p75 LCP/INP/CLS, low-end device or throttled-mobile measurement; no high-concurrency or paid-provider traffic. Third-party product image availability remains source-owned. Connection failures may still dominate slow or failed requests until their underlying TLS cause is resolved.
+
+Production spot check after the first change: catalog TTFB 2.28 s / total 2.48 s; shared shop HTML TTFB 2.36 s / total 2.54 s with a valid bootstrap containing 3 shops and 14 products. These are individual samples, not a percentile or controlled causal comparison. The underlying Source TLS failure still appeared in logs.

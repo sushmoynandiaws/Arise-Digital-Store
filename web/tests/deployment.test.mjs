@@ -26,3 +26,10 @@ test('a static browser client uses public same-origin API, not runtime-only serv
   assert.ok(client.includes('fetch(`/api${path}`'));
   for(const service of Object.values(config.services))assert.equal(service.bindings,undefined);
 });
+
+
+test('long browser caching is limited to content-hashed assets, never HTML or private APIs',()=>{
+  const headersFor=path=>config.headers.filter(rule=>new RegExp(`^${rule.source.replace(':file','[^/]+')}$`).test(path)).flatMap(rule=>rule.headers);
+  for(const path of ['/assets/index-abc123.js','/assets/index-abc123.css'])assert.deepEqual(headersFor(path),[{key:'Cache-Control',value:'public, max-age=31536000, immutable'}]);
+  for(const path of ['/','/index.html','/api/session','/api/catalog','/api/orders/private','/purchases/private','/settings'])assert.deepEqual(headersFor(path),[]);
+});

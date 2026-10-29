@@ -98,6 +98,8 @@ test("shared shop HTML renders its public catalog without a duplicate initial fe
   await page.goto("/shops/fashion-shop");
   await expect(page.locator(".product-card").getByRole("link",{name:physical.name,exact:true})).toBeVisible();
   expect(catalogReads).toBe(0);
+  await page.getByRole("navigation",{name:"Breadcrumb"}).getByRole("link",{name:"Shops",exact:true}).click();
+  await expect(page).toHaveURL(/\/shops$/);
   await page.getByRole("link",{name:"Products",exact:true}).first().click();
   await expect(page.getByRole("heading",{name:"All products",exact:true})).toBeVisible();
   expect(catalogReads).toBe(0);
