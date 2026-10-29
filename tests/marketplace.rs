@@ -43,7 +43,7 @@ async fn setup_with_pool(pool: sqlx::AnyPool) -> (AppState, Requests, tokio::tas
     let shopping_calls = calls.clone();
     let source=Router::new()
         .route("/index.html",get(||async {axum::response::Html("<!doctype html><html><head><title>Arise Store</title></head><body><div id='root'></div><script src='/assets/app.js'></script></body></html>")}))
-        .route("/api/v1/marketplace/feed",get(||async {Json(json!({"shops":[{"id":SHOP,"slug":"test-shop","name":"Test shop"}],"products":[{"id":PRODUCT,"shop_id":SHOP,"name":"Owned product","url_slug":"owned-product","description":"Plain text <img src=x onerror=alert(1)>","currency":"BDT","variants":[{"price":"12.50","stock":2}]}]}))}))
+        .route("/api/v1/marketplace/feed",get(||async {Json(json!({"shops":[{"id":SHOP,"slug":"test-shop","name":"Test shop"}],"products":[{"id":PRODUCT,"shop_id":SHOP,"name":"Owned product","url_slug":"owned-product","description":"Plain text <img src=x onerror=alert(1)> </script><script>alert(2)</script>","currency":"BDT","variants":[{"price":"12.50","stock":2}]}]}))}))
         .route("/api/v1/marketplace/checkout/{id}/scope",get(||async {Json(json!({"shop_id":SHOP,"product_id":PRODUCT,"items":[{"product_id":"99999999-9999-4999-8999-999999999999"}]}))}))
         .route("/api/v1/marketplace/craft",post(|headers:axum::http::HeaderMap, Json(value):Json<Value>|async move {
             assert_eq!(headers["x-marketplace-buyer"], BUYER);
@@ -1809,9 +1809,24 @@ async fn product_share_response_has_server_rendered_metadata_and_keeps_the_app_s
     assert!(text.contains("property=\"og:title\" content=\"Owned product\""));
     assert!(text.contains("&lt;img src=x onerror=alert(1)&gt;"));
     assert!(!text.contains("<img src=x"));
+    assert!(!text.contains("</script><script>alert(2)"));
     assert!(text.contains("product:price:amount"));
     assert!(text.contains("/shops/test-shop/products/owned-product"));
     assert!(text.contains("summary_large_image"));
+    let catalog = text
+        .split("<script id=\"arise-catalog\" type=\"application/json\">")
+        .nth(1)
+        .unwrap()
+        .split("</script>")
+        .next()
+        .unwrap();
+    assert!(!catalog.contains('<'));
+    let catalog: Value = serde_json::from_str(catalog).unwrap();
+    assert_eq!(
+        catalog["products"][0]["description"],
+        "Plain text <img src=x onerror=alert(1)> </script><script>alert(2)</script>"
+    );
+    assert_eq!(catalog["shops"][0]["id"], SHOP);
     assert!(text.contains("<script"));
     server.abort();
 }

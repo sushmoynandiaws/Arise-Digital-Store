@@ -440,18 +440,23 @@ async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Result<Res
     Ok(response)
 }
 pub(crate) async fn feed(state: &AppState) -> Result<Value> {
-    let mut feed = state
-        .source(reqwest::Method::GET, "/marketplace/feed", None, None, None)
-        .await?;
-    let hidden: Vec<(String, String)> =
-        sqlx::query_as("SELECT kind,target_id FROM moderation WHERE hidden=1")
+    let (mut feed, hidden, pages) = tokio::try_join!(
+        state.source(reqwest::Method::GET, "/marketplace/feed", None, None, None),
+        async {
+            sqlx::query_as::<_, (String, String)>(
+                "SELECT kind,target_id FROM moderation WHERE hidden=1",
+            )
             .fetch_all(&state.db)
             .await
-            .map_err(|_| AppError::internal())?;
-    let pages: Vec<(String, String)> = sqlx::query_as("SELECT shop_id,content FROM shop_pages")
-        .fetch_all(&state.db)
-        .await
-        .map_err(|_| AppError::internal())?;
+            .map_err(|_| AppError::internal())
+        },
+        async {
+            sqlx::query_as::<_, (String, String)>("SELECT shop_id,content FROM shop_pages")
+                .fetch_all(&state.db)
+                .await
+                .map_err(|_| AppError::internal())
+        }
+    )?;
     if let Some(shops) = feed["shops"].as_array_mut() {
         shops.retain(|shop| {
             !hidden

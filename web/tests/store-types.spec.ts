@@ -81,3 +81,24 @@ test("source category filters include physical shops and unavailable checkout ca
   await expect(page.getByRole("heading",{name:"Checkout unavailable",exact:true})).toBeVisible();
   await expect(page.getByText("Contact the seller to complete custom requirements.",{exact:true})).toBeVisible();
 });
+
+
+test("shared shop HTML renders its public catalog without a duplicate initial fetch", async ({page}) => {
+  let catalogReads = 0;
+  await page.route("**/api/**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/catalog") catalogReads++;
+    return route.fulfill({json: path === "/api/session" ? {user:null,csrf:"dummy",demo:false,source_web:""} : path === "/api/promotions" ? {ads:[],settings:{}} : {ok:true,questions:[],reviews:[],count:0,average:null}});
+  });
+  await page.route("**/shops/fashion-shop", async route => {
+    const response = await route.fetch();
+    const catalog = JSON.stringify({shops:[shop],products:[physical],synced_at:new Date().toISOString()}).replaceAll("<", "\\u003c");
+    await route.fulfill({response, body:(await response.text()).replace("</head>", `<script id="arise-catalog" type="application/json">${catalog}</script></head>`)});
+  });
+  await page.goto("/shops/fashion-shop");
+  await expect(page.locator(".product-card").getByRole("link",{name:physical.name,exact:true})).toBeVisible();
+  expect(catalogReads).toBe(0);
+  await page.getByRole("link",{name:"Products",exact:true}).first().click();
+  await expect(page.getByRole("heading",{name:"All products",exact:true})).toBeVisible();
+  expect(catalogReads).toBe(0);
+});

@@ -11,8 +11,7 @@ import {
 } from "react";
 import { LangProvider, useLang } from "./i18n.js";
 import { generateQrMatrix } from "./qr.js";
-import { CraftCheckout } from "./CraftCheckout";
-import { ShoppingAssistant } from "./ShoppingAssistant";
+import { readInitialCatalog } from "./catalog";
 import {
   Link,
   NavLink,
@@ -102,6 +101,9 @@ import {
   StickyBottomSponsoredStrip,
 } from "./ads.js";
 
+const CraftCheckout = lazy(() => import("./CraftCheckout").then(module => ({default: module.CraftCheckout})));
+const ShoppingAssistant = lazy(() => import("./ShoppingAssistant").then(module => ({default: module.ShoppingAssistant})));
+
 type Market = {
   catalog: Catalog | null;
   catalogError: string;
@@ -118,7 +120,7 @@ function ShoppingHelp() {
   const shop = useRouteShop();
   const {pathname} = useLocation();
   if (!catalog || !session || !shop || !pathname.startsWith("/shops/") ) return null;
-  return <ShoppingAssistant key={shop.id} catalog={catalog} shop={shop}/>;
+  return <Suspense fallback={null}><ShoppingAssistant key={shop.id} catalog={catalog} shop={shop}/></Suspense>;
 }
 const paymentLogos: Record<string, string> = {
   bkash: "/payment-methods/bkash.svg",
@@ -2778,7 +2780,7 @@ function Checkout() {
   const {id} = useParams();
   const {catalog} = useMarket();
   const product = catalog?.products.find(p => p.id === id);
-  return product?.custom_order && product.checkout_available !== false ? <CraftCheckout key={product.id} product={product}><CheckoutDetails /></CraftCheckout> : <CheckoutDetails />;
+  return product?.custom_order && product.checkout_available !== false ? <Suspense fallback={<Loading />}><CraftCheckout key={product.id} product={product}><CheckoutDetails /></CraftCheckout></Suspense> : <CheckoutDetails />;
 }
 function CheckoutDetails() {
   const { id } = useParams();
@@ -4754,7 +4756,7 @@ function ScrollToTop() {
 export default function App() {
   const { pathname } = useLocation();
   const adminRoute = /^\/admin(?:\/|$)/.test(pathname);
-  const [catalog, setCatalog] = useState<Catalog | null>(null),
+  const [catalog, setCatalog] = useState<Catalog | null>(readInitialCatalog),
     [catalogError, setCatalogError] = useState("");
   const [session, setSession] = useState<Session | null>(null),
     [sessionError, setSessionError] = useState("");
@@ -4806,7 +4808,7 @@ export default function App() {
       .catch((e) => {
         if (current && revision === sessionRevision.current) setSessionError(e.message);
       });
-    void reloadCatalog();
+    if (!catalog) void reloadCatalog();
     const interval = setInterval(() => {
       if (!document.hidden) void reloadCatalog();
     }, 30000);

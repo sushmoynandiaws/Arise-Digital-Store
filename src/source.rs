@@ -7,6 +7,7 @@ use serde_json::Value;
 
 fn transport_cause(error: &(dyn std::error::Error + 'static)) -> &'static str {
     let mut cause = Some(error);
+    let mut category = "unclassified";
     for _ in 0..8 {
         let Some(error) = cause else { break };
         if let Some(io) = error.downcast_ref::<std::io::Error>() {
@@ -17,10 +18,14 @@ fn transport_cause(error: &(dyn std::error::Error + 'static)) -> &'static str {
             );
         }
         let message = error.to_string().to_ascii_lowercase();
-        for (needle, category) in [
+        for (needle, detected) in [
             ("unknownissuer", "tls_unknown_issuer"),
             ("certificate has expired", "tls_expired"),
             ("invalid peer certificate", "tls_certificate"),
+            ("handshakefailure", "tls_alert_handshake_failure"),
+            ("accessdenied", "tls_alert_access_denied"),
+            ("unexpected eof", "unexpected_eof"),
+            ("peer closed connection", "peer_closed"),
             ("tls handshake", "tls_handshake"),
             ("temporary failure in name resolution", "dns_temporary"),
             ("too many open files", "file_descriptor_limit"),
@@ -36,12 +41,13 @@ fn transport_cause(error: &(dyn std::error::Error + 'static)) -> &'static str {
             ("timed out", "timeout"),
         ] {
             if message.contains(needle) {
-                return category;
+                category = detected;
+                break;
             }
         }
         cause = error.source();
     }
-    "unclassified"
+    category
 }
 
 impl AppState {
@@ -158,6 +164,34 @@ impl AppState {
 #[cfg(test)]
 mod tests {
     use super::transport_cause;
+
+    #[test]
+    fn transport_diagnostics_prefer_the_nested_tls_reason() {
+        #[derive(Debug)]
+        struct Handshake(std::io::Error);
+        impl std::fmt::Display for Handshake {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("TLS handshake failed")
+            }
+        }
+        impl std::error::Error for Handshake {
+            fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                Some(&self.0)
+            }
+        }
+        assert_eq!(
+            transport_cause(&Handshake(std::io::Error::other(
+                "invalid peer certificate: UnknownIssuer"
+            ))),
+            "tls_unknown_issuer"
+        );
+        assert_eq!(
+            transport_cause(&Handshake(std::io::Error::other(
+                "received fatal alert: HandshakeFailure"
+            ))),
+            "tls_alert_handshake_failure"
+        );
+    }
 
     #[test]
     fn transport_diagnostics_only_emit_fixed_categories() {

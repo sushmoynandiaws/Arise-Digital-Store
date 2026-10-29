@@ -584,7 +584,18 @@ async fn share_html(
         escape(image),
         escape(&url)
     );
-    let shell = shell.replace("</head>", &format!("{meta}</head>"));
+    // Reuse only the moderated public feed; escape HTML delimiters in the inert JSON block.
+    let catalog = feed
+        .to_string()
+        .replace('&', "\\u0026")
+        .replace('<', "\\u003c")
+        .replace('>', "\\u003e");
+    let shell = shell.replace(
+        "</head>",
+        &format!(
+            "{meta}<script id=\"arise-catalog\" type=\"application/json\">{catalog}</script></head>"
+        ),
+    );
     let shell = shell.replace("</head>", &format!("<meta name=\"description\" content=\"{}\">{}</head>",escape(&description),price.map_or(String::new(),|price|format!("<meta property=\"product:price:amount\" content=\"{price:.2}\"><meta property=\"product:price:currency\" content=\"{}\">",escape(item["currency"].as_str().unwrap_or("BDT"))))));
     Ok(Html(shell))
 }
