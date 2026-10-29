@@ -81,3 +81,24 @@ Check `/health`, `/api/session`, `/api/catalog`, `/api/not-found`, and a direct 
 Push the reviewed changes, import/redeploy the single Vercel project with root `.`, add the final domain and environment variables, and verify the exact callback on AriseSell. Check a fresh guest checkout, an unverified transaction ID remaining unpaid, verified payment and both delivery modes, seller isolation, restart/session persistence, and moderation before a public launch. Never use a development synthetic receipt with production accounts.
 
 Schema references: [Services](https://vercel.com/docs/services), [routing](https://vercel.com/docs/services/routing), [bindings](https://vercel.com/docs/services/bindings), [Rust runtime](https://vercel.com/docs/functions/runtimes/rust). No production deployment or database migration is performed by merely adding this configuration.
+
+## Current domain and Source repository
+
+The production Store domain is `https://store.arisesell.com`; its existing Store
+GitHub repository remains `sushmoynandiaws/Arise-Digital-Store`. The companion Source
+repository moved to `https://github.com/arisesellofficial/arise-sell`.
+
+Coordinate these settings in the same release:
+
+- Store Vercel Production: `PUBLIC_ORIGIN=https://store.arisesell.com`.
+- Source backend: `MARKETPLACE_REDIRECT_URI=https://store.arisesell.com/api/auth/callback`.
+- Keep `ARISESELL_API_URL=https://arisesell.com/api/v1` and
+  `ARISESELL_WEB_URL=https://arisesell.com`; a GitHub owner change is not an API URL change.
+- Preserve existing bridge, session encryption and database credentials. Redeploy
+  the configured services so their runtime receives the updated values.
+
+The old Vercel hostname is not the canonical origin for authentication or writes.
+Public catalog reads succeeding there does not prove the new domain's login/CSRF
+flow is configured. Keep exact origin/callback checks; do not add a wildcard bypass.
+GitHub-hosted Source deployment requires its account billing/spending admission to
+be available, in addition to existing repository secrets and the trusted host variable.

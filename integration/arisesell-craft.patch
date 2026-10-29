@@ -2614,96 +2614,39 @@ diff --git a/backend/app/api/v1/marketplace.py b/backend/app/api/v1/marketplace.
 
  @router.post("/orders/{order_id}/proof", dependencies=[Depends(bridge)])
 diff --git a/backend/tests/test_marketplace.py b/backend/tests/test_marketplace.py
+index 9c12a87cba6e8457f57ac71425e4d944a8fe678c..98f8f47ea24bc78bde91025cc4d24f96eba8bf5c 100644
 --- a/backend/tests/test_marketplace.py
 +++ b/backend/tests/test_marketplace.py
-@@ -188,14 +188,18 @@
-     assert "enabled digital checkout" in product["checkout_unavailable_reason"]
+@@ -366,13 +366,13 @@
+     env_file = tmp_path / ".env"
+     env_file.write_text("KEEP=this\nMARKETPLACE_BRIDGE_KEY=old\nMARKETPLACE_BRIDGE_KEY=duplicate\n")
+     monkeypatch.setenv("MARKETPLACE_BRIDGE_KEY", "a" * 64)
+-    monkeypatch.setenv("MARKETPLACE_REDIRECT_URI", "https://arise-digital-store.vercel.app/api/auth/callback")
++    monkeypatch.setenv("MARKETPLACE_REDIRECT_URI", "https://store.arisesell.com/api/auth/callback")
+
+     configure_marketplace_env(env_file)
+
+     lines = env_file.read_text().splitlines()
+     assert lines.count("MARKETPLACE_BRIDGE_KEY=" + "a" * 64) == 1
+-    assert lines.count("MARKETPLACE_REDIRECT_URI=https://arise-digital-store.vercel.app/api/auth/callback") == 1
++    assert lines.count("MARKETPLACE_REDIRECT_URI=https://store.arisesell.com/api/auth/callback") == 1
+     assert "KEEP=this" in lines and not any(line.endswith("=old") for line in lines)
 
 
--async def test_physical_custom_requirements_disable_checkout_and_show_reason(market_api, physical_shop):
-+async def test_physical_custom_requirements_need_a_confirmed_selection(market_api, physical_shop):
-     sales = physical_shop
-     sales.product.custom_order = {"enabled": True, "fields": [{"id": "print", "label": "Printed name",
-         "question": "Which name should be printed?", "type": "text"}]}
-     await sales.db.commit()
-     product = (await market_api.get("/api/v1/marketplace/feed")).json()["products"][0]
--    assert product["checkout_available"] is False
--    assert "custom order requirements" in product["checkout_unavailable_reason"]
-+    assert product["checkout_available"] is True
-+    assert product["custom_order"]["fields"][0]["id"] == "print"
-+    response = await market_api.post("/api/v1/marketplace/checkout/quote", json={"shop_id": str(sales.business.id),
-+        "product_id": str(sales.product.id), "variant_id": str(sales.variant.id), "quantity": 1,
-+        "provider": "cod", "buyer": {"name": "Test buyer", "phone": "01712345678", "address": "House 12 Road 4 Mirpur", "district": "Dhaka"}})
-+    assert response.status_code == 409
-
-
- async def test_marketplace_guest_order_uses_authoritative_stock_and_verified_payment(market_api, sales):
-@@ -306,8 +310,13 @@
-     await stock(sales, 1)
-     first, _ = await quote_and_accept(market_api, sales)
-     assert first.status_code == 200
--    second, _ = await quote_and_accept(market_api, sales, identity="b" * 64)
-+    second = await market_api.post("/api/v1/marketplace/checkout/quote",
-+        headers={"X-Marketplace-Buyer": "b" * 64}, json={
-+            "shop_id": str(sales.business.id), "product_id": str(sales.product.id),
-+            "variant_id": str(sales.variant.id), "quantity": 1, "provider": "bkash",
-+            "buyer": {"name": "Second buyer"}})
-     assert second.status_code == 409
-+    assert "Not enough stock" in second.json()["detail"]
-     assert await sales.db.scalar(select(func.count()).select_from(Order)) == 1
-     assert await sales.db.scalar(select(func.count()).select_from(DigitalPaymentRequest)) == 1
-
-@@ -519,7 +528,7 @@
-     assert (await market_api.post("/api/v1/marketplace/checkout/quote", json={**req,"coupon_code":"RENEW10"})).status_code == 409
-
-
--async def test_marketplace_track_orders_by_phone_and_otp(market_api, sales):
-+async def test_marketplace_phone_recovery_requires_a_verified_delivery_service(market_api, sales):
-     await stock(sales, 5)
-     phone = "01799998888"
-     # Place an order as a guest on Browser A
-@@ -551,28 +560,10 @@
-     b_orders = await market_api.get("/api/v1/marketplace/orders", headers={"X-Marketplace-Buyer": browser_b})
-     assert len(b_orders.json()["orders"]) == 0
-
--    # 1. Request OTP for phone on Browser B
--    otp_req = await market_api.post("/api/v1/marketplace/orders/track/request-otp", headers={"X-Marketplace-Buyer": browser_b}, json={
--        "phone": phone,
--    })
--    assert otp_req.status_code == 200
--    data = otp_req.json()
--    assert data["ok"] is True
--    assert data["order_count"] >= 1
--    demo_otp = data["demo_otp"]
--    assert len(demo_otp) == 4
--
--    # 2. Verify OTP on Browser B
--    verify_req = await market_api.post("/api/v1/marketplace/orders/track/verify-otp", headers={"X-Marketplace-Buyer": browser_b}, json={
--        "phone": phone,
--        "otp": demo_otp,
--    })
--    assert verify_req.status_code == 200
--    v_data = verify_req.json()
--    assert v_data["ok"] is True
--    assert any(o["id"] == order_id for o in v_data["orders"])
--
--    # 3. Verify that Browser B now directly sees the order in standard GET /orders
--    b_orders_after = await market_api.get("/api/v1/marketplace/orders", headers={"X-Marketplace-Buyer": browser_b})
--    assert len(b_orders_after.json()["orders"]) >= 1
--    assert any(o["id"] == order_id for o in b_orders_after.json()["orders"])
-+    for path, payload in (("request-otp", {"phone": phone}), ("verify-otp", {"phone": phone, "otp": "1234"})):
-+        response = await market_api.post("/api/v1/marketplace/orders/track/" + path,
-+                                        headers={"X-Marketplace-Buyer": browser_b}, json=payload)
-+        assert response.status_code == 503, response.text
-+        assert "demo_otp" not in response.json()
-+    assert (await market_api.get(f"/api/v1/marketplace/orders/{order_id}", headers={"X-Marketplace-Buyer": browser_b})).status_code == 404
-+    assert (await market_api.get(f"/api/v1/marketplace/orders/{order_id}", headers={"X-Marketplace-Buyer": browser_a})).status_code == 200
 diff --git a/AGENT.md b/AGENT.md
-index 00d2d19b317829253cd78a42ce5fdf974018cc78..d108b1a079aae2b3e9bcf0eef31061fb4e696abe 100644
+index 00d2d19b317829253cd78a42ce5fdf974018cc78..9cc089ff2a8b5d6a8f9bdf46493c101601623381 100644
 --- a/AGENT.md
 +++ b/AGENT.md
-@@ -1,4 +1,64 @@
+@@ -1,4 +1,72 @@
  # AGENT.md — Agent Guidelines & Repository Context
++
++Canonical Source repository is `arisesellofficial/arise-sell`; deployment fetches the current
++workflow repository and exact tested SHA, retaining its trusted-host and CI gates.
++The Store callback is `https://store.arisesell.com/api/auth/callback`. Coordinate
++Source `MARKETPLACE_REDIRECT_URI` with Store `PUBLIC_ORIGIN=https://store.arisesell.com`
++in one release; do not rotate existing bridge/session/encryption keys for this move.
++GitHub Actions billing/spending admission is required for workflow deployment;
++this configuration edit does not update production environment or enable a rollout.
 +
 +Website policy extraction walks the existing soup once without serializing,
 +reparsing or mutating it. Keep complete outer matching blocks, including nested
@@ -2768,11 +2711,19 @@ index 00d2d19b317829253cd78a42ce5fdf974018cc78..d108b1a079aae2b3e9bcf0eef31061fb
  Catalog browsing shares a 10-product page across WhatsApp, Messenger, Instagram
  and Playground. Preserve the server-owned filter/cursor on More; navigation cards
 diff --git a/SITE.md b/SITE.md
-index f5fc28cce98546d945731f85f79f66c2b88ac611..59c75fc5881fb79f7c20737aaa22fdb341e0b5f0 100644
+index f5fc28cce98546d945731f85f79f66c2b88ac611..089a68d2c5d3252d44fa3f257d4f2a826b6af831 100644
 --- a/SITE.md
 +++ b/SITE.md
-@@ -1,4 +1,20 @@
+@@ -1,4 +1,28 @@
  # AriseSell — Site Documentation
++
++Canonical Source repository is `arisesellofficial/arise-sell`; deployment fetches the current
++workflow repository and exact tested SHA, retaining its trusted-host and CI gates.
++The Store callback is `https://store.arisesell.com/api/auth/callback`. Coordinate
++Source `MARKETPLACE_REDIRECT_URI` with Store `PUBLIC_ORIGIN=https://store.arisesell.com`
++in one release; do not rotate existing bridge/session/encryption keys for this move.
++GitHub Actions billing/spending admission is required for workflow deployment;
++this configuration edit does not update production environment or enable a rollout.
 +
 +Website policy extraction walks the existing soup once without serializing,
 +reparsing or mutating it. Keep complete outer matching blocks, including nested
@@ -2792,7 +2743,7 @@ index f5fc28cce98546d945731f85f79f66c2b88ac611..59c75fc5881fb79f7c20737aaa22fdb3
 
  Product browsing now shows up to 10 products per page, followed by More Products
  and category cards. Large category lists have their own More Categories control.
-@@ -1636,3 +1652,67 @@
+@@ -1636,3 +1660,67 @@
  for the fixed assistant on laptop widths.
  The assistant hides its passive suggestion while the footer is visible, keeping
  links clear without adding empty padding; its launcher remains available.
@@ -3580,3 +3531,59 @@ index bb7208b2c28466d5a341fe2856be84301469981c..3f5e3ab157d3a64a1be1f117809b0a42
 +    assert web_scraper._extract_policy_knowledge(BeautifulSoup(f"<p>{text}</p><p>{text}</p>", "html.parser")) == {"delivery_info": text}
 +    with pytest.raises(ValueError, match="extraction budget"):
 +        web_scraper._extract_policy_knowledge(BeautifulSoup(f"<p>{text}</p><p>{text} Prepaid.</p>", "html.parser"))
+diff --git a/.github/workflows/deploy-vps.yml b/.github/workflows/deploy-vps.yml
+index 412e603ea880badeb10d1d740f65d7c67863b177..1154ae33a37a503c264be51d359aed74ed7af7a5 100644
+--- a/.github/workflows/deploy-vps.yml
++++ b/.github/workflows/deploy-vps.yml
+@@ -36,7 +36,7 @@
+         uses: appleboy/ssh-action@v1.0.3
+         env:
+           MARKETPLACE_BRIDGE_KEY: ${{ secrets.MARKETPLACE_BRIDGE_KEY }}
+-          MARKETPLACE_REDIRECT_URI: https://arise-digital-store.vercel.app/api/auth/callback
++          MARKETPLACE_REDIRECT_URI: https://store.arisesell.com/api/auth/callback
+         with:
+           host: ${{ secrets.VPS_HOST || '187.53.134.195' }}
+           fingerprint: ${{ vars.VPS_HOST_FINGERPRINT }}
+@@ -52,11 +52,11 @@
+           script: |
+             set -euo pipefail
+             test "${#MARKETPLACE_BRIDGE_KEY}" -ge 64
+-            test "$MARKETPLACE_REDIRECT_URI" = "https://arise-digital-store.vercel.app/api/auth/callback"
++            test "$MARKETPLACE_REDIRECT_URI" = "https://store.arisesell.com/api/auth/callback"
+             echo "🚀 Starting Automatic Deployment on VPS..."
+             cd /opt/arise-sell
+-            git remote set-url origin https://github.com/nazmulh0/arise-sell.git
+-            git fetch https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/nazmulh0/arise-sell.git ${{ github.sha }}
++            git remote set-url origin https://github.com/${{ github.repository }}.git
++            git fetch https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git ${{ github.sha }}
+             git reset --hard ${{ github.sha }}
+             test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+             cd backend
+@@ -90,7 +90,7 @@
+             fi
+             docker compose build --build-arg RELEASE_SHA=${{ github.sha }} visual_encoder frontend web celery_worker celery_webhook_worker celery_recovery_worker celery_outbound_worker celery_background_worker celery_beat
+             docker compose config --format json | docker compose run --rm -T --no-deps web python -m scripts.check_runtime_capacity
+-            docker compose run --rm web python -c "from app.core.config import settings; assert len(settings.MARKETPLACE_BRIDGE_KEY) >= 64; assert settings.MARKETPLACE_REDIRECT_URI == 'https://arise-digital-store.vercel.app/api/auth/callback'; print('Marketplace bridge configuration ready')"
++            docker compose run --rm web python -c "from app.core.config import settings; assert len(settings.MARKETPLACE_BRIDGE_KEY) >= 64; assert settings.MARKETPLACE_REDIRECT_URI == 'https://store.arisesell.com/api/auth/callback'; print('Marketplace bridge configuration ready')"
+             docker compose run --rm web python -c "from app.core.config import settings; assert settings.META_APP_SECRET, 'Configure META_APP_SECRET in server environment'; assert settings.META_INSTAGRAM_APP_SECRET, 'Configure META_INSTAGRAM_APP_SECRET in server environment'; assert settings.META_VERIFY_TOKEN, 'Configure META_VERIFY_TOKEN in server environment'"
+             docker compose run --rm web python sync_schema.py
+             docker compose run --rm --user root web python -m scripts.init_digital_keys
+diff --git a/backend/tests/test_reply_release_gate.py b/backend/tests/test_reply_release_gate.py
+index d196733d90ef7f9971071cc60a8efaa5899004dd..853f46990d90bb0778707de68d57cd2eb9a2da3d 100644
+--- a/backend/tests/test_reply_release_gate.py
++++ b/backend/tests/test_reply_release_gate.py
+@@ -61,6 +61,14 @@
+     assert int(job['steps'][reply_run]['timeout-minutes']) == 25
+     assert int(job['timeout-minutes']) >= 40
+     ssh = next(step['with'] for step in release['steps'] if step.get('uses', '').startswith('appleboy/ssh-action@'))
++    assert 'git remote set-url origin https://github.com/${{ github.repository }}.git' in ssh['script']
++    assert '@github.com/${{ github.repository }}.git ${{ github.sha }}' in ssh['script']
++    assert 'nazmulh0/arise-sell' not in ssh['script']
++    callback = 'https://store.arisesell.com/api/auth/callback'
++    step = next(step for step in release['steps'] if step.get('uses', '').startswith('appleboy/ssh-action@'))
++    assert step['env']['MARKETPLACE_REDIRECT_URI'] == callback
++    assert f'test "$MARKETPLACE_REDIRECT_URI" = "{callback}"' in ssh['script']
++    assert f"settings.MARKETPLACE_REDIRECT_URI == '{callback}'" in ssh['script']
+     assert 'git reset --hard ${{ github.sha }}' in ssh['script']
+     assert 'RELEASE_SHA=${{ github.sha }}' in ssh['script']
+     assert not any(key.startswith('secrets') for key in deploy['jobs']['regressions'])

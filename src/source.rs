@@ -14,6 +14,7 @@ impl AppState {
         buyer: Option<&str>,
         body: Option<Value>,
     ) -> Result<Value> {
+        let read_only = method == reqwest::Method::GET;
         let mut request = self
             .http
             .request(method, format!("{}{path}", self.config.source_api))
@@ -27,12 +28,41 @@ impl AppState {
         if let Some(body) = body {
             request = request.json(&body);
         }
-        let response = request.send().await.map_err(|_| {
-            AppError::new(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "AriseSell is temporarily unavailable. Please retry.",
-            )
-        })?;
+        if read_only {
+            request = request.timeout(std::time::Duration::from_secs(10));
+        }
+        let mut retried = false;
+        let response = loop {
+            match request
+                .try_clone()
+                .ok_or_else(AppError::internal)?
+                .send()
+                .await
+            {
+                Ok(response) => break response,
+                Err(error) => {
+                    let retry = read_only
+                        && !retried
+                        && (error.is_connect() || error.is_timeout() || error.is_request());
+                    // Never log the request URL, credentials or response body.
+                    eprintln!(
+                        "AriseSell transport failure: connect={} timeout={} request={} retry={}",
+                        error.is_connect(),
+                        error.is_timeout(),
+                        error.is_request(),
+                        retry
+                    );
+                    if !retry {
+                        return Err(AppError::new(
+                            StatusCode::SERVICE_UNAVAILABLE,
+                            "AriseSell is temporarily unavailable. Please retry.",
+                        ));
+                    }
+                    retried = true;
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                }
+            }
+        };
         let status = response.status();
         let value: Value = response.json().await.map_err(|_| {
             AppError::new(

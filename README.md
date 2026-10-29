@@ -160,3 +160,13 @@ Checks: `web/tests/auth-state.test.mjs`, `web/tests/api.test.mjs`, and
 `web/tests/purchase-privacy.spec.ts` (dummy API fixtures, included in browser CI).
 Native session deletion/cookie rotation and order ownership remain server checks;
 these browser fixtures do not substitute for their integration tests.
+
+## Transient Source reads
+
+The Store retries a failed Source GET transport once, keeping the same account and
+buyer credentials. Each read attempt is capped at 10 seconds with a 100ms backoff.
+HTTP permission/business errors and response decoding failures are returned without
+retry; POST/PUT/DELETE and other writes are never replayed. Diagnostic logs record
+only transport error categories, with no URLs, tokens or response contents. This is
+bounded recovery for intermittent transport failures, not a claim about their root
+cause. Run `cargo test --test source_transport` against isolated local fixtures.
