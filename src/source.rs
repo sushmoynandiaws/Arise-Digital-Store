@@ -5,6 +5,45 @@ use crate::{
 use axum::http::StatusCode;
 use serde_json::Value;
 
+fn transport_cause(error: &(dyn std::error::Error + 'static)) -> &'static str {
+    let mut cause = Some(error);
+    for _ in 0..8 {
+        let Some(error) = cause else { break };
+        if let Some(io) = error.downcast_ref::<std::io::Error>() {
+            eprintln!(
+                "AriseSell transport IO: kind={:?} errno={:?}",
+                io.kind(),
+                io.raw_os_error()
+            );
+        }
+        let message = error.to_string().to_ascii_lowercase();
+        for (needle, category) in [
+            ("unknownissuer", "tls_unknown_issuer"),
+            ("certificate has expired", "tls_expired"),
+            ("invalid peer certificate", "tls_certificate"),
+            ("tls handshake", "tls_handshake"),
+            ("temporary failure in name resolution", "dns_temporary"),
+            ("too many open files", "file_descriptor_limit"),
+            ("address family not supported", "address_family"),
+            ("failed to lookup", "dns"),
+            ("dns error", "dns"),
+            ("name or service not known", "dns"),
+            ("network is unreachable", "network_unreachable"),
+            ("connection refused", "connection_refused"),
+            ("connection reset", "connection_reset"),
+            ("permission denied", "permission_denied"),
+            ("cannot assign requested address", "address_unavailable"),
+            ("timed out", "timeout"),
+        ] {
+            if message.contains(needle) {
+                return category;
+            }
+        }
+        cause = error.source();
+    }
+    "unclassified"
+}
+
 impl AppState {
     pub async fn source(
         &self,
@@ -46,11 +85,12 @@ impl AppState {
                         && (error.is_connect() || error.is_timeout() || error.is_request());
                     // Never log the request URL, credentials or response body.
                     eprintln!(
-                        "AriseSell transport failure: connect={} timeout={} request={} retry={}",
+                        "AriseSell transport failure: connect={} timeout={} request={} retry={} cause={}",
                         error.is_connect(),
                         error.is_timeout(),
                         error.is_request(),
-                        retry
+                        retry,
+                        transport_cause(&error)
                     );
                     if !retry {
                         return Err(AppError::new(
@@ -112,5 +152,51 @@ impl AppState {
             ));
         }
         Ok(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::transport_cause;
+
+    #[test]
+    fn transport_diagnostics_only_emit_fixed_categories() {
+        for (message, expected) in [
+            (
+                "invalid peer certificate: UnknownIssuer",
+                "tls_unknown_issuer",
+            ),
+            ("certificate has expired", "tls_expired"),
+            (
+                "invalid peer certificate: NotValidForName",
+                "tls_certificate",
+            ),
+            ("failed to lookup address information", "dns"),
+            ("Temporary failure in name resolution", "dns_temporary"),
+            ("Too many open files (os error 24)", "file_descriptor_limit"),
+            ("Address family not supported by protocol", "address_family"),
+            (
+                "Network is unreachable (os error 101)",
+                "network_unreachable",
+            ),
+            ("Connection refused (os error 111)", "connection_refused"),
+            (
+                "Connection reset by peer (os error 104)",
+                "connection_reset",
+            ),
+            ("Permission denied (os error 13)", "permission_denied"),
+            (
+                "Cannot assign requested address (os error 99)",
+                "address_unavailable",
+            ),
+            ("operation timed out", "timeout"),
+            (
+                "https://dummy.invalid/private?dummy-token=secret",
+                "unclassified",
+            ),
+        ] {
+            let error = std::io::Error::other(message);
+            assert_eq!(transport_cause(&error), expected);
+        }
     }
 }
