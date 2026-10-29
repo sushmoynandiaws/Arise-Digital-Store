@@ -163,3 +163,26 @@ test("bilingual payment status and purchase headings render correctly in Bangla 
   assert.equal(purchaseMessage(readyOrder, "bn").title, "আপনার অর্ডার প্রস্তুত");
   assert.equal(purchaseMessage(readyOrder, "en").title, "Your order is ready");
 });
+
+
+test("an aborted private request cannot start another fetch", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  let calls = 0;
+  const { api } = client(async () => { calls++; return { ok: true, json: async () => ({}) }; });
+  await assert.rejects(api("/orders/dummy/reveal", { signal: controller.signal }), error => error.name === "AbortError");
+  assert.equal(calls, 0);
+});
+
+test("a private response aborted during decoding cannot release delivery data", async () => {
+  const controller = new AbortController();
+  let finish, started;
+  const decoding = new Promise(resolve => { started = resolve; });
+  const body = new Promise(resolve => { finish = resolve; });
+  const { api } = client(async () => ({ ok: true, json: () => { started(); return body; } }));
+  const request = api("/orders/dummy/reveal", { signal: controller.signal });
+  await decoding;
+  controller.abort();
+  finish({ items: [{ content: "NONCREDENTIAL-PRIVATE-FIXTURE" }] });
+  await assert.rejects(request, error => error.name === "AbortError");
+});

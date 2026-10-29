@@ -109,6 +109,7 @@ type Market = {
   session: Session | null;
   sessionError: string;
   refreshSession: () => Promise<void>;
+  signOut: () => Promise<void>;
 };
 const Context = createContext<Market>(null!);
 const useMarket = () => useContext(Context);
@@ -667,7 +668,7 @@ function SubNavBar() {
 }
 
 function Header() {
-  const { session, refreshSession } = useMarket();
+  const { session, signOut } = useMarket();
   const { t, lang, setLang, toggleLang } = useLang();
   const { wishlist } = useWishlist();
   const [showWishlist, setShowWishlist] = useState(false);
@@ -917,9 +918,7 @@ function Header() {
             <button
               onClick={async () => {
                 try {
-                  await api("/auth/logout", { method: "POST" });
-                  boot = undefined;
-                  await refreshSession();
+                  await signOut();
                 } catch {
                   window.location.reload();
                 }
@@ -3589,6 +3588,12 @@ function PurchasePage() {
     [items, setItems] = useState<{ item: number; content: string; name?: string; variant?: string }[] | null>(
       null,
     );
+  const requests = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    requests.current = controller;
+    return () => controller.abort();
+  }, []);
   const navigate = useNavigate();
   const [now, setNow] = useState(Date.now);
   const paymentDeadline = order?.payment ? Date.parse(order.payment.expires_at) : NaN;
@@ -3606,7 +3611,7 @@ function PurchasePage() {
     };
   }, [paymentDeadline, ticking]);
   const load = () =>
-    api<Purchase>(`/orders/${id}`).then((o) => {
+    api<Purchase>(`/orders/${id}`, { signal: requests.current?.signal }).then((o) => {
       setOrder(o);
       setError("");
     });
@@ -3614,7 +3619,7 @@ function PurchasePage() {
     if (!session) return;
     let current = true;
     const update = () =>
-      api<Purchase>(`/orders/${id}`)
+      api<Purchase>(`/orders/${id}`, { signal: requests.current?.signal })
         .then((o) => {
           if (current) {
             setOrder(o);
@@ -3739,6 +3744,7 @@ function PurchasePage() {
                 try {
                   const next = await api<Purchase>(`/orders/${id}/proof`, {
                     method: "POST",
+                    signal: requests.current?.signal,
                     body: JSON.stringify({ trx_id: trx.trim() }),
                   });
                   setOrder(next);
@@ -3862,7 +3868,7 @@ function PurchasePage() {
                   try {
                     const result = await api<{
                       items: { item: number; content: string; name?: string; variant?: string }[];
-                    }>(`/orders/${id}/reveal`, { method: "POST" });
+                    }>(`/orders/${id}/reveal`, { method: "POST", signal: requests.current?.signal });
                     setItems(result.items);
                     await load();
                   } catch (e) {
@@ -4716,10 +4722,10 @@ function HowItWorks() {
 }
 const AdminConsole = lazy(() => import("./Admin"));
 function AdminEntry() {
-  const { session, sessionError, refreshSession, reloadCatalog } = useMarket();
+  const { session, sessionError, refreshSession, signOut, reloadCatalog } = useMarket();
   if (!session) return <main id="main" className="container section">{sessionError ? <ErrorBox message={sessionError} retry={() => void refreshSession()} /> : <Loading />}</main>;
   if (!session.user?.admin) return <main id="main" className="container section"><Empty title="Administrator access required" heading="h1"><p>Continue with an authorized AriseSell administrator account.</p><a className="button primary" href="/api/auth/start?return_to=/admin">Continue with AriseSell</a><Link className="text-link" to="/">Return to marketplace</Link></Empty></main>;
-  return <Suspense fallback={<Loading />}><AdminConsole key={session.user.id} user={session.user} sourceWeb={session.source_web} reloadCatalog={reloadCatalog} onSignOut={async () => { await api("/auth/logout", { method: "POST" }); await refreshSession(); }} /></Suspense>;
+  return <Suspense fallback={<Loading />}><AdminConsole key={session.user.id} user={session.user} sourceWeb={session.source_web} reloadCatalog={reloadCatalog} onSignOut={signOut} /></Suspense>;
 }
 function NotFound() {
   return (
@@ -4753,6 +4759,8 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null),
     [sessionError, setSessionError] = useState("");
   const catalogRevision = useRef(0);
+  const sessionRevision = useRef(0);
+  const purchaseKey = JSON.stringify([pathname, session?.user?.id, session?.csrf]);
   const reloadCatalog = async () => {
     const revision = ++catalogRevision.current;
     try {
@@ -4766,26 +4774,37 @@ export default function App() {
     }
   };
   const refreshSession = async () => {
+    const revision = ++sessionRevision.current;
     try {
       const data = await api<Session>("/session");
+      if (revision !== sessionRevision.current) return;
       setCsrf(data.csrf);
       setSession(data);
       setSessionError("");
     } catch (e) {
-      setSessionError((e as Error).message);
+      if (revision === sessionRevision.current) setSessionError((e as Error).message);
     }
+  };
+  const signOut = async () => {
+    await api("/auth/logout", { method: "POST" });
+    ++sessionRevision.current;
+    boot = undefined;
+    setCsrf("");
+    setSession(null);
+    await refreshSession();
   };
   useEffect(() => {
     let current = true;
+    const revision = sessionRevision.current;
     bootstrap()
       .then((data) => {
-        if (current) {
+        if (current && revision === sessionRevision.current) {
           setCsrf(data.csrf);
           setSession(data);
         }
       })
       .catch((e) => {
-        if (current) setSessionError(e.message);
+        if (current && revision === sessionRevision.current) setSessionError(e.message);
       });
     void reloadCatalog();
     const interval = setInterval(() => {
@@ -4810,6 +4829,7 @@ export default function App() {
           session,
           sessionError,
           refreshSession,
+          signOut,
         }}
       >
         <CartProvider catalog={catalog}>
@@ -4840,8 +4860,8 @@ export default function App() {
           <Route path="/info/:section" element={<ShopInformationPage />} />
           <Route path="/track" element={<TrackOrderPage />} />
           <Route path="/checkout/:id" element={<Checkout />} />
-          <Route path="/purchases" element={<Purchases />} />
-          <Route path="/purchases/:id" element={<PurchasePage />} />
+          <Route path="/purchases" element={<Purchases key={purchaseKey} />} />
+          <Route path="/purchases/:id" element={<PurchasePage key={purchaseKey} />} />
           <Route path="/seller" element={<Seller />} />
           <Route path="/settings" element={<Seller settings />} />
           <Route path="/admin/*" element={<AdminEntry />} />

@@ -8,6 +8,7 @@ export async function api<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  options.signal?.throwIfAborted();
   const response = await fetch(`/api${path}`, {
     credentials: "same-origin",
     ...options,
@@ -24,6 +25,7 @@ export async function api<T>(
     .catch(() => ({
       error: "We could not read the response. Refresh this page to check the result before trying again.",
     }));
+  options.signal?.throwIfAborted();
   if (!response.ok)
     throw new Error(
       typeof payload.error === "string"

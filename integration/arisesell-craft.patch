@@ -1440,9 +1440,10 @@ index 101e4a53..5f5b83d9 100644
      from app.services.ai_embeddings import search_knowledge_base
 diff --git a/backend/tests/test_catalog_policy_permissions.py b/backend/tests/test_catalog_policy_permissions.py
 new file mode 100644
+index 0000000000000000000000000000000000000000..6a71311d0244695935e59230294537d3c07b134b
 --- /dev/null
 +++ b/backend/tests/test_catalog_policy_permissions.py
-@@ -0,0 +1,151 @@
+@@ -0,0 +1,192 @@
 +"""Real dummy sessions and workspace switching; no network or model calls."""
 +import uuid
 +from types import SimpleNamespace
@@ -1594,6 +1595,47 @@ new file mode 100644
 +    assert response.status_code == 200 and len(response.json()) == 1, response.text
 +    assert await knowledge_snapshot(a.db) == before
 +    a.commits.assert_awaited_once()
++
++
++async def test_native_scrape_extracts_nested_policies_without_writing_knowledge(policy_import, monkeypatch):
++    import socket
++    import sys
++    import httpx
++    from app.services import web_scraper
++    a = policy_import
++    text = "Delivery inside Dhaka only. " + "x" * 1000
++    html = "<ul><li>" * 8 + f"<span>{text}</span>" + "</li></ul>" * 8
++    url = "https://example.test/policies"
++    assert 500 < len(html.encode()) < 8192
++    before = await knowledge_snapshot(a.db)
++    real_client = httpx.AsyncClient
++    visited = []
++
++    def receive(request):
++        visited.append(str(request.url))
++        assert str(request.url) == url
++        return httpx.Response(200, text=html)
++
++    monkeypatch.setitem(sys.modules, "curl_cffi.requests", None)
++    monkeypatch.setattr(web_scraper.socket, "getaddrinfo", lambda *_args, **_kwargs:
++        [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))])
++    monkeypatch.setattr(web_scraper.httpx, "AsyncClient", lambda **kwargs:
++        real_client(transport=httpx.MockTransport(receive), **kwargs))
++    for name in ("_try_shopify_extraction", "_try_woocommerce_extraction", "_try_script_catalog_extraction", "_try_bitcommerz_extraction"):
++        monkeypatch.setattr(web_scraper, name, AsyncMock(return_value=None))
++    monkeypatch.setattr(web_scraper, "_extract_with_gemini_semantic", AsyncMock(return_value=[]))
++    paid = AsyncMock(side_effect=AssertionError("No model calls in policy extraction"))
++    monkeypatch.setattr(web_scraper, "execute_ai_gateway_prompt", paid)
++    payload = {"url": url, "generate_bangla": False}
++    assert (await a.client.post("/api/v1/catalog/import/scrape", json=payload)).status_code == 401
++    a.client.headers["Authorization"] = "Bearer " + a.tokens[a.owner.id]
++    result = await a.client.post("/api/v1/catalog/import/scrape", json=payload)
++    assert result.status_code == 200, result.text
++    assert result.json()["policy_knowledge"] == {"delivery_info": text}
++    assert result.json()["policy_extraction"]["status"] == "extracted"
++    assert visited == [url]
++    assert await knowledge_snapshot(a.db) == before
++    paid.assert_not_awaited()
 diff --git a/backend/app/services/craft_checkout.py b/backend/app/services/craft_checkout.py
 index 00cadecc..17a91555 100644
 --- a/backend/app/services/craft_checkout.py
@@ -1607,10 +1649,10 @@ index 00cadecc..17a91555 100644
          source.attachment = {**att, "asset_id": str(asset.id)}
      return {"message_id": str(source.id), "asset_id": source.attachment["asset_id"]}
 diff --git a/backend/app/services/product_images.py b/backend/app/services/product_images.py
-index 07fdf66d..617341d3 100644
+index 07fdf66ddfce30a9e5a0bdc5f1af9a90a308f387..5df9eb91bd998e1e2c99967f08357023f5eb1965 100644
 --- a/backend/app/services/product_images.py
 +++ b/backend/app/services/product_images.py
-@@ -9,6 +9,7 @@ import time
+@@ -9,6 +9,7 @@
  import uuid
  import warnings
  import base64
@@ -1618,7 +1660,7 @@ index 07fdf66d..617341d3 100644
  import re
  from types import SimpleNamespace
  from urllib.parse import urljoin
-@@ -18,41 +19,112 @@ from pathlib import Path
+@@ -18,41 +19,112 @@
 
  from fastapi import HTTPException
  from PIL import Image, ImageOps, UnidentifiedImageError
@@ -1723,8 +1765,12 @@ index 07fdf66d..617341d3 100644
 
  def display_image_url(product, *, base_url: str = "") -> str:
      raw_url = getattr(product, "image_url", "") or ""
--    asset_id = display_asset_id(product)
--    if not asset_id and not raw_url.strip():
++    if DISPLAY_ASSET_PATH.fullmatch(raw_url) and getattr(product, "image_public_path", None):
++        # The permanent reader independently verifies the current tenant/asset binding.
++        from app.services.product_image_links import public_image_url
++        return public_image_url(product.image_public_path, settings.FRONTEND_URL)
+     asset_id = display_asset_id(product)
+     if not asset_id and not raw_url.strip():
 -        try:
 -            images = getattr(product, "images", None) or []
 -            for img in images:
@@ -1734,19 +1780,59 @@ index 07fdf66d..617341d3 100644
 -        except Exception:
 -            pass
 -    if asset_id and getattr(product, "image_public_path", None):
-+    if DISPLAY_ASSET_PATH.fullmatch(raw_url) and getattr(product, "image_public_path", None):
-+        # The permanent reader independently verifies the current tenant/asset binding.
-         from app.services.product_image_links import public_image_url
-         return public_image_url(product.image_public_path, settings.FRONTEND_URL)
-+    asset_id = display_asset_id(product)
-+    if not asset_id and not raw_url.strip():
+-        from app.services.product_image_links import public_image_url
+-        return public_image_url(product.image_public_path, settings.FRONTEND_URL)
 +        asset_id = next((photo.asset_id for photo in _owned_product_images(product) if photo.is_active), None)
 +    if not asset_id and "/api/v1/catalog/image-assets/" in raw_url:
 +        return ""
      return image_url(asset_id, base_url=base_url) if asset_id else raw_url
 
 
-@@ -271,8 +343,12 @@ async def store_upload(db, user, raw: bytes, *, commit=True, deduplicate=False)
+@@ -211,17 +283,25 @@
+         if len(raw) > settings.PRODUCT_IMAGE_MAX_UPLOAD_BYTES:
+             raise HTTPException(422, "Catalog image is too large")
+     else:
+-        from app.services.web_scraper import DEFAULT_HEADERS, is_safe_url
++        from app.services.web_scraper import DEFAULT_HEADERS, resolve_public_url
+         url = source_url
+         raw = b""
+         headers = {"User-Agent": DEFAULT_HEADERS["User-Agent"], "Accept": "image/jpeg,image/png,image/webp,image/*;q=0.8"}
+         try:
+-            async with httpx.AsyncClient(timeout=15, follow_redirects=False, headers=headers) as client:
+-                for _ in range(4):
+-                    # shortcut: DNS is checked before connect; require private-range egress blocks until shared DNS pinning exists.
+-                    if not (await asyncio.to_thread(is_safe_url, url))[0]:
+-                        raise HTTPException(422, "Catalog image URL is not public")
+-                    async with client.stream("GET", url) as response:
++            for _ in range(4):
++                target = httpx.URL(url)
++                if target.userinfo:
++                    raise HTTPException(422, "Catalog image URL must not include credentials")
++                addresses, _ = await asyncio.to_thread(resolve_public_url, str(target))
++                if not addresses:
++                    raise HTTPException(422, "Catalog image URL is not public")
++                # Numeric connect target prevents a second hostname lookup; TLS still verifies the original host.
++                # shortcut: try the first approved IP; add bounded failover if multi-IP hosts need it.
++                pinned = target.copy_with(host=addresses[0])
++                # A fresh pool per hop cannot reuse another hostname's TLS connection on the same IP.
++                async with httpx.AsyncClient(timeout=15, follow_redirects=False, trust_env=False, headers=headers) as client:
++                    async with client.stream("GET", pinned, headers={"Host": target.netloc.decode("ascii")},
++                                             extensions={"sni_hostname": target.raw_host.decode("ascii")}) as response:
+                         if response.is_redirect:
+                             location = response.headers.get("location")
+                             if not location:
+@@ -238,8 +318,8 @@
+                             chunks.append(chunk)
+                         raw = b"".join(chunks)
+                         break
+-                else:
+-                    raise HTTPException(422, "Catalog image redirected too many times")
++            else:
++                raise HTTPException(422, "Catalog image redirected too many times")
+         except (httpx.HTTPError, httpx.InvalidURL) as exc:
+             raise HTTPException(502, "Catalog image could not be fetched") from exc
+     return raw
+@@ -271,8 +351,12 @@
      asset_id = uuid.uuid4()
      key = f"{user.business_id}/{asset_id}"
      storage = settings.PRODUCT_IMAGE_STORAGE
@@ -1760,7 +1846,7 @@ index 07fdf66d..617341d3 100644
          asset = ImageAsset(id=asset_id, business_id=user.business_id, storage=storage, storage_key=key,
                             content_hash=content_hash, mime_type=mime,
                             byte_size=len(raw) + len(preview), width=width, height=height, created_by=user.id)
-@@ -282,13 +358,15 @@ async def store_upload(db, user, raw: bytes, *, commit=True, deduplicate=False)
+@@ -282,13 +366,15 @@
          else:
              await db.flush()
          return asset
@@ -1781,7 +1867,7 @@ index 07fdf66d..617341d3 100644
          raise HTTPException(503, "Photo storage is unavailable. Please retry the upload.") from exc
 
 
-@@ -298,7 +376,7 @@ def gallery_response(product, base_url: str = "") -> list[dict]:
+@@ -298,7 +384,7 @@
               "is_primary": photo.is_primary, "is_active": photo.is_active, "caption": photo.caption,
               "url": display_image_url(product, base_url=base_url) if photo.asset_id == display_asset_id(product)
                      and photo.kind == "catalog" and photo.is_primary and not photo.variant_id
@@ -2613,11 +2699,27 @@ diff --git a/backend/tests/test_marketplace.py b/backend/tests/test_marketplace.
 +    assert (await market_api.get(f"/api/v1/marketplace/orders/{order_id}", headers={"X-Marketplace-Buyer": browser_b})).status_code == 404
 +    assert (await market_api.get(f"/api/v1/marketplace/orders/{order_id}", headers={"X-Marketplace-Buyer": browser_a})).status_code == 200
 diff --git a/AGENT.md b/AGENT.md
-index 00d2d19b..734e043942b3f8050c5bdbc1482180586df96d4b 100644
+index 00d2d19b317829253cd78a42ce5fdf974018cc78..d108b1a079aae2b3e9bcf0eef31061fb4e696abe 100644
 --- a/AGENT.md
 +++ b/AGENT.md
-@@ -1,4 +1,48 @@
+@@ -1,4 +1,64 @@
  # AGENT.md — Agent Guidelines & Repository Context
++
++Website policy extraction walks the existing soup once without serializing,
++reparsing or mutating it. Keep complete outer matching blocks, including nested
++qualifications, and skip script/style/nav/noscript subtrees. Admission caps are
++50,000 visited nodes and 120,000 raw text characters before text allocation;
++each policy remains limited to 12,000 characters including separators. Budget
++failure must stay `failed`, never an empty successful replacement of old policies.
++Run website-policy-evidence/resync and catalog-permission regressions offline.
++
++Catalog/craft image downloads resolve and validate all DNS answers, connect to the
++first approved numeric IP, and preserve the original HTTP Host and TLS hostname.
++Each redirect gets fresh validation and a fresh pool; environment proxies are off.
++Empty/malformed/non-global DNS answers fail closed. Other URL preflight callers
++are not address-pinned by this change and still require private-range egress rules.
++Run badge-image, image-DNS-pinning, scraper and craft/media regressions; the real
++socket case requires an isolated network namespace. No production egress claim.
 +
 +Store assistant `marketplace-chat-v3` returns a checked `reply`, never raw settings
 +labels/booleans/enums. Reuse Inbox dialect/policy renderers and marketplace payment
@@ -2666,10 +2768,31 @@ index 00d2d19b..734e043942b3f8050c5bdbc1482180586df96d4b 100644
  Catalog browsing shares a 10-product page across WhatsApp, Messenger, Instagram
  and Playground. Preserve the server-owned filter/cursor on More; navigation cards
 diff --git a/SITE.md b/SITE.md
-index f5fc28cc..4388f3c42e66b427371bfaebee1266f33fa41ccb 100644
+index f5fc28cce98546d945731f85f79f66c2b88ac611..59c75fc5881fb79f7c20737aaa22fdb341e0b5f0 100644
 --- a/SITE.md
 +++ b/SITE.md
-@@ -1636,3 +1636,67 @@
+@@ -1,4 +1,20 @@
+ # AriseSell — Site Documentation
++
++Website policy extraction walks the existing soup once without serializing,
++reparsing or mutating it. Keep complete outer matching blocks, including nested
++qualifications, and skip script/style/nav/noscript subtrees. Admission caps are
++50,000 visited nodes and 120,000 raw text characters before text allocation;
++each policy remains limited to 12,000 characters including separators. Budget
++failure must stay `failed`, never an empty successful replacement of old policies.
++Run website-policy-evidence/resync and catalog-permission regressions offline.
++
++Catalog/craft image downloads resolve and validate all DNS answers, connect to the
++first approved numeric IP, and preserve the original HTTP Host and TLS hostname.
++Each redirect gets fresh validation and a fresh pool; environment proxies are off.
++Empty/malformed/non-global DNS answers fail closed. Other URL preflight callers
++are not address-pinned by this change and still require private-range egress rules.
++Run badge-image, image-DNS-pinning, scraper and craft/media regressions; the real
++socket case requires an isolated network namespace. No production egress claim.
+
+ Product browsing now shows up to 10 products per page, followed by More Products
+ and category cards. Large category lists have their own More Categories control.
+@@ -1636,3 +1652,67 @@
  for the fixed assistant on laptop widths.
  The assistant hides its passive suggestion while the footer is visible, keeping
  links clear without adding empty padding; its launcher remains available.
@@ -2738,22 +2861,25 @@ index f5fc28cc..4388f3c42e66b427371bfaebee1266f33fa41ccb 100644
 +sold-out products keep their facts visible without checkout. No persistent customer
 +conversation or second inventory copy was added.
 diff --git a/backend/scripts/run_reply_regressions.py b/backend/scripts/run_reply_regressions.py
-index 9ad636bd..afd5712f 100644
+index 9ad636bd35a219805c37960f7ba7c0a0ec3a53d8..231c8b27fcf464a7972f69f301ee3dbab5861be0 100644
 --- a/backend/scripts/run_reply_regressions.py
 +++ b/backend/scripts/run_reply_regressions.py
-@@ -13,6 +13,7 @@ TESTS = (
+@@ -13,6 +13,8 @@
      "tests/test_sales_reply_grounding.py",
      "tests/test_new_store_reply_defaults.py",
      "tests/test_catalog_scope_evidence.py",
 +    "tests/test_catalog_policy_permissions.py",
++    "tests/test_website_policy_evidence.py",
      "tests/test_available_catalog.py",
      "tests/test_large_catalog_context.py",
      "tests/test_messaging_parity.py",
-@@ -54,6 +55,8 @@ TESTS = (
+@@ -54,6 +56,10 @@
      "tests/test_messenger_catalog.py",
      "tests/test_multichannel_catalog.py",
      "tests/test_product_image_storage_delivery.py",
 +    "tests/test_upload_transactions.py",
++    "tests/test_badge_image_security.py",
++    "tests/test_image_dns_pinning.py",
 +    "tests/test_marketplace_recovery_scope.py",
      "tests/test_photo_request_followups.py",
      "tests/test_omnichannel_media_delivery.py",
@@ -2929,3 +3055,528 @@ index d2384eb5..ce2c42c9 100644
      async with engine.begin() as conn:
          await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=tables))
      factory = async_sessionmaker(engine, expire_on_commit=False, autoflush=False)
+diff --git a/backend/app/services/web_scraper.py b/backend/app/services/web_scraper.py
+index 3703a59e76c5a75026b9f4a123e2e9b7170dc5db..7c04d767447607cd0576223c9cc0c30c31647298 100644
+--- a/backend/app/services/web_scraper.py
++++ b/backend/app/services/web_scraper.py
+@@ -19,7 +19,7 @@
+ from collections.abc import Awaitable, Callable
+ from typing import Any
+
+-from bs4 import BeautifulSoup
++from bs4 import BeautifulSoup, CData, NavigableString, Tag
+ from fastapi import HTTPException, status
+ import httpx
+
+@@ -78,23 +78,23 @@
+ }
+
+
+-def is_safe_url(url: str) -> tuple[bool, str]:
+-    """Validate URL against SSRF threats: scheme, DNS resolution, and private IP blocks."""
++def resolve_public_url(url: str) -> tuple[list[str], str]:
++    """Return only validated public addresses; callers may pin connections to them."""
+     if not url or not isinstance(url, str):
+-        return False, "URL string must not be empty."
++        return [], "URL string must not be empty."
+
+     try:
+         parsed = urllib.parse.urlparse(url.strip())
+     except Exception as e:
+-        return False, f"Malformed URL: {e}"
++        return [], f"Malformed URL: {e}"
+
+     scheme = (parsed.scheme or "").lower()
+     if scheme not in ("http", "https"):
+-        return False, f"Unsupported URL protocol '{scheme}'. Only HTTP and HTTPS are permitted."
++        return [], f"Unsupported URL protocol '{scheme}'. Only HTTP and HTTPS are permitted."
+
+     hostname = parsed.hostname
+     if not hostname:
+-        return False, "Missing hostname in URL."
++        return [], "Missing hostname in URL."
+
+     # Immediate rejection of standard local / cloud metadata hosts
+     blocked_hosts = {
+@@ -105,16 +105,17 @@
+         "instance-data",
+     }
+     if hostname.lower() in blocked_hosts or hostname.lower().endswith(".internal") or hostname.lower().endswith(".local"):
+-        return False, f"Access to restricted host '{hostname}' is prohibited."
++        return [], f"Access to restricted host '{hostname}' is prohibited."
+
+     # DNS resolution check
+     try:
+         addr_info = socket.getaddrinfo(hostname, None)
+     except socket.gaierror as e:
+-        return False, f"DNS resolution failed for hostname '{hostname}': {e}"
++        return [], f"DNS resolution failed for hostname '{hostname}': {e}"
+     except Exception as e:
+-        return False, f"Failed to resolve host '{hostname}': {e}"
+-
++        return [], f"Failed to resolve host '{hostname}': {e}"
++
++    addresses = []
+     for entry in addr_info:
+         ip_str = entry[4][0]
+         try:
+@@ -122,24 +123,35 @@
+             if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+                 ip = ip.ipv4_mapped
+         except ValueError:
+-            continue
++            return [], "Invalid address in DNS response."
+
+         if ip.is_private:
+-            return False, f"Access to private IP address '{ip}' is restricted for security."
++            return [], f"Access to private IP address '{ip}' is restricted for security."
+         if ip.is_loopback:
+-            return False, f"Access to loopback IP address '{ip}' is restricted for security."
++            return [], f"Access to loopback IP address '{ip}' is restricted for security."
+         if ip.is_link_local:
+-            return False, f"Access to link-local IP address '{ip}' is restricted for security."
++            return [], f"Access to link-local IP address '{ip}' is restricted for security."
+         if ip.is_multicast:
+-            return False, f"Access to multicast IP address '{ip}' is restricted for security."
++            return [], f"Access to multicast IP address '{ip}' is restricted for security."
+         if ip.is_reserved:
+-            return False, f"Access to reserved IP address '{ip}' is restricted for security."
++            return [], f"Access to reserved IP address '{ip}' is restricted for security."
+         if ip.is_unspecified:
+-            return False, f"Access to unspecified IP address '{ip}' is restricted for security."
++            return [], f"Access to unspecified IP address '{ip}' is restricted for security."
+         if str(ip) in {"169.254.169.254", "metadata.google.internal"}:
+-            return False, "Access to cloud metadata IP is prohibited."
+-
+-    return True, ""
++            return [], "Access to cloud metadata IP is prohibited."
++
++        if not ip.is_global:
++            return [], "Access to non-public IP addresses is prohibited."
++        if str(ip) not in addresses:
++            addresses.append(str(ip))
++
++    return (addresses, "") if addresses else ([], "DNS returned no public addresses.")
++
++
++def is_safe_url(url: str) -> tuple[bool, str]:
++    """Compatibility preflight; only address-pinned callers prevent DNS rebinding."""
++    addresses, reason = resolve_public_url(url)
++    return bool(addresses), reason
+
+
+ async def _safe_scraper_get(
+@@ -2581,16 +2593,53 @@
+             it.name_bn = it.name
+
+
++POLICY_MAX_NODES = 50_000
++POLICY_MAX_TEXT_CHARS = 120_000
++POLICY_MAX_OUTPUT_CHARS = 12_000
++
++
+ def _extract_policy_knowledge(soup: BeautifulSoup) -> dict[str, str]:
+-    """Keep complete source paragraphs, including denials and policy qualifications."""
+-    source = BeautifulSoup(str(soup), "html.parser")
+-    for node in source(["script", "style", "nav", "noscript"]):
+-        node.decompose()
+-    blocks = source.find_all(["p", "li", "address", "dd", "td"])
+-    paragraphs = [block.get_text(" ", strip=True) for block in blocks] if blocks else [
+-        line.strip() for line in source.get_text("\n").splitlines() if line.strip()
+-    ]
+-    paragraphs = list(dict.fromkeys(paragraphs))
++    """Read each source text once, retaining complete outer policy blocks and qualifications."""
++    budget_error = "Policy source exceeds the extraction budget; keep the previous snapshot for review."
++    paragraphs: dict[str, None] = {}
++    stack = [iter(soup.children)]
++    chunks = None
++    block_depth = 0
++    found_blocks = False
++    visited = text_chars = 0
++    while stack:
++        try:
++            node = next(stack[-1])
++        except StopIteration:
++            stack.pop()
++            if chunks is not None and len(stack) == block_depth:
++                paragraphs.setdefault(" ".join(chunks), None)
++                chunks = None
++            continue
++        visited += 1
++        if visited > POLICY_MAX_NODES:
++            raise ValueError(budget_error)
++        if isinstance(node, Tag):
++            if node.name in {"script", "style", "nav", "noscript"}:
++                continue
++            if chunks is None and node.name in {"p", "li", "address", "dd", "td"}:
++                if not found_blocks:
++                    paragraphs.clear()  # Plain-text fallback applies only when there are no blocks.
++                    found_blocks = True
++                chunks, block_depth = [], len(stack)
++            stack.append(iter(node.children))
++        elif type(node) in (NavigableString, CData):
++            # Budget before strip/split/join can allocate another copy of hostile text.
++            text_chars += len(node)
++            if text_chars > POLICY_MAX_TEXT_CHARS:
++                raise ValueError(budget_error)
++            if chunks is not None:
++                if text := node.strip():
++                    chunks.append(text)
++            elif not found_blocks:
++                for line in node.splitlines():
++                    if text := line.strip():
++                        paragraphs.setdefault(text, None)
+     keywords = {
+         "delivery_info": r"delivery|shipping|ডেলিভারি|শিপিং",
+         "return_policy": r"return|refund|exchange|ফেরত|রিটার্ন|এক্সচেঞ্জ",
+@@ -2598,15 +2647,16 @@
+     }
+     policies = {}
+     for key, pattern in keywords.items():
+-        matches = [text for text in paragraphs if re.search(pattern, text, re.I) and len(text) >= 20]
+-        content = "\n\n".join(matches)
+-        if len(content) > 12000:
+-            raise ValueError("Policy source exceeds the extraction budget; keep the previous snapshot for review.")
+-        if content:
+-            policies[key] = content
++        matches, size = [], 0
++        for text in paragraphs:
++            if len(text) >= 20 and re.search(pattern, text, re.I):
++                size += len(text) + (2 if matches else 0)
++                if size > POLICY_MAX_OUTPUT_CHARS:
++                    raise ValueError(budget_error)
++                matches.append(text)
++        if matches:
++            policies[key] = "\n\n".join(matches)
+     return policies
+-
+-
+
+
+ async def _fetch_stealth_html(url: str, timeout: float = 15.0) -> tuple[str, BeautifulSoup | None, str]:
+diff --git a/backend/tests/test_badge_image_security.py b/backend/tests/test_badge_image_security.py
+index 1fb9cb38f3e19e8b788c0a889c078013ac98e499..a4736c1f38c7a8ff22f0a874a020db33d1937910 100644
+--- a/backend/tests/test_badge_image_security.py
++++ b/backend/tests/test_badge_image_security.py
+@@ -33,11 +33,14 @@
+
+     def install(handler):
+         def receive(request):
+-            requested.append(str(request.url))
++            assert request.url.host == "93.184.216.34"
++            assert request.extensions["sni_hostname"] == request.headers["host"]
++            requested.append(str(request.url.copy_with(host=request.headers["host"])))
+             return handler(request)
+
+         def client(**kwargs):
+             assert kwargs["follow_redirects"] is False
++            assert kwargs["trust_env"] is False
+             return real_client(transport=httpx.MockTransport(receive), **kwargs)
+
+         monkeypatch.setattr(product_images.httpx, "AsyncClient", client)
+@@ -99,8 +102,8 @@
+     install(lambda request: httpx.Response(302, headers={"location": "/image.png"})
+         if request.url.path == "/start" else httpx.Response(200, content=png))
+     checked = []
+-    real_guard = web_scraper.is_safe_url
+-    monkeypatch.setattr(web_scraper, "is_safe_url", lambda url: (checked.append(url) or real_guard(url)))
++    real_guard = web_scraper.resolve_public_url
++    monkeypatch.setattr(web_scraper, "resolve_public_url", lambda url: (checked.append(url) or real_guard(url)))
+     product, request, user, db, stamp = badge_case(monkeypatch, "https://cdn.example.test/start", custom)
+     to_thread = AsyncMock(wraps=catalog.asyncio.to_thread)
+     monkeypatch.setattr(catalog.asyncio, "to_thread", to_thread)
+diff --git a/backend/tests/test_image_dns_pinning.py b/backend/tests/test_image_dns_pinning.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..46b8ed6f63c4ba3e6da760988e462a5528d2ba56
+--- /dev/null
++++ b/backend/tests/test_image_dns_pinning.py
+@@ -0,0 +1,193 @@
++"""Bounded dummy DNS/transport checks; loopback test requires an isolated network namespace."""
++import asyncio
++import ipaddress
++import socket
++from unittest.mock import AsyncMock
++
++from fastapi import HTTPException
++import httpx
++import pytest
++
++from app.services import product_images, web_scraper
++
++PUBLIC = "93.184.216.34"
++
++
++def answer(address):
++    family = socket.AF_INET6 if ":" in address else socket.AF_INET
++    return (family, socket.SOCK_STREAM, 6, "", (address, 0))
++
++
++@pytest.mark.parametrize("addresses", [
++    [], ["invalid"], [PUBLIC, "127.0.0.1"], [PUBLIC, "10.0.0.1"],
++    [PUBLIC, "169.254.169.254"], [PUBLIC, "::ffff:127.0.0.1"], ["100.64.0.1"],
++])
++def test_resolver_fails_closed_on_any_non_public_or_missing_address(monkeypatch, addresses):
++    monkeypatch.setattr(web_scraper.socket, "getaddrinfo", lambda *_: [answer(ip) for ip in addresses])
++    assert web_scraper.resolve_public_url("https://fixture.test/image")[0] == []
++    assert web_scraper.is_safe_url("https://fixture.test/image")[0] is False
++
++
++def test_resolver_preserves_public_answers_and_legacy_boolean_contract(monkeypatch):
++    monkeypatch.setattr(web_scraper.socket, "getaddrinfo", lambda *_: [
++        answer(PUBLIC), answer("2606:4700:4700::1111"), answer(PUBLIC)])
++    assert web_scraper.resolve_public_url("https://fixture.test/image") == ([PUBLIC, "2606:4700:4700::1111"], "")
++    assert web_scraper.is_safe_url("https://fixture.test/image") == (True, "")
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize("address", [PUBLIC, "2606:4700:4700::1111"])
++async def test_each_hop_pins_ip_preserves_host_port_sni_and_uses_a_fresh_pool(monkeypatch, address):
++    real_client = httpx.AsyncClient
++    lookups, requests, clients = [], [], []
++
++    def dns(host, *_):
++        lookups.append(host)
++        return [answer(address)]
++
++    def receive(request):
++        requests.append(request)
++        assert request.url.host == address
++        assert request.url.port == 8443
++        assert request.headers["host"] == ("first.test:8443" if len(requests) == 1 else "second.test:8443")
++        assert request.extensions["sni_hostname"] == ("first.test" if len(requests) == 1 else "second.test")
++        assert request.url.raw_path == (b"/a%20b?item=1" if len(requests) == 1 else b"/final")
++        return httpx.Response(302, headers={"location": "https://second.test:8443/final"}) if len(requests) == 1 else httpx.Response(200, content=b"fixture")
++
++    def client(**kwargs):
++        assert kwargs["trust_env"] is False and kwargs["follow_redirects"] is False
++        result = real_client(transport=httpx.MockTransport(receive), **kwargs)
++        clients.append(result)
++        return result
++
++    monkeypatch.setattr(web_scraper.socket, "getaddrinfo", dns)
++    monkeypatch.setattr(product_images.httpx, "AsyncClient", client)
++    assert await product_images.load_catalog_image_bytes("https://first.test:8443/a%20b?item=1") == b"fixture"
++    assert lookups == ["first.test", "second.test"]
++    assert len(clients) == 2 and all(client.is_closed for client in clients)
++
++
++@pytest.mark.asyncio
++async def test_same_host_redirect_rechecks_dns_and_blocks_a_rebound_address(monkeypatch):
++    real_client = httpx.AsyncClient
++    lookups, visited = [], []
++
++    def dns(host, *_):
++        lookups.append(host)
++        return [answer(PUBLIC if len(lookups) == 1 else "127.0.0.1")]
++
++    def receive(request):
++        visited.append(request.url.host)
++        return httpx.Response(302, headers={"location": "/next"})
++
++    monkeypatch.setattr(web_scraper.socket, "getaddrinfo", dns)
++    monkeypatch.setattr(product_images.httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(receive), **kwargs))
++    with pytest.raises(HTTPException, match="not public"):
++        await product_images.load_catalog_image_bytes("https://fixture.test/start")
++    assert lookups == ["fixture.test", "fixture.test"] and visited == [PUBLIC]
++
++
++@pytest.mark.asyncio
++async def test_url_credentials_are_rejected_before_resolution_or_transport(monkeypatch):
++    resolve = AsyncMock()
++    monkeypatch.setattr(product_images.asyncio, "to_thread", resolve)
++    with pytest.raises(HTTPException, match="credentials"):
++        await product_images.load_catalog_image_bytes("https://user:fixture-password@fixture.test/image")
++    resolve.assert_not_called()
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize("use_proxy", [False, True])
++async def test_real_transport_does_not_resolve_the_hostname_again_or_reach_loopback(monkeypatch, use_proxy):
++    # No MockTransport: the second hostname resolution would reach this harmless local trap.
++    # Run only with explicit opt-in inside a network-isolated sandbox; the address has no route there.
++    import os
++    if os.environ.get("IMAGE_PINNING_ISOLATED_NETWORK") != "1":
++        pytest.skip("Requires an isolated loopback namespace with no external network")
++    lookups, peers, gets = [], [], []
++    real_dns, real_connect = socket.getaddrinfo, socket.socket.connect
++
++    async def trap(reader, writer):
++        try:
++            data = await asyncio.wait_for(reader.read(1024), 1)
++            if data:
++                gets.append(data)
++                writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 7\r\n\r\nfixture")
++                await writer.drain()
++        finally:
++            writer.close()
++            await writer.wait_closed()
++
++    server = await asyncio.start_server(trap, "127.0.0.1", 0)
++    port = server.sockets[0].getsockname()[1]
++
++    def dns(host, port_arg, *args, **kwargs):
++        value = host.decode() if isinstance(host, bytes) else host
++        if value == "rebind.fixture.test":
++            lookups.append(value)
++            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (PUBLIC if len(lookups) == 1 else "127.0.0.1", port_arg or 0))]
++        # Numeric addresses retain their real meaning; never map the pinned public IP to loopback.
++        ipaddress.ip_address(value)
++        return real_dns(host, port_arg, *args, **kwargs)
++
++    def connect(sock, address):
++        peers.append(address[0])
++        return real_connect(sock, address)
++
++    monkeypatch.setattr(socket, "getaddrinfo", dns)
++    monkeypatch.setattr(socket.socket, "connect", connect)
++    if use_proxy:
++        monkeypatch.setenv("HTTP_PROXY", f"http://127.0.0.1:{port}")
++        monkeypatch.setenv("ALL_PROXY", f"http://127.0.0.1:{port}")
++        monkeypatch.setenv("NO_PROXY", "")
++    try:
++        # Control: the isolated trap is listening and accepts one ordinary dummy GET.
++        async with httpx.AsyncClient(trust_env=False) as client:
++            assert (await client.get(f"http://127.0.0.1:{port}/control")).content == b"fixture"
++        gets.clear()
++        peers.clear()
++        with pytest.raises(HTTPException) as error:
++            await asyncio.wait_for(product_images.load_catalog_image_bytes(f"http://rebind.fixture.test:{port}/image"), 3)
++        assert error.value.status_code == 502
++        assert lookups == ["rebind.fixture.test"]
++        assert peers and set(peers) == {PUBLIC}
++        assert gets == []
++    finally:
++        server.close()
++        await server.wait_closed()
++
++
++@pytest.mark.asyncio
++async def test_httpx_tls_handshake_keeps_hostname_and_certificate_verification(monkeypatch):
++    # Exercise HTTPX/httpcore below the transport using a dummy network stream, never a provider.
++    import ssl
++    from httpcore._backends.mock import AsyncMockBackend, AsyncMockStream
++    real_transport = httpx.AsyncHTTPTransport
++    handshakes, connects, writes = [], [], []
++
++    class Stream(AsyncMockStream):
++        async def start_tls(self, ssl_context, server_hostname=None, timeout=None):
++            handshakes.append(server_hostname)
++            assert ssl_context.check_hostname is True
++            assert ssl_context.verify_mode == ssl.CERT_REQUIRED
++            return self
++
++        async def write(self, buffer, timeout=None):
++            writes.append(buffer)
++
++    class Backend(AsyncMockBackend):
++        async def connect_tcp(self, host, port, **kwargs):
++            connects.append((host, port))
++            return Stream([b"HTTP/1.1 200 OK\r\nContent-Length: 7\r\n\r\nfixture"])
++
++    def transport(**kwargs):
++        result = real_transport(**kwargs)
++        result._pool._network_backend = Backend([])
++        return result
++
++    monkeypatch.setattr(web_scraper.socket, "getaddrinfo", lambda *_: [answer(PUBLIC)])
++    monkeypatch.setattr(httpx._client, "AsyncHTTPTransport", transport)
++    assert await product_images.load_catalog_image_bytes("https://images.fixture.test:8443/image") == b"fixture"
++    assert connects == [(PUBLIC, 8443)]
++    assert handshakes == ["images.fixture.test"]
++    assert b"Host: images.fixture.test:8443\r\n" in b"".join(writes)
+diff --git a/backend/tests/test_website_policy_evidence.py b/backend/tests/test_website_policy_evidence.py
+index bb7208b2c28466d5a341fe2856be84301469981c..3f5e3ab157d3a64a1be1f117809b0a4200efa521 100644
+--- a/backend/tests/test_website_policy_evidence.py
++++ b/backend/tests/test_website_policy_evidence.py
+@@ -61,11 +61,16 @@
+     assert "store_policies" not in tenant.settings_data
+
+
+-async def test_oversized_policy_scan_cannot_retire_previous_source_snapshot(scrape, db_session):
++@pytest.mark.parametrize("budget", ["output", "text", "nodes"])
++async def test_oversized_policy_scan_cannot_retire_previous_source_snapshot(scrape, db_session, monkeypatch, budget):
+     from app.schemas.knowledge import WebsitePolicySyncRequest
+     from pydantic import ValidationError
+     fetch, _, gateway = scrape
+     html = "<p>Delivery takes 2 days.</p><p>No warranty. " + "details " * 1600 + "</p>"
++    if budget == "text":
++        monkeypatch.setattr(web_scraper, "POLICY_MAX_TEXT_CHARS", 32)
++    elif budget == "nodes":
++        monkeypatch.setattr(web_scraper, "POLICY_MAX_NODES", 2)
+     fetch.return_value = (html, BeautifulSoup(html, "html.parser"), "offline")
+     tenant = await store(db_session)
+     initial = await brain.sync_website_knowledge(WebsitePolicySyncRequest(source=SOURCE,
+@@ -240,3 +245,73 @@
+         "Delivery requires payment first; no cash on delivery is available."]
+     soup = BeautifulSoup("".join(f"<p>{p}</p>" for p in paragraphs), "html.parser")
+     assert web_scraper._extract_policy_knowledge(soup)["delivery_info"] == "\n\n".join(paragraphs)
++
++
++@pytest.mark.parametrize("depth", [8, 16, 32])
++def test_nested_policy_text_is_read_once_without_changing_source(monkeypatch, depth):
++    from bs4 import NavigableString
++    first, second = "Delivery inside Dhaka only. " + "A" * 1000, "Prepaid delivery only. " + "B" * 1000
++    html = "<ul><li>" * depth + f"<span>{first}</span><span>{second}</span>" + "</li></ul>" * depth
++    assert len(html.encode()) < 8192
++    soup = BeautifulSoup(html, "html.parser")
++    assert len(soup.find_all("li")) == depth
++    reads = []
++    original_strip = NavigableString.strip
++
++    def strip(text, *args, **kwargs):
++        reads.append(len(text))
++        return original_strip(text, *args, **kwargs)
++
++    monkeypatch.setattr(NavigableString, "strip", strip)
++    assert web_scraper._extract_policy_knowledge(soup) == {"delivery_info": first + " " + second}
++    assert reads == [len(first), len(second)]
++    assert str(soup) == html
++
++
++def test_nested_blocks_keep_outer_denial_and_inner_qualification():
++    soup = BeautifulSoup("<li>No delivery outside Dhaka.<ul><li>Delivery inside Dhaka costs BDT 60.50.</li></ul>Prepayment is required.</li>", "html.parser")
++    assert web_scraper._extract_policy_knowledge(soup) == {"delivery_info":
++        "No delivery outside Dhaka. Delivery inside Dhaka costs BDT 60.50. Prepayment is required."}
++
++
++def test_plain_text_fallback_ignores_navigation_scripts_and_comments():
++    soup = BeautifulSoup("<nav>Delivery everywhere for free.</nav><script>Delivery is free.</script><!-- Delivery is free. -->"
++        "<div>Delivery inside Dhaka only.\nNo delivery outside Dhaka.</div>", "html.parser")
++    original = str(soup)
++    assert web_scraper._extract_policy_knowledge(soup) == {"delivery_info":
++        "Delivery inside Dhaka only.\n\nNo delivery outside Dhaka."}
++    assert str(soup) == original
++
++
++def test_text_budget_is_checked_before_stripping_and_deduplication(monkeypatch):
++    from bs4 import NavigableString
++    monkeypatch.setattr(web_scraper, "POLICY_MAX_TEXT_CHARS", 64)
++    soup = BeautifulSoup("<p>" + " x" * 33 + "</p>", "html.parser")
++    monkeypatch.setattr(NavigableString, "strip", lambda *_: pytest.fail("Oversized text was materialized before admission"))
++    with pytest.raises(ValueError, match="extraction budget"):
++        web_scraper._extract_policy_knowledge(soup)
++
++
++def test_duplicate_blocks_still_consume_the_aggregate_text_budget(monkeypatch):
++    text = "Delivery inside Dhaka only."
++    monkeypatch.setattr(web_scraper, "POLICY_MAX_TEXT_CHARS", len(text) * 2)
++    soup = BeautifulSoup(("<p>" + text + "</p>") * 3, "html.parser")
++    with pytest.raises(ValueError, match="extraction budget"):
++        web_scraper._extract_policy_knowledge(soup)
++
++
++def test_node_budget_bounds_deep_structure_without_recursive_text_traversal(monkeypatch):
++    from bs4 import Tag
++    monkeypatch.setattr(web_scraper, "POLICY_MAX_NODES", 16)
++    soup = BeautifulSoup("<div>" * 17 + "Delivery inside Dhaka only." + "</div>" * 17, "html.parser")
++    monkeypatch.setattr(Tag, "get_text", lambda *_args, **_kwargs: pytest.fail("Repeated descendant traversal"))
++    with pytest.raises(ValueError, match="extraction budget"):
++        web_scraper._extract_policy_knowledge(soup)
++
++
++def test_output_budget_includes_separators_and_does_not_return_partial_policy(monkeypatch):
++    text = "Delivery inside Dhaka only."
++    monkeypatch.setattr(web_scraper, "POLICY_MAX_OUTPUT_CHARS", len(text))
++    assert web_scraper._extract_policy_knowledge(BeautifulSoup(f"<p>{text}</p><p>{text}</p>", "html.parser")) == {"delivery_info": text}
++    with pytest.raises(ValueError, match="extraction budget"):
++        web_scraper._extract_policy_knowledge(BeautifulSoup(f"<p>{text}</p><p>{text} Prepaid.</p>", "html.parser"))

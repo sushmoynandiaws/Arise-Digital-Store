@@ -21,3 +21,11 @@ Shop assistant layout follows `design-system/arise-digital-store/pages/assistant
 Render checked conversational replies, never raw knowledge fields or legacy
 `information` cards. Keep AI identity, Send/Enter/IME behavior, shop isolation and
 source-owned product facts; contact links must not imply a completed human handoff.
+
+Purchase pages/history are keyed by route, account ID and buyer CSRF identity.
+Successful logout clears local identity before refreshing it; stale session responses
+cannot restore it. Abort private-page requests on unmount and preserve the API's
+abort checks before fetch and after body decoding. Keep guest purchases supported.
+Run auth-state/API unit tests and purchase-privacy browser cases; browser fixtures
+mock the server and do not establish real cookie/session deletion. Previously copied
+clipboard data is outside this UI-state cleanup.

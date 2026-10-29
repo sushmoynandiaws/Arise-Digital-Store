@@ -146,3 +146,17 @@ Design decisions are in `design-system/arise-digital-store/`. Dependencies: [Axu
 Deployment requires the companion changes in `integration/arisesell-growth.patch` at the revision in `integration/manifest.json`. They are implemented in the companion source checkout; do not apply the patch twice. Apply `migrations/006_growth.sql` with the migration role and grant runtime CRUD on `arise_marketplace.product_questions` and `arise_marketplace.traffic_events`. Existing append-only audit permissions and commerce isolation remain intact. Standalone SQLite applies metadata automatically; production startup never performs this migration. The source VPS workflow and marketplace provisioning script include the additive migration and grants for the next authorized deployment. There are no new environment variables. Deploy the source bridge before the storefront (cart acceptance requires its bound checkout-scope endpoint).
 
 Validation includes real SQLite/PostgreSQL cart, coupon, sales-report and buyer-isolation tests in source `tests/test_marketplace_growth.py`; Rust metadata/permissions/sharing tests; and `web/tests/growth.spec.ts` covering mobile multi-product checkout, mixed-shop prevention, recent products, Q&A, offer expiry, inline courier tracking, admin offers/badges/reports and 320px layouts. Live courier accounts, Facebook's preview cache and production rollout require deployment verification.
+
+## Purchase privacy after sign-out
+
+Purchase details and history reset when the route, account or buyer CSRF identity
+changes. Successful logout clears the local session before fetching its replacement,
+including when refresh fails; older session responses are ignored. Unmount cancels
+private order/reveal/proof requests, and the API rejects a response aborted during
+body decoding. Browser-owned guest purchases continue to use Source ownership checks.
+The UI cannot erase content already copied to the system clipboard or another app.
+
+Checks: `web/tests/auth-state.test.mjs`, `web/tests/api.test.mjs`, and
+`web/tests/purchase-privacy.spec.ts` (dummy API fixtures, included in browser CI).
+Native session deletion/cookie rotation and order ownership remain server checks;
+these browser fixtures do not substitute for their integration tests.
