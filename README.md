@@ -170,3 +170,13 @@ retry; POST/PUT/DELETE and other writes are never replayed. Diagnostic logs reco
 only transport error categories, with no URLs, tokens or response contents. This is
 bounded recovery for intermittent transport failures, not a claim about their root
 cause. Run `cargo test --test source_transport` against isolated local fixtures.
+
+
+If a public catalog refresh fails after a successful load, the Store retains that
+public snapshot, shows a retry notice and pauses new purchasing actions until a
+refresh succeeds. First-load errors still show a retry; successful removal or
+moderation responses are authoritative. No private account/delivery state is cached
+by this behavior. A Source GET transport retry creates a fresh client to avoid
+reusing a failed connection pool/TLS session cache, retaining the same validation,
+credentials and bounded request count. This does not establish that all upstream
+transport faults have been eliminated.

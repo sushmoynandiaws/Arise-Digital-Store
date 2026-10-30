@@ -4212,3 +4212,6 @@ footer { padding: 48px max(40px, calc((100% - 1200px) / 2)) 0; border-top: 1px s
 .settings-shortcuts { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: var(--section-space); }
 .settings-shortcuts a { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 16px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface); color: var(--primary); }
 .seller-page [id^="settings-"] { scroll-margin-top: 180px; }
+
+.catalog-refresh-notice { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 20px; }
+.catalog-refresh-notice p { flex: 1 1 260px; margin: 0; font-size: var(--text-body); }

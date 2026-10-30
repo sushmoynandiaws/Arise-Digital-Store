@@ -132,11 +132,7 @@ impl AppState {
     pub fn new(config: Config, db: AnyPool) -> Result<Self, String> {
         let cipher = Aes256Gcm::new_from_slice(&config.encryption_key)
             .map_err(|_| "Invalid encryption key")?;
-        let http = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(20))
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|_| "Could not create AriseSell client")?;
+        let http = source_http_client()?;
         Ok(Self {
             db,
             config: Arc::new(config),
@@ -144,4 +140,12 @@ impl AppState {
             cipher: Arc::new(cipher),
         })
     }
+}
+
+fn source_http_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|_| "Could not create AriseSell client".into())
 }

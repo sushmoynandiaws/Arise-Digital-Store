@@ -115,6 +115,16 @@ type Market = {
 };
 const Context = createContext<Market>(null!);
 const useMarket = () => useContext(Context);
+function CatalogRefreshNotice() {
+  const { catalog, catalogError, reloadCatalog } = useMarket();
+  const { lang } = useLang();
+  const { pathname } = useLocation();
+  if (!catalog || !catalogError || /^\/(?:admin|seller|settings|purchases)(?:\/|$)/.test(pathname)) return null;
+  return <aside className="container notice catalog-refresh-notice" role="status">
+    <p>{lang === "bn" ? "পণ্যের তথ্য আপডেট করা যায়নি। আগের তথ্য দেখানো হচ্ছে। কেনার আগে আবার চেষ্টা করুন।" : "Products could not refresh. Previously loaded details are shown. Try again before buying."}</p>
+    <button type="button" className="button secondary" onClick={() => void reloadCatalog()}>{lang === "bn" ? "আবার চেষ্টা করুন" : "Try again"}</button>
+  </aside>;
+}
 function ShoppingHelp() {
   const {catalog, session} = useMarket();
   const shop = useRouteShop();
@@ -1985,7 +1995,7 @@ function Home() {
             link={lang === "bn" ? "সব প্রোডাক্ট দেখুন" : "View all products"}
             to="/products"
           />
-          {catalogError ? (
+          {catalogError && !catalog ? (
             <ErrorBox
               message={catalogError}
               retry={() => void reloadCatalog()}
@@ -2173,7 +2183,7 @@ function Products({ shop }: { shop?: Shop }) {
         {products.length} {products.length === 1 ? (lang === "bn" ? "টি প্রোডাক্ট" : "product") : (lang === "bn" ? "টি প্রোডাক্ট" : "products")}
         {query && <> {lang === "bn" ? `খোঁজা হচ্ছে: “${query}”` : `for “${query}”`}</>}
       </p>
-      {catalogError ? (
+      {catalogError && !catalog ? (
         <ErrorBox message={catalogError} retry={() => void reloadCatalog()} />
       ) : !catalog ? (
         <Loading />
@@ -2284,7 +2294,7 @@ function Shops() {
         </div>
       )}
       <FeaturedShopSponsoredAd />
-      {catalogError ? (
+      {catalogError && !catalog ? (
         <ErrorBox message={catalogError} retry={() => void reloadCatalog()} />
       ) : !catalog ? (
         <Loading />
@@ -2317,12 +2327,12 @@ function Shops() {
 }
 function ShopPage() {
   const { slug } = useParams();
-  const { catalog, catalogError } = useMarket();
+  const { catalog, catalogError, reloadCatalog } = useMarket();
   const { lang } = useLang();
-  if (catalogError)
+  if (catalogError && !catalog)
     return (
       <main id="main" className="container section">
-        <ErrorBox message={catalogError} />
+        <ErrorBox message={catalogError} retry={() => void reloadCatalog()} />
       </main>
     );
   if (!catalog) return <Loading />;
@@ -2352,12 +2362,12 @@ function ShopPage() {
 
 function ShopReviewsPage() {
   const { slug } = useParams();
-  const { catalog, catalogError } = useMarket();
+  const { catalog, catalogError, reloadCatalog } = useMarket();
   const { lang } = useLang();
-  if (catalogError)
+  if (catalogError && !catalog)
     return (
       <main id="main" className="container section">
-        <ErrorBox message={catalogError} />
+        <ErrorBox message={catalogError} retry={() => void reloadCatalog()} />
       </main>
     );
   if (!catalog) return <Loading />;
@@ -2490,7 +2500,7 @@ function ProductPage() {
   function closeSection() {
     if (section) navigate({ pathname: location.pathname, search: location.search, hash: "" }, { replace: true });
   }
-  const { catalog, catalogError } = useMarket();
+  const { catalog, catalogError, reloadCatalog } = useMarket();
   const { t, lang } = useLang();
   const { wishlist, toggleWishlist, isWishlisted } = useWishlist();
   const [variant, setVariant] = useState("");
@@ -2528,10 +2538,10 @@ function ProductPage() {
       ),
     [product?.id],
   );
-  if (catalogError)
+  if (catalogError && !catalog)
     return (
       <main id="main" className="container section">
-        <ErrorBox message={catalogError} />
+        <ErrorBox message={catalogError} retry={() => void reloadCatalog()} />
       </main>
     );
   if (!catalog) return <Loading />;
@@ -2543,7 +2553,7 @@ function ProductPage() {
   const available = Boolean(canCheckout(product, shop) && selected && selected.stock > 0);
   const maximum = Math.min(selected?.stock ?? 0, 100);
   const total = selected ? checkoutTotal(selected.price, quantity) : null;
-  const canBuy = available && total !== null && quantity <= maximum;
+  const canBuy = !catalogError && available && total !== null && quantity <= maximum;
   return (
     <main id="main" className="container detail-page">
       <nav className="breadcrumbs" aria-label="Breadcrumb">
@@ -2660,7 +2670,7 @@ function ProductPage() {
             </Link>
           ) : (
             <button className="button primary buy-now" disabled>
-              {!available ? (product.sales_enabled ? (lang === "bn" ? "বর্তমানে স্টক নেই" : "Currently unavailable") : (lang === "bn" ? "বিক্রি সাময়িকভাবে বন্ধ" : "Purchases paused")) : (lang === "bn" ? "পরিমাণ চেক করুন" : "Check quantity")}
+              {catalogError ? (lang === "bn" ? "তথ্য আপডেটের অপেক্ষায়" : "Waiting for updated details") : !available ? (product.sales_enabled ? (lang === "bn" ? "বর্তমানে স্টক নেই" : "Currently unavailable") : (lang === "bn" ? "বিক্রি সাময়িকভাবে বন্ধ" : "Purchases paused")) : (lang === "bn" ? "পরিমাণ চেক করুন" : "Check quantity")}
             </button>
           )}
               <button
@@ -2673,7 +2683,7 @@ function ProductPage() {
                 <span>{isWishlisted(product.id) ? (lang === "bn" ? "উইশলিস্টে যুক্ত" : "Saved") : (lang === "bn" ? "পরে কিনুন" : "Save")}</span>
               </button>
             </div>
-            {available && !canBuy && <p role="alert" className="product-quantity-error">Choose a whole quantity between 1 and {maximum}.</p>}
+            {available && !catalogError && !canBuy && <p role="alert" className="product-quantity-error">Choose a whole quantity between 1 and {maximum}.</p>}
             <div className="product-policy-links">
               <button type="button" onClick={() => selectSection("terms")}>{lang === "bn" ? "ক্রয়ের শর্তাবলী" : "Purchase terms"}</button>
               <button type="button" onClick={() => selectSection("delivery")}>{lang === "bn" ? "ডেলিভারি বিবরণ" : "Delivery details"}</button>
@@ -2784,7 +2794,7 @@ function Checkout() {
 }
 function CheckoutDetails() {
   const { id } = useParams();
-  const { catalog, session } = useMarket();
+  const { catalog, catalogError, session } = useMarket();
   const { lang, t } = useLang();
   const [params] = useSearchParams();
   const cart = useCart();
@@ -2829,7 +2839,7 @@ function CheckoutDetails() {
   const required = new Set(["name", ...product.required_buyer_fields, ...cartRows.flatMap(row=>row.product?.required_buyer_fields || [])]);
   const cartTotal = bagItems.length ? bagItems.reduce((sum,item)=>{const p=catalog.products.find(p=>p.id===item.product_id),v=p?.variants.find(v=>v.id===item.variant_id);return sum+Number(checkoutTotal(v?.price||"0",item.quantity)||0);},0).toFixed(2) : null;
   const estimatedTotal = cartTotal ?? checkoutTotal(variant.price, quantity);
-  const validQuantity = estimatedTotal !== null && paymentMethods.length > 0 && (bagItems.length ? bagItems.every(item=>{const p=catalog.products.find(p=>p.id===item.product_id),v=p?.variants.find(v=>v.id===item.variant_id);return !!p&&!!v&&canCheckout(p,shop)&&item.quantity<=Math.min(v.stock,100);}) : quantity <= Math.min(variant.stock, 100));
+  const validQuantity = !catalogError && estimatedTotal !== null && paymentMethods.length > 0 && (bagItems.length ? bagItems.every(item=>{const p=catalog.products.find(p=>p.id===item.product_id),v=p?.variants.find(v=>v.id===item.variant_id);return !!p&&!!v&&canCheckout(p,shop)&&item.quantity<=Math.min(v.stock,100);}) : quantity <= Math.min(variant.stock, 100));
   const displayQuantity = bagItems.length ? bagItems.reduce((sum,item)=>sum+item.quantity,0) : quantity;
   const total = quote?.snapshot.total ?? (validQuantity ? estimatedTotal : null);
   async function submit(e: React.FormEvent) {
@@ -4849,6 +4859,7 @@ export default function App() {
             />
           </div>
         )}
+        <CatalogRefreshNotice />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/products" element={<Products />} />

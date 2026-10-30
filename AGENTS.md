@@ -29,3 +29,10 @@ abort checks before fetch and after body decoding. Keep guest purchases supporte
 Run auth-state/API unit tests and purchase-privacy browser cases; browser fixtures
 mock the server and do not establish real cookie/session deletion. Previously copied
 clipboard data is outside this UI-state cleanup.
+
+A failed public catalog refresh keeps the last loaded public page visible with a
+stale-data notice and retry. Pause Buy now/Add to bag and new quotes until refresh
+succeeds; a successful catalog response removing a product must still remove it.
+Never apply this public snapshot behavior to account or private delivery state.
+Source read retries use a fresh HTTP/TLS client within the existing one-retry limit;
+keep exact auth headers, certificate verification and the prohibition on write replay.

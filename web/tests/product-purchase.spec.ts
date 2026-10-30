@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("arise_lang", "en"));
@@ -103,4 +103,76 @@ test("product options, quantity and total stay consistent through checkout", asy
   await buy.click();
   await expect(page.getByRole("spinbutton", { name: "Quantity", exact: true })).toHaveValue("6");
   await expect(page.locator(".summary-total strong")).toHaveText(/60\.00/);
+});
+
+
+const refreshShop = {id:"refresh-shop",slug:"refresh-shop",name:"Refresh shop",published:true,payment_methods:["bkash"]};
+const refreshProduct = {id:"refresh-product",shop_id:refreshShop.id,url_slug:"course",name:"Refresh course",category:"Education",description:"Source product description.",image_url:"",currency:"BDT",delivery_mode:"automatic",required_buyer_fields:[],sales_enabled:true,variants:[{id:"refresh-variant",name:"Standard",price:"10.00",stock:4}]};
+async function refreshFixture(page: Page, catalog: () => {status: number; json: unknown}) {
+  await page.route("**/api/**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/catalog") return route.fulfill(catalog());
+    if (path === "/api/session") return route.fulfill({json:{user:null,csrf:"dummy",demo:false,source_web:""}});
+    if (path === "/api/promotions") return route.fulfill({json:{ads:[],settings:{}}});
+    if (path.endsWith("/reviews")) return route.fulfill({json:{count:0,average:null,has_more:false,reviews:[]}});
+    if (path.endsWith("/questions")) return route.fulfill({json:{questions:[],has_more:false}});
+    if (path === "/api/traffic") return route.fulfill({json:{ok:true}});
+    throw new Error(`Unexpected request: ${path}`);
+  });
+}
+
+test("a failed background refresh retains product options, pauses buying and recovers with current source data", async ({page}) => {
+  await page.clock.install();
+  let offline = false, removed = false, price = "10.00";
+  await refreshFixture(page, () => offline ? {status:503,json:{error:"AriseSell is temporarily unavailable. Please retry."}} : {status:200,json:{shops:[refreshShop],products:removed ? [] : [{...refreshProduct,variants:[{...refreshProduct.variants[0],price}]}]}});
+  await page.goto("/shops/refresh-shop/products/course");
+  const heading = page.getByRole("heading",{name:refreshProduct.name,exact:true});
+  await expect(heading).toBeVisible();
+  await page.getByRole("spinbutton",{name:"Quantity",exact:true}).fill("2");
+  offline = true;
+  await page.clock.runFor(30000);
+  await expect(page.getByText("Products could not refresh.",{exact:false})).toBeVisible();
+  await expect(heading).toBeVisible();
+  await expect(page.getByRole("spinbutton",{name:"Quantity",exact:true})).toHaveValue("2");
+  await expect(page.getByRole("link",{name:"Buy now",exact:true})).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Waiting for updated details",exact:true})).toBeDisabled();
+  await expect(page.getByRole("button",{name:"Add to bag",exact:true})).toBeDisabled();
+  await expect(page.getByText(/Choose a whole quantity/)).toHaveCount(0);
+  offline = false; price = "12.50";
+  await page.getByRole("button",{name:"Try again",exact:true}).click();
+  await expect(page.getByText("Products could not refresh.",{exact:false})).toHaveCount(0);
+  await expect(page.getByRole("link",{name:"Buy now",exact:true})).toHaveAttribute("href","/checkout/refresh-product?variant=refresh-variant&quantity=2");
+  await expect(page.locator(".product-purchase-total")).toContainText("25.00");
+  removed = true;
+  await page.clock.runFor(30000);
+  await expect(heading).toHaveCount(0);
+  await expect(page.getByRole("link",{name:"Buy now",exact:true})).toHaveCount(0);
+});
+
+test("an initial catalog failure has a working retry without fabricating a product", async ({page}) => {
+  let offline = true;
+  await refreshFixture(page, () => offline ? {status:503,json:{error:"AriseSell is temporarily unavailable. Please retry."}} : {status:200,json:{shops:[refreshShop],products:[refreshProduct]}});
+  await page.goto("/shops/refresh-shop/products/course");
+  await expect(page.getByRole("alert")).toContainText("AriseSell is temporarily unavailable");
+  await expect(page.getByRole("heading",{name:refreshProduct.name,exact:true})).toHaveCount(0);
+  offline = false;
+  await page.getByRole("button",{name:"Try again",exact:true}).click();
+  await expect(page.getByRole("heading",{name:refreshProduct.name,exact:true})).toBeVisible();
+});
+
+
+test("checkout cannot request a new quote while its catalog refresh has failed", async ({page}) => {
+  await page.clock.install();
+  let offline = false;
+  await refreshFixture(page, () => offline ? {status:503,json:{error:"AriseSell is temporarily unavailable. Please retry."}} : {status:200,json:{shops:[refreshShop],products:[refreshProduct]}});
+  await page.goto("/checkout/refresh-product?variant=refresh-variant");
+  const review = page.getByRole("button",{name:"Review order",exact:true});
+  await expect(review).toBeEnabled();
+  offline = true;
+  await page.clock.runFor(30000);
+  await expect(page.getByText("Products could not refresh.",{exact:false})).toBeVisible();
+  await expect(review).toBeDisabled();
+  offline = false;
+  await page.getByRole("button",{name:"Try again",exact:true}).click();
+  await expect(review).toBeEnabled();
 });

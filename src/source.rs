@@ -25,6 +25,7 @@ fn transport_cause(error: &(dyn std::error::Error + 'static)) -> &'static str {
             ("handshakefailure", "tls_alert_handshake_failure"),
             ("accessdenied", "tls_alert_access_denied"),
             ("unexpected eof", "unexpected_eof"),
+            ("tls handshake eof", "unexpected_eof"),
             ("peer closed connection", "peer_closed"),
             ("tls handshake", "tls_handshake"),
             ("temporary failure in name resolution", "dns_temporary"),
@@ -45,7 +46,13 @@ fn transport_cause(error: &(dyn std::error::Error + 'static)) -> &'static str {
                 break;
             }
         }
-        cause = error.source();
+        cause = error
+            .downcast_ref::<std::io::Error>()
+            .and_then(|io| {
+                io.get_ref()
+                    .map(|inner| inner as &(dyn std::error::Error + 'static))
+            })
+            .or_else(|| error.source());
     }
     category
 }
@@ -76,12 +83,12 @@ impl AppState {
         if read_only {
             request = request.timeout(std::time::Duration::from_secs(10));
         }
+        let request = request.build().map_err(|_| AppError::internal())?;
+        let mut client = self.http.clone();
         let mut retried = false;
         let response = loop {
-            match request
-                .try_clone()
-                .ok_or_else(AppError::internal)?
-                .send()
+            match client
+                .execute(request.try_clone().ok_or_else(AppError::internal)?)
                 .await
             {
                 Ok(response) => break response,
@@ -104,6 +111,8 @@ impl AppState {
                             "AriseSell is temporarily unavailable. Please retry.",
                         ));
                     }
+                    // A transport retry must not reuse the failing pool or TLS session cache.
+                    client = crate::source_http_client().map_err(|_| AppError::internal())?;
                     retried = true;
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 }
@@ -191,6 +200,15 @@ mod tests {
             ))),
             "tls_alert_handshake_failure"
         );
+    }
+
+    #[test]
+    fn transport_diagnostics_inspect_wrapped_io_errors() {
+        let error = std::io::Error::other(std::io::Error::new(
+            std::io::ErrorKind::UnexpectedEof,
+            "tls handshake eof",
+        ));
+        assert_eq!(transport_cause(&error), "unexpected_eof");
     }
 
     #[test]
