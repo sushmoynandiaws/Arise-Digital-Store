@@ -29,6 +29,10 @@ async fn fixture(
                 assert!(header.len() < 8192);
             }
             let header = String::from_utf8(header).unwrap().to_lowercase();
+            assert!(header.contains(concat!(
+                "user-agent: arisedigitalstore/",
+                env!("CARGO_PKG_VERSION")
+            )));
             assert!(
                 header.contains(
                     "x-marketplace-key: dummy-bridge-key-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

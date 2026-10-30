@@ -171,6 +171,15 @@ only transport error categories, with no URLs, tokens or response contents. This
 bounded recovery for intermittent transport failures, not a claim about their root
 cause. Run `cargo test --test source_transport` against isolated local fixtures.
 
+The Source client identifies itself as `AriseDigitalStore/<version>` and currently
+caps TLS at 1.2. The default TLS negotiation failed with `UnexpectedEof` from Vercel
+in both Mumbai and Singapore while the identified TLS 1.2 client passed live catalog
+reads in Mumbai. Certificate verification, the existing timeout, exact authorization
+headers and the ban on write replay remain in force. Lift the TLS cap only after
+Vercel-to-Source TLS 1.3 checks pass. Verification included four local transport tests,
+repeated live catalog reads and one guest assistant query returning the current
+NO LOVE shirt price; no order or payment action was performed.
+
 
 If a public catalog refresh fails after a successful load, the Store retains that
 public snapshot, shows a retry notice and pauses new purchasing actions until a

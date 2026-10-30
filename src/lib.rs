@@ -144,6 +144,9 @@ impl AppState {
 
 fn source_http_client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
+        .user_agent(concat!("AriseDigitalStore/", env!("CARGO_PKG_VERSION")))
+        // shortcut: keep verified Source TLS 1.2; lift after Vercel TLS 1.3 checks pass.
+        .max_tls_version(reqwest::tls::Version::TLS_1_2)
         .timeout(std::time::Duration::from_secs(20))
         .redirect(reqwest::redirect::Policy::none())
         .build()
