@@ -180,3 +180,8 @@ by this behavior. A Source GET transport retry creates a fresh client to avoid
 reusing a failed connection pool/TLS session cache, retaining the same validation,
 credentials and bounded request count. This does not establish that all upstream
 transport faults have been eliminated.
+
+Shared shop/product document requests return the normal retry-capable app shell
+with the upstream 5xx status and `no-store` when catalog lookup fails transiently.
+They do not inject catalog data on that path. JSON APIs and authoritative 404s keep
+their existing error behavior.

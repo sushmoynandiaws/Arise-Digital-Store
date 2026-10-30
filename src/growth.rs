@@ -8,7 +8,7 @@ use axum::{
     Json, Router,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
-    response::Html,
+    response::{Html, IntoResponse, Response},
     routing::{get, post, put},
 };
 use serde::Deserialize;
@@ -468,13 +468,39 @@ fn escape(value: &str) -> String {
         .replace('"', "&quot;")
         .replace('\'', "&#39;")
 }
+async fn app_shell(state: &AppState) -> Result<String> {
+    Ok(match std::fs::read_to_string("web/dist/index.html") {
+        Ok(html) => html,
+        Err(_) => state
+            .http
+            .get(format!("{}/index.html", state.config.origin))
+            .send()
+            .await
+            .map_err(|_| AppError::internal())?
+            .error_for_status()
+            .map_err(|_| AppError::internal())?
+            .text()
+            .await
+            .map_err(|_| AppError::internal())?,
+    })
+}
 async fn share_html(
     state: &AppState,
     shop: &str,
     product: Option<&str>,
     by_id: bool,
-) -> Result<Html<String>> {
-    let feed = crate::app::feed(state).await?;
+) -> Result<Response> {
+    let feed = match crate::app::feed(state).await {
+        Ok(feed) => feed,
+        Err(error) if error.0.is_server_error() => {
+            let mut response = (error.0, Html(app_shell(state).await?)).into_response();
+            response
+                .headers_mut()
+                .insert("Cache-Control", "no-store".parse().unwrap());
+            return Ok(response);
+        }
+        Err(error) => return Err(error),
+    };
     let selected = product.and_then(|id| {
         feed["products"].as_array()?.iter().find(|p| {
             if by_id {
@@ -546,20 +572,7 @@ async fn share_html(
         )
     });
     let url = format!("{}{path}", state.config.origin);
-    let mut shell = match std::fs::read_to_string("web/dist/index.html") {
-        Ok(html) => html,
-        Err(_) => state
-            .http
-            .get(format!("{}/index.html", state.config.origin))
-            .send()
-            .await
-            .map_err(|_| AppError::internal())?
-            .error_for_status()
-            .map_err(|_| AppError::internal())?
-            .text()
-            .await
-            .map_err(|_| AppError::internal())?,
-    };
+    let mut shell = app_shell(state).await?;
     if let (Some(start), Some(end)) = (shell.find("<title>"), shell.find("</title>")) {
         shell.replace_range(
             start..end + 8,
@@ -597,24 +610,21 @@ async fn share_html(
         ),
     );
     let shell = shell.replace("</head>", &format!("<meta name=\"description\" content=\"{}\">{}</head>",escape(&description),price.map_or(String::new(),|price|format!("<meta property=\"product:price:amount\" content=\"{price:.2}\"><meta property=\"product:price:currency\" content=\"{}\">",escape(item["currency"].as_str().unwrap_or("BDT"))))));
-    Ok(Html(shell))
+    Ok(Html(shell).into_response())
 }
-async fn shop_html(
-    State(state): State<AppState>,
-    Path(slug): Path<String>,
-) -> Result<Html<String>> {
+async fn shop_html(State(state): State<AppState>, Path(slug): Path<String>) -> Result<Response> {
     share_html(&state, &slug, None, false).await
 }
 async fn product_html(
     State(state): State<AppState>,
     Path((slug, product)): Path<(String, String)>,
-) -> Result<Html<String>> {
+) -> Result<Response> {
     share_html(&state, &slug, Some(&product), false).await
 }
 async fn product_id_html(
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> Result<Html<String>> {
+) -> Result<Response> {
     uuid(&id)?;
     share_html(&state, "", Some(&id), true).await
 }
