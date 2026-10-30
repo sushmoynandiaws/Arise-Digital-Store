@@ -185,3 +185,28 @@ Shared shop/product document requests return the normal retry-capable app shell
 with the upstream 5xx status and `no-store` when catalog lookup fails transiently.
 They do not inject catalog data on that path. JSON APIs and authoritative 404s keep
 their existing error behavior.
+
+## Shop assistant grounding
+
+The existing shop assistant now reuses AriseSell's sales prompt, canonical merchant
+facts, knowledge retrieval, language/tone choices and reply validation. AriseSell
+remains the source for current published products, approved policies, prices,
+stock, digital delivery and purchase terms. The Rust bridge continues to replace
+browser-supplied shop information and product allowlists with server-owned values;
+the frontend already renders the checked `reply` contract and resets conversation
+state when shops change. No new storefront runtime endpoint, dependency, migration
+or environment variable is required.
+
+The incremental source change is bundled in
+`integration/arisesell-assistant-grounding.patch`, based on the source revision in
+`integration/manifest.json`. It is implemented in the isolated companion checkout
+`C:/Users/Sushmoy/.codex/worktrees/shop-assistant-grounding/next-product-2`.
+Use `git apply --check` on a compatible AriseSell checkout before applying; do not
+apply it twice. Deploy the source backend for this feature to become live. The
+existing Store build needs no API-contract change. Detailed boundaries and offline
+checks are in the patch's `backend/docs/marketplace_assistant.md`.
+
+Live-provider answers and production rollout still need verification. Tests use
+synthetic merchants and mocked providers; they never send customer messages or
+consume a merchant's live AI quota. Finite validators can reject ambiguous wording
+and fall back safely; they cannot prove every generated statement semantically.

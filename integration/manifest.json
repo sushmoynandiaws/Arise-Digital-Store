@@ -98,5 +98,30 @@
       "Existing configured AriseSell AI Gateway",
       "Existing Redis admission service"
     ]
+  },
+  "assistant_grounding_extension": {
+    "source_repository": "arisesellofficial/arise-sell",
+    "base_revision": "7e8d433b4f994a2792ae5172bd6112a1fad5f304",
+    "patch": "arisesell-assistant-grounding.patch",
+    "files": [
+      "backend/app/api/v1/marketplace.py",
+      "backend/app/services/marketplace_assistant.py",
+      "backend/app/services/messaging_policy.py",
+      "backend/tests/test_marketplace.py",
+      "backend/tests/test_marketplace_assistant.py",
+      "backend/docs/marketplace_assistant.md"
+    ],
+    "production_deployed": false,
+    "database_migration_required": false,
+    "new_environment_variables": [],
+    "deployment_order": [
+      "Deploy the existing AriseSell backend with the grounding change; the storefront contract remains marketplace-chat-v3."
+    ],
+    "capabilities": [
+      "shared_sales_prompt_and_reply_validation",
+      "shop_scoped_current_knowledge_and_settings",
+      "checked_natural_multilingual_replies",
+      "source_owned_digital_terms_and_stock"
+    ]
   }
 }
