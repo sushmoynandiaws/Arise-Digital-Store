@@ -351,79 +351,7 @@ export function DynamicPaymentQR({
   const cellSize = 6;
   const qrPixelSize = size * cellSize;
 
-  return (
-    <div className="dynamic-qr-box">
-      <div className="payment-mode-tabs" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "qr"}
-          className={`tab-btn ${mode === "qr" ? "active" : ""}`}
-          onClick={() => setMode("qr")}
-        >
-          {t("scanQrTitle")}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "manual"}
-          className={`tab-btn ${mode === "manual" ? "active" : ""}`}
-          onClick={() => setMode("manual")}
-        >
-          {t("manualAccountTransfer")}
-        </button>
-      </div>
-
-      {mode === "qr" && (
-        <div className="qr-display-container">
-          <div className="qr-svg-wrapper" aria-label={`Payment QR Code for ${provider}`}>
-            <svg
-              viewBox={`0 0 ${qrPixelSize} ${qrPixelSize}`}
-              width={180}
-              height={180}
-              className="qr-svg-code"
-            >
-              <rect width="100%" height="100%" fill="#ffffff" />
-              {matrix.map((row, r) =>
-                row.map((dark, c) =>
-                  dark ? (
-                    <rect
-                      key={`${r}-${c}`}
-                      x={c * cellSize}
-                      y={r * cellSize}
-                      width={cellSize}
-                      height={cellSize}
-                      fill="#0f172a"
-                    />
-                  ) : null
-                )
-              )}
-            </svg>
-            <div className="qr-badge-pill">
-              <span className={`provider-dot ${provider.toLowerCase()}`} />
-              <strong>{provider.toUpperCase()} ৳{amount}</strong>
-            </div>
-          </div>
-
-          <p className="qr-scan-instruction">
-            {t("scanQrDesc")}
-          </p>
-
-          {appUrl && (
-            <a
-              href={appUrl}
-              className="button primary open-app-deep-btn"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <ExternalLink size={16} />
-              {lang === "bn" ? `সরাসরি ${provider} অ্যাপে পে করুন` : `Open in ${provider} App`}
-            </a>
-          )}
-        </div>
-      )}
-    </div>
-  );
+  return null;
 }
 
 export function TrackOrderPage() {
@@ -3074,8 +3002,8 @@ function CheckoutDetails() {
               ) : provider ? (
                 <p className="payment-method-desc">
                   {lang === "bn"
-                    ? `${paymentMethodLabel(provider)}-এর মাধ্যমে পেমেন্ট করতে পারবেন। অর্ডার নিশ্চিত করার পর অ্যাকাউন্ট নম্বর ও সরাসরি স্ক্যান করে পেমেন্ট করার কিউআর কোড পেয়ে যাবেন।`
-                    : `Pay via ${paymentMethodLabel(provider)}. Account details and payment QR code will be shown after confirming your order.`}
+                    ? `${paymentMethodLabel(provider)}-এর মাধ্যমে পেমেন্ট করতে পারবেন। অর্ডার নিশ্চিত করার পর অ্যাকাউন্ট নম্বর ও ধাপে ধাপে পেমেন্ট নির্দেশিকা পেয়ে যাবেন।`
+                    : `Pay via ${paymentMethodLabel(provider)}. Account details and payment instructions will be shown after confirming your order.`}
                 </p>
               ) : null}
               {!paymentMethods.length && <ErrorBox message={lang === "bn" ? "এই বিক্রেতার কোনো পেমেন্ট মাধ্যম উপলব্ধ নেই। অনুগ্রহ করে বিক্রেতার সাথে যোগাযোগ করুন।" : "This seller has no payment method available. Please contact the seller."} />}
@@ -3669,7 +3597,7 @@ function PurchasePage() {
     : null;
   const message = purchaseMessage(order, lang);
   return (
-    <main id="main" className="container purchase-page narrow-page">
+    <main id="main" className="container purchase-page">
       <Link to="/purchases" className="back-link">
         <ArrowLeft size={16} />
         {lang === "bn" ? "আমার অর্ডারসমূহ" : "My purchases"}
@@ -3684,205 +3612,110 @@ function PurchasePage() {
         {paid && !order.ready && !cancelled && order.delivery_estimate && <p className="preserve-lines">{order.delivery_estimate}</p>}
       </div>
       {error && <ErrorBox message={error} />}
-      <div className="panel purchase-panel">
-        <div className="purchase-product">
-          <div>
-            <span className="muted">{order.shop.name}</span>
-            <h2>{order.name}</h2>
-            <p>
-              {order.quantity} {order.quantity === 1 ? (lang === "bn" ? "টি আইটেম" : "item") : (lang === "bn" ? "টি আইটেম" : "items")}
-              {order.coupon_code && <span className="order-coupon-pill"> · {lang === "bn" ? `কুপন ${order.coupon_code}` : `Coupon ${order.coupon_code}`}</span>}
-            </p>
-          </div>
-          <div className="purchase-pricing-col">
-            <strong className="price">{money(order.total, order.currency)}</strong>
-            {order.discount && Number(order.discount) > 0 && (
-              <span className="purchase-discount-tag">{lang === "bn" ? "ছাড়: -" : "Discount: -"}{money(order.discount)}</span>
-            )}
-          </div>
-        </div>
-        <div className="order-status-grid">
-          <div>
-            <span>{lang === "bn" ? "পেমেন্ট" : "Payment"}</span>
-            <strong>{paymentLabel(order.payment_status, lang)}</strong>
-          </div>
-          <div>
-            <span>{lang === "bn" ? "ডেলিভারি" : "Delivery"}</span>
-            <strong>{deliveryLabel(order.delivery_status, lang)}</strong>
-          </div>
-        </div>
-        {(order.buyer_name || order.buyer_email || order.buyer_phone || order.buyer_fields?.note) && (
-          <div className="purchase-buyer-info">
-            <span className="buyer-details-label">
-              {lang === "bn" ? "ক্রেতার তথ্য" : "Customer details"}
-            </span>
-            <div className="buyer-summary-grid">
-              {order.buyer_name && (
-                <div>
-                  <span className="muted">{lang === "bn" ? "নাম: " : "Name: "}</span>
-                  <strong>{order.buyer_name}</strong>
-                </div>
-              )}
-              {order.buyer_email && (
-                <div>
-                  <span className="muted">{lang === "bn" ? "ইমেইল: " : "Email: "}</span>
-                  <strong>{order.buyer_email}</strong>
-                </div>
-              )}
-              {order.buyer_phone && (
-                <div>
-                  <span className="muted">{lang === "bn" ? "ফোন: " : "Phone: "}</span>
-                  <strong>{order.buyer_phone}</strong>
-                </div>
-              )}
-            </div>
-            {order.buyer_fields?.note && (
-              <p className="preserve-lines buyer-note">
-                <span className="muted">{lang === "bn" ? "নোট / বিবরণ: " : "Note / details: "}</span>
-                <strong>{String(order.buyer_fields.note)}</strong>
-              </p>
-            )}
-          </div>
-        )}
-        {paymentOpen && !cancelled && order.payment && !expired && (
-          <>
-            <PaymentInstructionCard order={order} session={session} remainingSeconds={remainingSeconds} />
-            <form
-              className="proof-form"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setBusy(true);
-                setError("");
-                try {
-                  const next = await api<Purchase>(`/orders/${id}/proof`, {
-                    method: "POST",
-                    signal: requests.current?.signal,
-                    body: JSON.stringify({ trx_id: trx.trim() }),
-                  });
-                  setOrder(next);
-                } catch (e) {
-                  setError((e as Error).message);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              <label className="field">
-                {lang === "bn" ? "ট্রানজাকশন আইডি (TrxID)" : "Transaction ID"}
-                <input
-                  required
-                  minLength={4}
-                  maxLength={64}
-                  pattern="[A-Za-z0-9]+"
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={trx}
-                  onChange={(e) => setTrx(e.target.value)}
-                  placeholder={lang === "bn" ? "পেমেন্ট রসিদ থেকে প্রাপ্ত TrxID লিখুন" : "Enter the TrxID from your payment receipt"}
-                />
-              </label>
-              <button className="button primary" disabled={busy}>
-                {busy ? (lang === "bn" ? "যাচাই করা হচ্ছে…" : "Checking…") : (lang === "bn" ? "পেমেন্ট চেক করুন" : "Check payment")}
-                <ArrowRight size={17} />
-              </button>
-            </form>
-            {order.payment.trx_id && (
-              <p className="notice">
-                {lang === "bn"
-                  ? `সাবমিট করা হয়েছে: ${order.payment.trx_id}। বিক্রেতার পেমেন্ট রিসিটের সাথে এটি মেলানো হচ্ছে।`
-                  : `Submitted: ${order.payment.trx_id}. We're matching it with the seller's payment receipt.`}
-              </p>
-            )}
-          </>
-        )}
-        {paymentOpen && (expired || cancelled) && (
-          <div className="notice">
-            <p>{lang === "bn" ? "এই পেমেন্ট রিকোয়েস্টটির মেয়াদ শেষ হয়েছে। অনুগ্রহ করে এই নম্বরে টাকা পাঠাবেন না।" : "This payment request is no longer active. Do not send payment using these details."}</p>
-            <button
-              className="button secondary"
-              onClick={() => navigate("/products")}
-            >
-              {lang === "bn" ? "প্রোডাক্ট ব্রাউজ করুন" : "Browse products"}
-              <ArrowRight size={16} />
-            </button>
-          </div>
-        )}
-        {order.fulfilment_kind === "physical" && <section className="purchase-buyer-info" aria-label="Delivery details">
-          {!!order.custom_summary?.length && <><h3>{lang === "bn" ? "কাস্টম পণ্যের বিবরণ" : "Custom product details"}</h3>{order.custom_summary.map((text, i) => <p key={i}>{text}</p>)}</>}
-          <h3>Delivery details</h3><p className="preserve-lines">{order.address}, {order.district}</p>
-          <p>Payment method: {paymentMethodLabel(order.payment_method || "cod")}</p>
-          {order.delivery_charge !== undefined && <p>Delivery charge: {money(order.delivery_charge, order.currency)}</p>}
-          {Number(order.advance_amount || 0) > 0 && (
-            <p className="advance-order-info">
-              <strong>{lang === "bn" ? "প্রয়োজনীয় অগ্রিম:" : "Required advance:"}</strong> {money(order.advance_amount!, order.currency)}
-              {order.payment_status === "paid" ? (
-                <span className="badge-paid"> {lang === "bn" ? "(পরিশোধিত)" : "(Paid)"}</span>
-              ) : (
-                <span> {lang === "bn" ? "— অগ্রিম যাচাই করতে বিক্রেতার সাথে যোগাযোগ করুন।" : "— Contact the seller to verify the advance before dispatch."}</span>
-              )}
-            </p>
-          )}
-          <CourierStatus order={order}/>
-          {order.tracking?.tracking_url?.startsWith("https://") && <a className="button secondary" href={order.tracking.tracking_url} target="_blank" rel="noopener noreferrer">Track with courier<ExternalLink size={16} /></a>}
-        </section>}
-        {order.fulfilment_kind !== "physical" && paid && order.ready && !cancelled && (
-          <div className="private-delivery">
-            <div>
-              <LockKeyhole size={24} />
-              <h3>{lang === "bn" ? "আপনার ডিজিটাল পণ্য" : "Your digital items"}</h3>
-              <p>
-                {lang === "bn" ? "আপনার পাসওয়ার্ড, লাইসেন্স কী ও এক্সেস তথ্য সবসময় গোপন ও নিরাপদ রাখুন।" : "Keep your passwords, license keys and access details private."}
-              </p>
-            </div>
-            {items ? (
-              <div className="private-items">
-                {items.map((item) => {
-                  const downloadLinks = extractDownloadLinks(item.content);
-                  return (
-                    <div key={item.item} className="private-item">
-                      <div className="private-item-header">
-                        <strong>{lang === "bn" ? `আইটেম ${item.item}` : `Item ${item.item}`}{item.name ? ` · ${item.name}${item.variant ? ` — ${item.variant}` : ""}` : ""}</strong>
-                        <CopyButton value={item.content} />
-                      </div>
-                      {downloadLinks.length > 0 && (
-                        <div className="private-item-downloads">
-                          {downloadLinks.map((dl, idx) => (
-                            <a
-                              key={idx}
-                              href={dl.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              download={dl.isFile ? true : undefined}
-                              className="button primary download-action-btn"
-                            >
-                              <Download size={16} />
-                              <span>{dl.label}</span>
-                              <ExternalLink size={14} />
-                            </a>
-                          ))}
-                        </div>
-                      )}
-                      <pre data-private="true">{item.content}</pre>
-                    </div>
-                  );
-                })}
-                <button className="button ghost" onClick={() => setItems(null)}>
-                  {lang === "bn" ? "তথ্য লুকান" : "Hide my items"}
-                </button>
+      <div className="purchase-grid">
+        <div className="purchase-col-summary">
+          <div className="panel purchase-panel purchase-summary-panel">
+            <div className="purchase-product">
+              <div>
+                <span className="muted">{order.shop.name}</span>
+                <h2>{order.name}</h2>
+                <p>
+                  {order.quantity} {order.quantity === 1 ? (lang === "bn" ? "টি আইটেম" : "item") : (lang === "bn" ? "টি আইটেম" : "items")}
+                  {order.coupon_code && <span className="order-coupon-pill"> · {lang === "bn" ? `কুপন ${order.coupon_code}` : `Coupon ${order.coupon_code}`}</span>}
+                </p>
               </div>
-            ) : (
-              <button
-                className="button primary"
-                disabled={busy}
-                onClick={async () => {
+              <div className="purchase-pricing-col">
+                <strong className="price">{money(order.total, order.currency)}</strong>
+                {order.discount && Number(order.discount) > 0 && (
+                  <span className="purchase-discount-tag">{lang === "bn" ? "ছাড়: -" : "Discount: -"}{money(order.discount)}</span>
+                )}
+              </div>
+            </div>
+            <div className="order-status-grid">
+              <div>
+                <span>{lang === "bn" ? "পেমেন্ট" : "Payment"}</span>
+                <strong>{paymentLabel(order.payment_status, lang)}</strong>
+              </div>
+              <div>
+                <span>{lang === "bn" ? "ডেলিভারি" : "Delivery"}</span>
+                <strong>{deliveryLabel(order.delivery_status, lang)}</strong>
+              </div>
+            </div>
+            {(order.buyer_name || order.buyer_email || order.buyer_phone || order.buyer_fields?.note) && (
+              <div className="purchase-buyer-info">
+                <span className="buyer-details-label">
+                  {lang === "bn" ? "ক্রেতার তথ্য" : "Customer details"}
+                </span>
+                <div className="buyer-summary-grid">
+                  {order.buyer_name && (
+                    <div>
+                      <span className="muted">{lang === "bn" ? "নাম: " : "Name: "}</span>
+                      <strong>{order.buyer_name}</strong>
+                    </div>
+                  )}
+                  {order.buyer_email && (
+                    <div>
+                      <span className="muted">{lang === "bn" ? "ইমেইল: " : "Email: "}</span>
+                      <strong>{order.buyer_email}</strong>
+                    </div>
+                  )}
+                  {order.buyer_phone && (
+                    <div>
+                      <span className="muted">{lang === "bn" ? "ফোন: " : "Phone: "}</span>
+                      <strong>{order.buyer_phone}</strong>
+                    </div>
+                  )}
+                </div>
+                {order.buyer_fields?.note && (
+                  <p className="preserve-lines buyer-note">
+                    <span className="muted">{lang === "bn" ? "নোট / বিবরণ: " : "Note / details: "}</span>
+                    <strong>{String(order.buyer_fields.note)}</strong>
+                  </p>
+                )}
+              </div>
+            )}
+            {order.fulfilment_kind === "physical" && <section className="purchase-buyer-info" aria-label="Delivery details">
+              {!!order.custom_summary?.length && <><h3>{lang === "bn" ? "কাস্টম পণ্যের বিবরণ" : "Custom product details"}</h3>{order.custom_summary.map((text, i) => <p key={i}>{text}</p>)}</>}
+              <h3>Delivery details</h3><p className="preserve-lines">{order.address}, {order.district}</p>
+              <p>Payment method: {paymentMethodLabel(order.payment_method || "cod")}</p>
+              {order.delivery_charge !== undefined && <p>Delivery charge: {money(order.delivery_charge, order.currency)}</p>}
+              {Number(order.advance_amount || 0) > 0 && (
+                <p className="advance-order-info">
+                  <strong>{lang === "bn" ? "প্রয়োজনীয় অগ্রিম:" : "Required advance:"}</strong> {money(order.advance_amount!, order.currency)}
+                  {order.payment_status === "paid" ? (
+                    <span className="badge-paid"> {lang === "bn" ? "(পরিশোধিত)" : "(Paid)"}</span>
+                  ) : (
+                    <span> {lang === "bn" ? "— অগ্রিম যাচাই করতে বিক্রেতার সাথে যোগাযোগ করুন।" : "— Contact the seller to verify the advance before dispatch."}</span>
+                  )}
+                </p>
+              )}
+              {(!paid || !order.payment) && (
+                <>
+                  <CourierStatus order={order}/>
+                  {order.tracking?.tracking_url?.startsWith("https://") && <a className="button secondary" href={order.tracking.tracking_url} target="_blank" rel="noopener noreferrer">Track with courier<ExternalLink size={16} /></a>}
+                </>
+              )}
+            </section>}
+          </div>
+        </div>
+
+        <div className="purchase-col-action">
+          {paymentOpen && !cancelled && order.payment && !expired && (
+            <div className="panel purchase-panel purchase-action-panel">
+              <PaymentInstructionCard order={order} session={session} remainingSeconds={remainingSeconds} />
+              <form
+                className="proof-form"
+                onSubmit={async (e) => {
+                  e.preventDefault();
                   setBusy(true);
                   setError("");
                   try {
-                    const result = await api<{
-                      items: { item: number; content: string; name?: string; variant?: string }[];
-                    }>(`/orders/${id}/reveal`, { method: "POST", signal: requests.current?.signal });
-                    setItems(result.items);
-                    await load();
+                    const next = await api<Purchase>(`/orders/${id}/proof`, {
+                      method: "POST",
+                      signal: requests.current?.signal,
+                      body: JSON.stringify({ trx_id: trx.trim() }),
+                    });
+                    setOrder(next);
                   } catch (e) {
                     setError((e as Error).message);
                   } finally {
@@ -3890,20 +3723,145 @@ function PurchasePage() {
                   }
                 }}
               >
-                {busy ? (lang === "bn" ? "খোলা হচ্ছে…" : "Opening…") : (lang === "bn" ? "আমার আইটেম দেখুন" : "View my items")}
-                <LockKeyhole size={16} />
-              </button>
-            )}
-          </div>
-        )}
-        {paid && !order.ready && !cancelled && (
-          <div className="notice">
-            <Package size={22} />
-            <p>
-              {order.delivery_status === "needs_attention" ? "Contact the seller using the support details below." : "Check the delivery status above for updates. This page refreshes automatically."}
-            </p>
-          </div>
-        )}
+                <label className="field">
+                  {lang === "bn" ? "ট্রানজাকশন আইডি (TrxID)" : "Transaction ID"}
+                  <input
+                    required
+                    minLength={4}
+                    maxLength={64}
+                    pattern="[A-Za-z0-9]+"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={trx}
+                    onChange={(e) => setTrx(e.target.value)}
+                    placeholder={lang === "bn" ? "পেমেন্ট রসিদ থেকে প্রাপ্ত TrxID লিখুন" : "Enter the TrxID from your payment receipt"}
+                  />
+                </label>
+                <button className="button primary" disabled={busy}>
+                  {busy ? (lang === "bn" ? "যাচাই করা হচ্ছে…" : "Checking…") : (lang === "bn" ? "পেমেন্ট চেক করুন" : "Check payment")}
+                  <ArrowRight size={17} />
+                </button>
+              </form>
+              {order.payment.trx_id && (
+                <p className="notice">
+                  {lang === "bn"
+                    ? `সাবমিট করা হয়েছে: ${order.payment.trx_id}। বিক্রেতার পেমেন্ট রিসিটের সাথে এটি মেলানো হচ্ছে।`
+                    : `Submitted: ${order.payment.trx_id}. We're matching it with the seller's payment receipt.`}
+                </p>
+              )}
+            </div>
+          )}
+          {paymentOpen && (expired || cancelled) && (
+            <div className="panel purchase-panel purchase-action-panel">
+              <div className="notice">
+                <p>{lang === "bn" ? "এই পেমেন্ট রিকোয়েস্টটির মেয়াদ শেষ হয়েছে। অনুগ্রহ করে এই নম্বরে টাকা পাঠাবেন না।" : "This payment request is no longer active. Do not send payment using these details."}</p>
+                <button
+                  className="button secondary"
+                  onClick={() => navigate("/products")}
+                >
+                  {lang === "bn" ? "প্রোডাক্ট ব্রাউজ করুন" : "Browse products"}
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+          {order.fulfilment_kind === "physical" && paid && (
+            <div className="panel purchase-panel purchase-action-panel">
+              <h3 style={{ margin: "0 0 16px", fontSize: "var(--title-subsection)" }}>
+                {lang === "bn" ? "কুরিয়ার ও ট্র্যাকিং স্ট্যাটাস" : "Courier & delivery tracking"}
+              </h3>
+              <CourierStatus order={order}/>
+              {order.tracking?.tracking_url?.startsWith("https://") && (
+                <a className="button secondary" style={{ marginTop: "16px" }} href={order.tracking.tracking_url} target="_blank" rel="noopener noreferrer">
+                  Track with courier<ExternalLink size={16} />
+                </a>
+              )}
+            </div>
+          )}
+          {order.fulfilment_kind !== "physical" && paid && order.ready && !cancelled && (
+            <div className="panel purchase-panel purchase-action-panel">
+              <div className="private-delivery" style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
+                <div>
+                  <LockKeyhole size={24} />
+                  <h3>{lang === "bn" ? "আপনার ডিজিটাল পণ্য" : "Your digital items"}</h3>
+                  <p>
+                    {lang === "bn" ? "আপনার পাসওয়ার্ড, লাইসেন্স কী ও এক্সেস তথ্য সবসময় গোপন ও নিরাপদ রাখুন।" : "Keep your passwords, license keys and access details private."}
+                  </p>
+                </div>
+                {items ? (
+                  <div className="private-items">
+                    {items.map((item) => {
+                      const downloadLinks = extractDownloadLinks(item.content);
+                      return (
+                        <div key={item.item} className="private-item">
+                          <div className="private-item-header">
+                            <strong>{lang === "bn" ? `আইটেম ${item.item}` : `Item ${item.item}`}{item.name ? ` · ${item.name}${item.variant ? ` — ${item.variant}` : ""}` : ""}</strong>
+                            <CopyButton value={item.content} />
+                          </div>
+                          {downloadLinks.length > 0 && (
+                            <div className="private-item-downloads">
+                              {downloadLinks.map((dl, idx) => (
+                                <a
+                                  key={idx}
+                                  href={dl.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  download={dl.isFile ? true : undefined}
+                                  className="button primary download-action-btn"
+                                >
+                                  <Download size={16} />
+                                  <span>{dl.label}</span>
+                                  <ExternalLink size={14} />
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                          <pre data-private="true">{item.content}</pre>
+                        </div>
+                      );
+                    })}
+                    <button className="button ghost" onClick={() => setItems(null)}>
+                      {lang === "bn" ? "তথ্য লুকান" : "Hide my items"}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="button primary"
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      setError("");
+                      try {
+                        const result = await api<{
+                          items: { item: number; content: string; name?: string; variant?: string }[];
+                        }>(`/orders/${id}/reveal`, { method: "POST", signal: requests.current?.signal });
+                        setItems(result.items);
+                        await load();
+                      } catch (e) {
+                        setError((e as Error).message);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    {busy ? (lang === "bn" ? "খোলা হচ্ছে…" : "Opening…") : (lang === "bn" ? "আমার আইটেম দেখুন" : "View my items")}
+                    <LockKeyhole size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          {paid && !order.ready && !cancelled && (
+            <div className="panel purchase-panel purchase-action-panel">
+              <div className="notice" style={{ margin: 0 }}>
+                <Package size={22} />
+                <p>
+                  {order.delivery_status === "needs_attention" ? "Contact the seller using the support details below." : "Check the delivery status above for updates. This page refreshes automatically."}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {(order.can_review || order.review) && <PurchaseReview key={order.id} order={order} />}

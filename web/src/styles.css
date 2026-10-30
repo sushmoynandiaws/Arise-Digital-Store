@@ -441,6 +441,42 @@ textarea { resize: vertical; }
 .purchase-page-heading h1 { font-size: var(--title-status); }
 .purchase-page-heading > p:last-child { color: var(--muted); margin-top: 16px; }
 .purchase-panel { padding: var(--panel-padding); }
+.purchase-page { max-width: 1100px; margin-inline: auto; }
+.purchase-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  align-items: start;
+  gap: 24px;
+}
+.purchase-col-summary,
+.purchase-col-action {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.purchase-summary-panel,
+.purchase-action-panel {
+  padding: 24px;
+}
+.purchase-action-panel .payment-instruction-card {
+  margin: 0 0 16px;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+.purchase-action-panel .proof-form {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 860px) {
+  .purchase-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+}
 .purchase-product { display: flex; justify-content: space-between; align-items: start; gap: 24px; padding-bottom: 24px; }
 .purchase-product h2 { font-size: var(--title-section); margin-block: 8px; }
 .purchase-product p, .purchase-product .muted { color: var(--muted); font-size: var(--text-meta); }
